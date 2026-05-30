@@ -1478,3 +1478,4 @@ var Exam = {
   },
   kembaliMenu(){ hentikanTimer(); TTS.berhenti(); STT.berhenti(); App.renderModul("exam"); }
 };
+ 
