@@ -179,6 +179,7 @@ body {
   border: 2px solid transparent;
 }
 .sub-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-h); border-color: var(--c-biru); }
+.sub-card-aktif { border-color: var(--c-hijau) !important; background: color-mix(in srgb, var(--c-hijau) 10%, var(--c-card)); }
 .sub-icon  { font-size: 26px; margin-bottom: 6px; }
 .sub-label { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
 .sub-desc  { font-size: 11px; color: var(--c-sub); line-height: 1.3; }
