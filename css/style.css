@@ -636,3 +636,132 @@ body {
   .main-menu-grid, .sub-menu-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .topbar-title { font-size: 15px; }
 }
+
+/* ================================================================
+   QUIZ MODULE — Tambahan Style
+   ================================================================ */
+
+/* Menu card khusus Quiz */
+.menu-card-quiz {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border: 2px solid var(--c-hijau);
+}
+.menu-card-quiz:hover { background: linear-gradient(135deg, #c8e6c9, #a5d6a7); }
+
+/* Setup wrap */
+.quiz-setup-wrap { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
+.quiz-setup-wrap .card { margin: 0; }
+
+/* Select pilih sheet */
+.quiz-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #ddd;
+  font-size: 14px;
+  background: #fafafa;
+  color: #333;
+  margin-top: 8px;
+  cursor: pointer;
+}
+.quiz-select:focus { outline: none; border-color: var(--c-biru); }
+
+/* Status sheet */
+.quiz-status {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
+  min-height: 18px;
+}
+
+/* Opsi grup (tombol pilihan) */
+.opsi-grup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.opsi {
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid #ddd;
+  background: #f5f5f5;
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+.opsi:hover { border-color: var(--c-biru); color: var(--c-biru); }
+.opsi.aktif {
+  background: var(--c-biru);
+  border-color: var(--c-biru);
+  color: #fff;
+}
+.opsi.aktif-hijau.aktif {
+  background: var(--c-hijau);
+  border-color: var(--c-hijau);
+  color: #fff;
+}
+.opsi.aktif-ungu.aktif {
+  background: var(--c-ungu);
+  border-color: var(--c-ungu);
+  color: #fff;
+}
+
+/* Info box */
+.quiz-info-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1.5px solid #90caf9;
+}
+.quiz-info-box.quiz-info-oren {
+  background: #fff3e0;
+  color: #e65100;
+  border-color: #ffcc80;
+}
+
+/* Label chip di dalam kuis */
+.quiz-label-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.quiz-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.quiz-chip-ungu {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+/* Box soal kuis */
+.quiz-soal-box {
+  font-size: 20px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.5;
+  margin: 12px 0 10px;
+  min-height: 40px;
+}
+
+/* Streak */
+.quiz-streak {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e65100;
+  min-height: 22px;
+  margin-bottom: 8px;
+}
