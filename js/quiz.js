@@ -197,6 +197,7 @@ var Quiz = {
       sheet: sheet
     };
     this.ulangiCb = null;
+    this._sedangTransisi = false;
     resetSkor();
 
     // Render halaman kuis
@@ -261,6 +262,7 @@ var Quiz = {
   // ================================================================
   _tampilSoal() {
     this.ulangiCb = null;
+    this._sedangTransisi = false;
     const soalObj = this.daftarSoal[this.state.nomor];
     const total   = this.daftarSoal.length;
 
@@ -431,6 +433,7 @@ var Quiz = {
   //  PROSES JAWABAN
   // ================================================================
   _prosesJawaban(jawaban) {
+    if (this._sedangTransisi) return;   // ← abaikan input saat transisi
     const soalObj = this.daftarSoal[this.state.nomor];
     const full    = soalObj.kunci || "";
     const parts   = full.split("||");
@@ -507,7 +510,15 @@ var Quiz = {
       if (benar) {
         this.state.ulangiSoal = -1;
         this.ulangiCb = null;
-        setTimeout(() => { this.state.nomor = 0; this.state.streak = 0; this._tampilSoal(); }, 1800);
+        this._sedangTransisi = true;          // ← blokir input baru
+        TTS.berhenti();
+        STT.berhenti();
+        setTimeout(() => {
+          this._sedangTransisi = false;
+          this.state.nomor = 0;
+          this.state.streak = 0;
+          this._tampilSoal();
+        }, 1800);
       } else {
         setTimeout(() => this._tampilUlangi(), 2000);
       }
@@ -612,6 +623,7 @@ var Quiz = {
     this.state.putaran = 1;
     this.state.ulangiSoal = -1;
     this.ulangiCb = null;
+    this._sedangTransisi = false;
     resetSkor();
     this._tampilSoal();
   },
