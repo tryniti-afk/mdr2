@@ -766,3 +766,147 @@ body {
   margin-bottom: 8px;
 }
  
+
+/* ================================================================
+   SETSOAL WIDGET
+   ================================================================ */
+.ss-widget {
+  background: #f8f9ff;
+  border: 1.5px solid #e0e4f0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+.ss-section { margin-bottom: 14px; }
+.ss-section:last-child { margin-bottom: 0; }
+.ss-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-opsi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ss-btn {
+  padding: 6px 13px;
+  border-radius: 20px;
+  border: 1.5px solid #ddd;
+  background: #fff;
+  color: #555;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.ss-btn:hover { border-color: var(--c-biru); color: var(--c-biru); }
+.ss-btn.aktif { background: var(--c-biru); border-color: var(--c-biru); color: #fff; }
+.ss-btn-sm {
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1.5px solid #aaa;
+  background: #fff;
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
+}
+.ss-btn-sm:hover { border-color: var(--c-biru); color: var(--c-biru); }
+.ss-status {
+  font-size: 12px;
+  color: #888;
+  margin-top: 6px;
+  min-height: 16px;
+}
+.ss-info-box {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1.5px solid #90caf9;
+}
+.ss-input-num {
+  width: 70px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1.5px solid #ddd;
+  font-size: 14px;
+  text-align: center;
+}
+.ss-fmt-hint {
+  font-size: 12px;
+  color: #777;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 6px 0 8px;
+  line-height: 1.7;
+}
+
+/* ================================================================
+   MENU CARD — QUIZ & EXAM
+   ================================================================ */
+.menu-card-quiz {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border: 2px solid var(--c-hijau);
+}
+.menu-card-quiz:hover { background: linear-gradient(135deg, #c8e6c9, #a5d6a7); }
+.menu-card-exam {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  border: 2px solid var(--c-kuning);
+}
+
+/* ================================================================
+   SETTINGS SCREEN
+   ================================================================ */
+.btn-settings {
+  padding: 9px 24px;
+  border-radius: 20px;
+  border: 1.5px solid #bbb;
+  background: #f5f5f5;
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-settings:hover { background: #e0e0e0; border-color: #999; }
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.set-row label { font-size: 14px; color: #444; flex: 1; }
+.set-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.set-ctrl span {
+  min-width: 44px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-biru);
+  text-align: right;
+}
+
+/* ================================================================
+   MISC FIXES
+   ================================================================ */
+.soal-pinyin-hint {
+  font-size: 14px;
+  color: #888;
+  margin: 4px 0 10px;
+}
