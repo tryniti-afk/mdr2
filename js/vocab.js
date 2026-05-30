@@ -8,7 +8,7 @@ var Vocab = {
   idx: 0,
   skor: { benar:0, salah:0 },
   modeSaat: null,
-  infinityUlangi: false,
+  speakingTipe: "arti",   // tipe tampilan soal speaking yang dipilih
 
   // ── RENDER MENU ──────────────────────────────────────────────
   renderMenu() {
@@ -25,7 +25,7 @@ var Vocab = {
         ${SetSoal.renderWidget("vocab", "v")}
         <div class="sub-menu-grid" style="margin-top:12px">
           ${subFitur.map(f => `
-            <div class="sub-card" onclick="Vocab.mulai('${f.id}')">
+            <div class="sub-card" onclick="Vocab.${f.id === 'speaking' ? 'pilihTipeSpeaking' : "mulai('"+f.id+"')"}()">
               <div class="sub-icon">${f.icon}</div>
               <div class="sub-label">${f.label}</div>
               <div class="sub-desc">${f.desc}</div>
@@ -40,11 +40,47 @@ var Vocab = {
     SetSoal._pilihSheet("vocab", SetSoal.get("vocab").sheet, "v");
   },
 
+  // ── PILIH TIPE SPEAKING ──────────────────────────────────────
+  pilihTipeSpeaking() {
+    const opsi = [
+      { id:"arti",         label:"Terjemahan Saja",    desc:"Lihat arti Indonesia, ucapkan Hanzi-nya" },
+      { id:"hanzi",        label:"Hanzi Saja",         desc:"Lihat karakter Hanzi, ucapkan ulang" },
+      { id:"pinyin",       label:"Pinyin Saja",        desc:"Lihat Pinyin, ucapkan pengucapannya" },
+      { id:"hanzi-pinyin", label:"Hanzi + Pinyin",     desc:"Lihat karakter dan Pinyin sekaligus" },
+      { id:"hanzi-audio",  label:"Hanzi + Audio",      desc:"Lihat Hanzi, dengar audio, lalu tirukan" },
+      { id:"audio",        label:"Audio Saja",         desc:"Hanya dengar audio, lalu tirukan" },
+    ];
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🎤 Speaking Vocab — Pilih Tipe Soal</div>
+        <div class="soal-hint" style="margin-bottom:12px">Bagaimana soal ingin ditampilkan?</div>
+        <div class="sub-menu-grid">
+          ${opsi.map(o => `
+            <div class="sub-card ${this.speakingTipe === o.id ? 'sub-card-aktif' : ''}"
+                 onclick="Vocab._pilihSpeakingTipe('${o.id}')">
+              <div class="sub-label">${o.label}</div>
+              <div class="sub-desc">${o.desc}</div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-hijau" onclick="Vocab.mulai('speaking')">▶ Mulai</button>
+          <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _pilihSpeakingTipe(tipe) {
+    this.speakingTipe = tipe;
+    // refresh highlight pilihan
+    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    event.currentTarget.classList.add("sub-card-aktif");
+  },
+
   // ── MULAI ─────────────────────────────────────────────────────
   async mulai(mode) {
     this.modeSaat = mode;
     this.idx      = 0;
-    this.infinityUlangi = false;
     resetSkor();
 
     const raw = await SetSoal.getSoalSiap("vocab", mode);
@@ -93,7 +129,6 @@ var Vocab = {
 
   // ── SOAL A: Hanzi → Indonesia ────────────────────────────────
   _soalHanziIndo(item) {
-    // Buat pilihan dari soalList atau DB.vocab fallback
     const pool     = this.soalList.filter(v => v.arti !== item.arti);
     const salahArr = acak(pool.length >= 3 ? pool : (DB.vocab.filter(v => v.arti !== item.arti))).slice(0,3);
     const semua    = acak([item.arti, ...salahArr.map(v => v.arti)]);
@@ -195,12 +230,47 @@ var Vocab = {
 
   // ── SOAL F: Speaking ─────────────────────────────────────────
   _soalSpeaking(item) {
+    const tipe = this.speakingTipe;
+
+    // Bangun tampilan prompt berdasarkan tipe yang dipilih
+    let promptHTML = "";
+    let labelTipe  = "";
+
+    if (tipe === "arti") {
+      labelTipe  = "Lihat Terjemahan → Ucapkan Hanzi";
+      promptHTML = `<div class="soal-arti">${item.arti}</div>`;
+    } else if (tipe === "hanzi") {
+      labelTipe  = "Lihat Hanzi → Ucapkan Ulang";
+      promptHTML = `<div class="soal-hanzi">${item.hanzi}</div>`;
+    } else if (tipe === "pinyin") {
+      labelTipe  = "Lihat Pinyin → Ucapkan";
+      promptHTML = `<div class="soal-hanzi" style="font-size:28px">${item.pinyin || "(no pinyin)"}</div>`;
+    } else if (tipe === "hanzi-pinyin") {
+      labelTipe  = "Hanzi + Pinyin → Ucapkan";
+      promptHTML = `
+        <div class="soal-hanzi">${item.hanzi}</div>
+        <div class="soal-hint" style="font-size:16px;color:#555">${item.pinyin || ""}</div>`;
+    } else if (tipe === "hanzi-audio") {
+      labelTipe  = "Hanzi + Audio → Tirukan";
+      promptHTML = `
+        <div class="soal-hanzi">${item.hanzi}</div>
+        <div class="audio-btn-wrap" style="margin:8px 0">
+          <button class="btn-audio" onclick="TTS.mandarin('${this._esc(item.hanzi)}')">🔊 Dengar Audio</button>
+        </div>`;
+    } else if (tipe === "audio") {
+      labelTipe  = "Audio Saja → Tirukan";
+      promptHTML = `
+        <div class="audio-btn-wrap" style="margin:16px 0">
+          <button class="btn-audio" onclick="TTS.mandarin('${this._esc(item.hanzi)}')">🔊 Putar Audio</button>
+        </div>`;
+    }
+
     return `
       <div class="soal-wrap">
-        <div class="label-mode">🎤 Speaking Vocab</div>
-        <div class="soal-arti">${item.arti}</div>
-        <div class="soal-hint">Ucapkan kata Mandarin:</div>
-        <div class="soal-pinyin-hint">Target: <b>${item.hanzi}</b>${item.pinyin ? " (" + item.pinyin + ")" : ""}</div>
+        <div class="label-mode">🎤 Speaking — ${labelTipe}</div>
+        ${promptHTML}
+        <div class="soal-hint" style="margin-top:8px">Ucapkan kata Mandarin:</div>
+        <div class="soal-pinyin-hint">Target: <b>${item.hanzi}</b>${item.pinyin ? " ("+item.pinyin+")" : ""}</div>
         <div class="hasil-box" id="hasil-vocab">Tekan tombol mic lalu bicara...</div>
         <div class="btn-row">
           <button class="btn btn-merah" id="btn-mic" onclick="Vocab._jawabSuara()">🎤 Mulai Bicara</button>
@@ -217,6 +287,10 @@ var Vocab = {
     if (mode === "hanzi-pinyin") setTimeout(() => buildKbPinyin("kb-display", null), 50);
     if (mode === "audio-arti" || mode === "audio-hanzi") {
       setTimeout(() => TTS.bicara(this.soalList[this.idx].hanzi, "zh-CN", cfg.ttRate || 0.85), 300);
+    }
+    // speaking: auto-putar audio jika tipe hanzi-audio atau audio
+    if (mode === "speaking" && (this.speakingTipe === "hanzi-audio" || this.speakingTipe === "audio")) {
+      setTimeout(() => TTS.bicara(this.soalList[this.idx].hanzi, "zh-CN", cfg.ttRate || 0.85), 400);
     }
     setTimeout(() => {
       const inp = el("input-jawab");
@@ -316,14 +390,19 @@ var Vocab = {
 
   // ── NEXT / INFINITY RETRY ────────────────────────────────────
   _nextOrRetry(benar) {
-    const cfg  = SetSoal.get("vocab");
+    const cfg   = SetSoal.get("vocab");
     const delay = benar ? 1600 : 2000;
+
     if (!benar && cfg.mode === "infinity") {
-      // Harus ulang soal ini dulu
+      // Mode infinity + salah → reset ke soal pertama
       setTimeout(() => {
         const hEl = el("hasil-vocab");
-        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini...</small>";
-        setTimeout(() => this.tampilSoal(), 1400);
+        if (hEl) hEl.innerHTML += "<br><small>🔄 Mulai dari awal...</small>";
+        setTimeout(() => {
+          this.idx      = 0;
+          this.soalList = acak(this.soalList);
+          this.tampilSoal();
+        }, 1400);
       }, delay);
     } else {
       setTimeout(() => { this.idx++; this.tampilSoal(); }, delay);
