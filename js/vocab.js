@@ -393,17 +393,26 @@ var Vocab = {
     const cfg   = SetSoal.get("vocab");
     const delay = benar ? 1600 : 2000;
 
-    if (!benar && cfg.mode === "infinity") {
-      // Mode infinity + salah → reset ke soal pertama
-      setTimeout(() => {
-        const hEl = el("hasil-vocab");
-        if (hEl) hEl.innerHTML += "<br><small>🔄 Mulai dari awal...</small>";
+    if (cfg.mode === "infinity") {
+      if (!benar) {
+        // Salah → tampil ulang soal yang sama (idx tidak berubah)
         setTimeout(() => {
-          this.idx      = 0;
-          this.soalList = acak(this.soalList);
-          this.tampilSoal();
-        }, 1400);
-      }, delay);
+          const hEl = el("hasil-vocab");
+          if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
+          setTimeout(() => this.tampilSoal(), 1400);
+        }, delay);
+      } else {
+        // Benar → reset ke soal pertama (acak ulang list)
+        setTimeout(() => {
+          const hEl = el("hasil-vocab");
+          if (hEl) hEl.innerHTML += "<br><small>✅ Lanjut dari soal pertama...</small>";
+          setTimeout(() => {
+            this.idx      = 0;
+            this.soalList = acak(this.soalList);
+            this.tampilSoal();
+          }, 1000);
+        }, delay);
+      }
     } else {
       setTimeout(() => { this.idx++; this.tampilSoal(); }, delay);
     }
