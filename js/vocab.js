@@ -2,7 +2,7 @@
 //  VOCAB.JS — 6 Sub-Fitur Vocabulary Training
 // ================================================================
 
-const Vocab = {
+var Vocab = {
 
   // State sesi
   soalList: [],
@@ -322,4 +322,3 @@ const Vocab = {
     App.renderModul("vocab");
   }
 };
- 
