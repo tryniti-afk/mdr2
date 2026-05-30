@@ -237,3 +237,4 @@ function acak(arr) {
 function ambilAcak(arr, n = 1) {
   return acak(arr).slice(0, n);
 }
+ 
