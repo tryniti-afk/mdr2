@@ -685,3 +685,4 @@ var Quiz = {
     setTimeout(() => this._pasangEventMenu(), 50);
   },
 };
+ 
