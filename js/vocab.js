@@ -322,3 +322,4 @@ const Vocab = {
     App.renderModul("vocab");
   }
 };
+ 
