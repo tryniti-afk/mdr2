@@ -379,11 +379,11 @@ var Vocab = {
 
   _skip() {
     const item = this.soalList[this.idx];
-    tambahSkor(false);
+    tambahSkor(true);
     const hEl = el("hasil-vocab");
     if (hEl) {
       hEl.innerHTML = `⏭ Di-skip. Jawaban: <b>${item.hanzi}</b>${item.arti ? " = "+item.arti : ""}`;
-      hEl.className = "hasil-box salah";
+      hEl.className = "hasil-box benar";
     }
     setHTML("skor-mini", `✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}`);
     setTimeout(() => { this.idx++; this.tampilSoal(); }, 1500);
