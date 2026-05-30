@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🀄 Belajar Mandarin</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ========== SCREEN: HOME ========== -->
+  <div id="screen-home">
+    <div class="home-header">
+      <div class="home-logo">🀄</div>
+      <h1>Belajar Mandarin</h1>
+      <p class="home-sub">Pilih kategori latihan</p>
+    </div>
+
+    <!-- PROGRESS BAR GLOBAL -->
+    <div class="global-progress-wrap" id="global-progress-wrap">
+      <div class="global-progress-label" id="global-progress-label">Level 1 · 0 XP</div>
+      <div class="global-bar"><div class="global-fill" id="global-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- 9 MENU UTAMA -->
+    <div class="main-menu-grid">
+
+      <div class="menu-card" onclick="App.buka('vocab')">
+        <div class="menu-icon">📚</div>
+        <div class="menu-label">Vocabulary</div>
+        <div class="menu-desc">Hafalan & recall kata</div>
+        <div class="menu-badge" id="badge-vocab"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('sentence')">
+        <div class="menu-icon">📝</div>
+        <div class="menu-label">Sentence</div>
+        <div class="menu-desc">Terjemah & susun kalimat</div>
+        <div class="menu-badge" id="badge-sentence"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('grammar')">
+        <div class="menu-icon">📖</div>
+        <div class="menu-label">Grammar</div>
+        <div class="menu-desc">Pola tata bahasa</div>
+        <div class="menu-badge" id="badge-grammar"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('dialogue')">
+        <div class="menu-icon">💬</div>
+        <div class="menu-label">Dialogue</div>
+        <div class="menu-desc">Percakapan & respon</div>
+        <div class="menu-badge" id="badge-dialogue"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('listening')">
+        <div class="menu-icon">🎧</div>
+        <div class="menu-label">Listening</div>
+        <div class="menu-desc">Memahami audio</div>
+        <div class="menu-badge" id="badge-listening"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('reading')">
+        <div class="menu-icon">📰</div>
+        <div class="menu-label">Reading</div>
+        <div class="menu-desc">Teks & pemahaman</div>
+        <div class="menu-badge" id="badge-reading"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('writing')">
+        <div class="menu-icon">✍️</div>
+        <div class="menu-label">Writing</div>
+        <div class="menu-desc">Ketik & menulis</div>
+        <div class="menu-badge" id="badge-writing"></div>
+      </div>
+
+      <div class="menu-card" onclick="App.buka('speaking')">
+        <div class="menu-icon">🎤</div>
+        <div class="menu-label">Speaking</div>
+        <div class="menu-desc">HSKK & pronunciation</div>
+        <div class="menu-badge" id="badge-speaking"></div>
+      </div>
+
+      <div class="menu-card menu-card-exam" onclick="App.buka('exam')">
+        <div class="menu-icon">🧪</div>
+        <div class="menu-label">Exam Mode</div>
+        <div class="menu-desc">Simulasi HSK / HSKK</div>
+        <div class="menu-badge" id="badge-exam"></div>
+      </div>
+
+    </div>
+
+    <!-- STATISTIK SINGKAT -->
+    <div class="stat-row" id="stat-row">
+      <div class="stat-item">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-lbl">Total Latihan</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="stat-streak">0🔥</div>
+        <div class="stat-lbl">Hari Berturut</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="stat-vocab">0</div>
+        <div class="stat-lbl">Kata Dikuasai</div>
+      </div>
+    </div>
+
+  </div><!-- /screen-home -->
+
+  <!-- ========== SCREEN: MODUL ========== -->
+  <div id="screen-modul" style="display:none">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <button class="topbar-back" onclick="App.kembaliHome()">← Kembali</button>
+      <div class="topbar-title" id="topbar-title">Vocabulary</div>
+      <div class="topbar-xp" id="topbar-xp">0 XP</div>
+    </div>
+
+    <!-- KONTEN UTAMA (sub-menu atau soal aktif) -->
+    <div id="konten-utama" class="konten-utama"></div>
+
+  </div><!-- /screen-modul -->
+
+</div><!-- /app -->
+
+<!-- ========== TOAST NOTIF ========== -->
+<div id="toast" class="toast"></div>
+
+<!-- SCRIPTS — urutan penting! -->
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/vocab.js"></script>
+<script src="js/sentence.js"></script>
+<script src="js/modules.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
