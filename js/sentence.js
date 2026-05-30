@@ -2,7 +2,7 @@
 //  SENTENCE.JS — 7 Sub-Fitur Sentence Training
 // ================================================================
 
-const Sentence = {
+var Sentence = {
   soalList: [],
   idx: 0,
   modeSaat: null,
@@ -363,4 +363,3 @@ const Sentence = {
     App.renderModul("sentence");
   }
 };
- 
