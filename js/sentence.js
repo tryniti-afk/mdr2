@@ -363,3 +363,4 @@ const Sentence = {
     App.renderModul("sentence");
   }
 };
+ 
