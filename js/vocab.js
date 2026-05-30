@@ -79,9 +79,10 @@ var Vocab = {
 
   // ── MULAI ─────────────────────────────────────────────────────
   async mulai(mode) {
-    this.modeSaat       = mode;
-    this.idx            = 0;
-    this._infinityRetry = false;
+    this.modeSaat         = mode;
+    this.idx              = 0;
+    this._infinityRetry   = false;
+    this._sedangTransisi  = false;
     resetSkor();
 
     const raw = await SetSoal.getSoalSiap("vocab", mode);
@@ -391,6 +392,7 @@ var Vocab = {
 
   // ── NEXT / INFINITY RETRY ────────────────────────────────────
   _nextOrRetry(benar) {
+    if (this._sedangTransisi) return;   // blokir input ganda / STT fire kedua
     const cfg = SetSoal.get("vocab");
 
     if (cfg.mode === "infinity") {
@@ -399,18 +401,19 @@ var Vocab = {
         this._infinityRetry = true;
         const hEl = el("hasil-vocab");
         if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
-        setTimeout(() => this.tampilSoal(), 2800);
+        this._sedangTransisi = true;
+        setTimeout(() => { this._sedangTransisi = false; this.tampilSoal(); }, 2800);
       } else {
         // Benar → jika tadi retry, reset ke soal pertama; jika lanjut normal, increment
         if (this._infinityRetry) {
-          this._infinityRetry = false;
-          setTimeout(() => {
-            this.idx      = 0;
-            this.soalList = acak(this.soalList);
-            this.tampilSoal();
-          }, 1600);
+          this._infinityRetry  = false;
+          this._sedangTransisi = true;
+          TTS.berhenti();
+          STT.berhenti();
+          setTimeout(() => { this._sedangTransisi = false; this.idx = 0; this.tampilSoal(); }, 1600);
         } else {
-          setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
+          this._sedangTransisi = true;
+          setTimeout(() => { this._sedangTransisi = false; this.idx++; this.tampilSoal(); }, 1600);
         }
       }
     } else {
