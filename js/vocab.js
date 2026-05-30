@@ -96,11 +96,11 @@ var Vocab = {
 
   // ── TAMPIL SOAL ──────────────────────────────────────────────
   tampilSoal() {
+    this._sedangTransisi = false;   // pastikan selalu reset saat soal baru tampil
     const cfg = SetSoal.get("vocab");
-    // infinity: loop dari awal jika sudah habis
+    // infinity: loop dari awal jika sudah habis (tanpa acak ulang agar urutan konsisten)
     if (cfg.mode === "infinity" && this.idx >= this.soalList.length) {
       this.idx = 0;
-      this.soalList = acak(this.soalList);
     }
     if (this.idx >= this.soalList.length) { this.tampilSelesai(); return; }
 
@@ -302,6 +302,7 @@ var Vocab = {
 
   // ── PROSES JAWABAN ───────────────────────────────────────────
   _jawabPilihan(idx, dipilih, jawaban) {
+    if (this._sedangTransisi) return;
     const benar = dipilih === jawaban;
     tambahSkor(benar);
     const item = this.soalList[this.idx];
@@ -320,6 +321,7 @@ var Vocab = {
   },
 
   _jawabKetikHanzi() {
+    if (this._sedangTransisi) return;
     const inp = el("input-jawab");
     const input = inp ? inp.value.trim() : "";
     if (!input) return;
@@ -339,6 +341,7 @@ var Vocab = {
   },
 
   _jawabPinyin() {
+    if (this._sedangTransisi) return;
     const input = getKbTeks();
     if (!input) return;
     const item  = this.soalList[this.idx];
@@ -355,6 +358,7 @@ var Vocab = {
   },
 
   _jawabSuara() {
+    if (this._sedangTransisi) return;
     const btnMic = el("btn-mic");
     const item   = this.soalList[this.idx];
     if (btnMic) { btnMic.disabled = true; btnMic.innerText = "🎙️ Mendengarkan..."; }
@@ -392,28 +396,26 @@ var Vocab = {
 
   // ── NEXT / INFINITY RETRY ────────────────────────────────────
   _nextOrRetry(benar) {
-    if (this._sedangTransisi) return;   // blokir input ganda / STT fire kedua
+    if (this._sedangTransisi) return;
+    this._sedangTransisi = true;   // blokir input selama animasi transisi
     const cfg = SetSoal.get("vocab");
 
     if (cfg.mode === "infinity") {
       if (!benar) {
-        // Salah → tandai harus ulang soal ini, jangan pindah idx
+        // Salah → tandai harus ulang, idx tidak berubah
         this._infinityRetry = true;
         const hEl = el("hasil-vocab");
         if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
-        this._sedangTransisi = true;
-        setTimeout(() => { this._sedangTransisi = false; this.tampilSoal(); }, 2800);
+        setTimeout(() => this.tampilSoal(), 2800);
       } else {
-        // Benar → jika tadi retry, reset ke soal pertama; jika lanjut normal, increment
+        // Benar → jika tadi retry, reset ke soal pertama; jika normal, increment
         if (this._infinityRetry) {
-          this._infinityRetry  = false;
-          this._sedangTransisi = true;
+          this._infinityRetry = false;
           TTS.berhenti();
           STT.berhenti();
-          setTimeout(() => { this._sedangTransisi = false; this.idx = 0; this.tampilSoal(); }, 1600);
+          setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
         } else {
-          this._sedangTransisi = true;
-          setTimeout(() => { this._sedangTransisi = false; this.idx++; this.tampilSoal(); }, 1600);
+          setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
       }
     } else {
