@@ -240,3 +240,4 @@ const App = {
 
 // ── BOOT ─────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => App.init());
+ 
