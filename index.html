@@ -19,12 +19,12 @@
     </div>
 
     <!-- PROGRESS BAR GLOBAL -->
-    <div class="global-progress-wrap" id="global-progress-wrap">
+    <div class="global-progress-wrap">
       <div class="global-progress-label" id="global-progress-label">Level 1 · 0 XP</div>
       <div class="global-bar"><div class="global-fill" id="global-fill" style="width:0%"></div></div>
     </div>
 
-    <!-- 9 MENU UTAMA -->
+    <!-- MENU UTAMA -->
     <div class="main-menu-grid">
 
       <div class="menu-card" onclick="App.buka('vocab')">
@@ -37,7 +37,7 @@
       <div class="menu-card" onclick="App.buka('sentence')">
         <div class="menu-icon">📝</div>
         <div class="menu-label">Sentence</div>
-        <div class="menu-desc">Terjemah & susun kalimat</div>
+        <div class="menu-desc">Terjemah & pola kalimat</div>
         <div class="menu-badge" id="badge-sentence"></div>
       </div>
 
@@ -91,16 +91,16 @@
       </div>
 
       <div class="menu-card menu-card-quiz" onclick="App.buka('quiz')">
-        <div class="menu-icon">🎤</div>
-        <div class="menu-label">Kuis Suara</div>
-        <div class="menu-desc">Soal bebas, jawab suara/ketik/pinyin</div>
+        <div class="menu-icon">🎯</div>
+        <div class="menu-label">Kuis Bebas</div>
+        <div class="menu-desc">Soal bebas, suara/ketik/pinyin</div>
         <div class="menu-badge" id="badge-quiz"></div>
       </div>
 
     </div>
 
-    <!-- STATISTIK SINGKAT -->
-    <div class="stat-row" id="stat-row">
+    <!-- STATISTIK -->
+    <div class="stat-row">
       <div class="stat-item">
         <div class="stat-num" id="stat-total">0</div>
         <div class="stat-lbl">Total Latihan</div>
@@ -115,31 +115,35 @@
       </div>
     </div>
 
+    <!-- TOMBOL SETTINGS -->
+    <div style="text-align:center;padding:8px 0 20px">
+      <button class="btn-settings" onclick="App.bukaSettings()">⚙️ Pengaturan</button>
+    </div>
+
   </div><!-- /screen-home -->
 
   <!-- ========== SCREEN: MODUL ========== -->
   <div id="screen-modul" style="display:none">
-
-    <!-- TOPBAR -->
     <div class="topbar">
       <button class="topbar-back" onclick="App.kembaliHome()">← Kembali</button>
       <div class="topbar-title" id="topbar-title">Vocabulary</div>
       <div class="topbar-xp" id="topbar-xp">0 XP</div>
     </div>
-
-    <!-- KONTEN UTAMA (sub-menu atau soal aktif) -->
     <div id="konten-utama" class="konten-utama"></div>
+  </div>
 
-  </div><!-- /screen-modul -->
+  <!-- ========== SCREEN: SETTINGS ========== -->
+  <div id="screen-settings" style="display:none"></div>
 
 </div><!-- /app -->
 
-<!-- ========== TOAST NOTIF ========== -->
 <div id="toast" class="toast"></div>
 
-<!-- SCRIPTS — urutan penting! -->
+<!-- SCRIPTS -->
 <script src="js/data.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/datamanager.js"></script>
+<script src="js/setsoal.js"></script>
 <script src="js/vocab.js"></script>
 <script src="js/sentence.js"></script>
 <script src="js/modules.js"></script>
@@ -148,4 +152,3 @@
 
 </body>
 </html>
- 
