@@ -228,7 +228,7 @@ const DB = {
   }
 
 };
- 
+
 // ── UTILS ─────────────────────────────────────────────────────
 function acak(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
@@ -237,14 +237,3 @@ function acak(arr) {
 function ambilAcak(arr, n = 1) {
   return acak(arr).slice(0, n);
 }
-
-// Progress storage
-const PROGRESS_KEY = "mdr_progress";
-function simpanProgress(data) {
-  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(data)); } catch(e){}
-}
-function ambilProgress() {
-  try { return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {}; } catch(e){ return {}; }
-}
-
-let progress = ambilProgress();
