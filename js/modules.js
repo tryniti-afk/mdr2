@@ -2,7 +2,7 @@
 //  GRAMMAR.JS — 4 Sub-Fitur Grammar Training
 // ================================================================
 
-const Grammar = {
+var Grammar = {
   idx: 0,
   modeSaat: null,
   soalList: [],
@@ -205,7 +205,7 @@ const Grammar = {
 //  DIALOGUE.JS — 5 Sub-Fitur Dialog Training
 // ================================================================
 
-const Dialogue = {
+var Dialogue = {
   idx: 0,
   modeSaat: null,
   dialogSaat: null,
@@ -452,7 +452,7 @@ const Dialogue = {
 //  LISTENING.JS — 6 Sub-Fitur Listening Training
 // ================================================================
 
-const Listening = {
+var Listening = {
   idx: 0,
   modeSaat: null,
   soalList: [],
@@ -669,7 +669,7 @@ const Listening = {
 //  READING.JS — 5 Sub-Fitur Reading Training
 // ================================================================
 
-const Reading = {
+var Reading = {
   idx: 0,
   modeSaat: null,
   passageSaat: null,
@@ -845,7 +845,7 @@ const Reading = {
 //  WRITING.JS — 5 Sub-Fitur Writing Training
 // ================================================================
 
-const Writing = {
+var Writing = {
   idx: 0,
   modeSaat: null,
   soalList: [],
@@ -1038,7 +1038,7 @@ const Writing = {
 //  SPEAKING.JS — 6 Sub-Fitur Speaking / HSKK
 // ================================================================
 
-const Speaking = {
+var Speaking = {
   idx: 0,
   modeSaat: null,
   soalList: [],
@@ -1239,7 +1239,7 @@ const Speaking = {
 //  EXAM.JS — 5 Sub-Fitur Exam Mode (HSK/HSKK Simulasi)
 // ================================================================
 
-const Exam = {
+var Exam = {
   idx: 0,
   modeSaat: null,
   soalList: [],
