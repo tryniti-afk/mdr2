@@ -79,8 +79,9 @@ var Vocab = {
 
   // ── MULAI ─────────────────────────────────────────────────────
   async mulai(mode) {
-    this.modeSaat = mode;
-    this.idx      = 0;
+    this.modeSaat       = mode;
+    this.idx            = 0;
+    this._infinityRetry = false;
     resetSkor();
 
     const raw = await SetSoal.getSoalSiap("vocab", mode);
@@ -390,31 +391,30 @@ var Vocab = {
 
   // ── NEXT / INFINITY RETRY ────────────────────────────────────
   _nextOrRetry(benar) {
-    const cfg   = SetSoal.get("vocab");
-    const delay = benar ? 1600 : 2000;
+    const cfg = SetSoal.get("vocab");
 
     if (cfg.mode === "infinity") {
       if (!benar) {
-        // Salah → tampil ulang soal yang sama (idx tidak berubah)
-        setTimeout(() => {
-          const hEl = el("hasil-vocab");
-          if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
-          setTimeout(() => this.tampilSoal(), 1400);
-        }, delay);
+        // Salah → tandai harus ulang soal ini, jangan pindah idx
+        this._infinityRetry = true;
+        const hEl = el("hasil-vocab");
+        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
+        setTimeout(() => this.tampilSoal(), 2800);
       } else {
-        // Benar → reset ke soal pertama (acak ulang list)
-        setTimeout(() => {
-          const hEl = el("hasil-vocab");
-          if (hEl) hEl.innerHTML += "<br><small>✅ Lanjut dari soal pertama...</small>";
+        // Benar → jika tadi retry, reset ke soal pertama; jika lanjut normal, increment
+        if (this._infinityRetry) {
+          this._infinityRetry = false;
           setTimeout(() => {
             this.idx      = 0;
             this.soalList = acak(this.soalList);
             this.tampilSoal();
-          }, 1000);
-        }, delay);
+          }, 1600);
+        } else {
+          setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
+        }
       }
     } else {
-      setTimeout(() => { this.idx++; this.tampilSoal(); }, delay);
+      setTimeout(() => { this.idx++; this.tampilSoal(); }, benar ? 1600 : 2000);
     }
   },
 
