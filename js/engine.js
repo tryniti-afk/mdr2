@@ -285,7 +285,7 @@ function updateKbDisplay(id) {
   if (e) e.innerText = kbState.teks || "";
 }
 
-function kbSpasi() {
+function kbSpasi() { 
   kbState.teks += " ";
   updateKbDisplay();
 }
