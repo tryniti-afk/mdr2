@@ -14,6 +14,7 @@ const MODUL_CFG = {
   writing:   { label: "✍️ Writing",     obj: "Writing",  icon: "✍️" },
   speaking:  { label: "🎤 Speaking",    obj: "Speaking", icon: "🎤" },
   exam:      { label: "🧪 Exam Mode",   obj: "Exam",     icon: "🧪" },
+  quiz:      { label: "🎤 Kuis Suara",  obj: "Quiz",     icon: "🎤" },
 };
 
 // ── PROGRESS KEY ─────────────────────────────────────────────
@@ -115,6 +116,8 @@ const App = {
       return;
     }
     setHTML("konten-utama", obj.renderMenu());
+    // Pasang event menu jika ada (misal Quiz._pasangEventMenu)
+    if (obj._pasangEventMenu) setTimeout(() => obj._pasangEventMenu(), 50);
   },
 
   // ── KEMBALI KE HOME ─────────────────────────────────────────
