@@ -305,3 +305,4 @@ function resetKb() {
   const btns = document.querySelectorAll(".nada");
   btns.forEach((b,i) => { b.classList.toggle("nada-aktif", i===0); });
 }
+ 
