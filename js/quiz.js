@@ -9,7 +9,7 @@
 //    • Edit Soal Lokal (format Pertanyaan | kunci || info)
 // ================================================================
 
-const Quiz = {
+var Quiz = {
 
   // ── STATE ──────────────────────────────────────────────────
   cfg: { soal: "suara", jawab: "suara", mode: "sekali" },
