@@ -138,7 +138,6 @@ var Vocab = {
       <div class="soal-wrap">
         <div class="label-mode">Hanzi → Indonesia</div>
         <div class="soal-hanzi">${item.hanzi}</div>
-        ${item.pinyin ? `<div class="soal-hint" style="font-size:14px;color:#888">${item.pinyin}</div>` : ""}
         <div class="soal-hint">Apa arti kata di atas?</div>
         <div class="pilihan-grid" id="pilihan-cont">
           ${semua.map((p,i) => `<button class="btn-pilihan"
@@ -158,8 +157,6 @@ var Vocab = {
       <div class="soal-wrap">
         <div class="label-mode">Indonesia → Hanzi</div>
         <div class="soal-arti">${item.arti}</div>
-        <div class="soal-hint">Tulis karakter Hanzi:</div>
-        ${item.pinyin ? `<div class="soal-pinyin-hint">Pinyin: ${item.pinyin}</div>` : ""}
         <input type="text" id="input-jawab" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off">
         <div class="hasil-box" id="hasil-vocab"></div>
         <div class="btn-row">
@@ -271,8 +268,6 @@ var Vocab = {
       <div class="soal-wrap">
         <div class="label-mode">🎤 Speaking — ${labelTipe}</div>
         ${promptHTML}
-        <div class="soal-hint" style="margin-top:8px">Ucapkan kata Mandarin:</div>
-        <div class="soal-pinyin-hint">Target: <b>${item.hanzi}</b>${item.pinyin ? " ("+item.pinyin+")" : ""}</div>
         <div class="hasil-box" id="hasil-vocab">Tekan tombol mic lalu bicara...</div>
         <div class="btn-row">
           <button class="btn btn-merah" id="btn-mic" onclick="Vocab._jawabSuara()">🎤 Mulai Bicara</button>
