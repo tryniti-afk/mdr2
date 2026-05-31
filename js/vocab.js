@@ -8,24 +8,25 @@ var Vocab = {
   idx: 0,
   skor: { benar:0, salah:0 },
   modeSaat: null,
-  speakingTipe: "arti",   // tipe tampilan soal speaking yang dipilih
+  speakingTipe: "arti",
+  audioHanziIndo: false,   // preferensi audio di mode hanzi-indo
 
   // ── RENDER MENU ──────────────────────────────────────────────
   renderMenu() {
     const subFitur = [
-      { id:"hanzi-indo",   icon:"🈯", label:"Hanzi → Indonesia",  desc:"Lihat karakter, jawab artinya" },
-      { id:"indo-hanzi",   icon:"🔤", label:"Indonesia → Hanzi",  desc:"Lihat arti, tulis karakternya" },
-      { id:"hanzi-pinyin", icon:"🔤", label:"Hanzi → Pinyin",     desc:"Tulis cara baca (romanisasi)" },
-      { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya" },
-      { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter" },
-      { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya" },
+      { id:"hanzi-indo",   icon:"🈯", label:"Hanzi → Indonesia",  desc:"Lihat karakter, jawab artinya", fn:"pilihOpsiHanziIndo" },
+      { id:"indo-hanzi",   icon:"🔤", label:"Indonesia → Hanzi",  desc:"Lihat arti, tulis karakternya", fn:"mulai('indo-hanzi')" },
+      { id:"hanzi-pinyin", icon:"🔤", label:"Hanzi → Pinyin",     desc:"Tulis cara baca (romanisasi)",  fn:"mulai('hanzi-pinyin')" },
+      { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya",   fn:"mulai('audio-arti')" },
+      { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
+      { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking" },
     ];
     return `
       <div style="padding-bottom:12px">
         ${SetSoal.renderWidget("vocab", "v")}
         <div class="sub-menu-grid" style="margin-top:12px">
           ${subFitur.map(f => `
-            <div class="sub-card" onclick="Vocab.${f.id === 'speaking' ? 'pilihTipeSpeaking' : "mulai('"+f.id+"')"}()">
+            <div class="sub-card" onclick="Vocab.${f.fn}()">
               <div class="sub-icon">${f.icon}</div>
               <div class="sub-label">${f.label}</div>
               <div class="sub-desc">${f.desc}</div>
@@ -77,7 +78,38 @@ var Vocab = {
     event.currentTarget.classList.add("sub-card-aktif");
   },
 
-  // ── MULAI ─────────────────────────────────────────────────────
+  // ── PILIH OPSI HANZI-INDO ────────────────────────────────────
+  pilihOpsiHanziIndo() {
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🈯 Hanzi → Indonesia — Pilih Opsi</div>
+        <div class="soal-hint" style="margin-bottom:14px">Apakah soal disertai audio pengucapan?</div>
+        <div class="sub-menu-grid">
+          <div class="sub-card ${!this.audioHanziIndo ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihAudioHanziIndo(false)">
+            <div class="sub-icon">👁️</div>
+            <div class="sub-label">Tanpa Audio</div>
+            <div class="sub-desc">Hanya tampil karakter Hanzi</div>
+          </div>
+          <div class="sub-card ${this.audioHanziIndo ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihAudioHanziIndo(true)">
+            <div class="sub-icon">🔊</div>
+            <div class="sub-label">Dengan Audio</div>
+            <div class="sub-desc">Karakter Hanzi + audio diputar otomatis</div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-hijau" onclick="Vocab.mulai('hanzi-indo')">▶ Mulai</button>
+          <button class="btn btn-abu"   onclick="Vocab.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _pilihAudioHanziIndo(pakai) {
+    this.audioHanziIndo = pakai;
+    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    event.currentTarget.classList.add("sub-card-aktif");
+  },
   async mulai(mode) {
     this.modeSaat         = mode;
     this.idx              = 0;
@@ -129,6 +161,11 @@ var Vocab = {
 
     el("konten-utama").innerHTML = html;
     this._pasangEvent();
+
+    // Auto-play audio jika mode hanzi-indo dengan audio aktif
+    if (mode === "hanzi-indo" && this.audioHanziIndo) {
+      setTimeout(() => TTS.ucap(item.hanzi, "zh-CN"), 300);
+    }
   },
 
   // ── SOAL A: Hanzi → Indonesia ────────────────────────────────
@@ -136,10 +173,14 @@ var Vocab = {
     const pool     = this.soalList.filter(v => v.arti !== item.arti);
     const salahArr = acak(pool.length >= 3 ? pool : (DB.vocab.filter(v => v.arti !== item.arti))).slice(0,3);
     const semua    = acak([item.arti, ...salahArr.map(v => v.arti)]);
+    const audioBtn = this.audioHanziIndo
+      ? `<button class="btn btn-abu" style="margin-bottom:8px" onclick="TTS.ucap('${this._esc(item.hanzi)}','zh-CN')">🔊 Putar Audio</button>`
+      : "";
     return `
       <div class="soal-wrap">
-        <div class="label-mode">Hanzi → Indonesia</div>
+        <div class="label-mode">Hanzi → Indonesia${this.audioHanziIndo ? " 🔊" : ""}</div>
         <div class="soal-hanzi">${item.hanzi}</div>
+        ${audioBtn}
         <div class="soal-hint">Apa arti kata di atas?</div>
         <div class="pilihan-grid" id="pilihan-cont">
           ${semua.map((p,i) => `<button class="btn-pilihan"
