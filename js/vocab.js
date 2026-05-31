@@ -81,6 +81,7 @@ var Vocab = {
   async mulai(mode) {
     this.modeSaat         = mode;
     this.idx              = 0;
+    this.streak           = 0;
     this._infinityRetry   = false;
     this._sedangTransisi  = false;
     resetSkor();
@@ -116,6 +117,7 @@ var Vocab = {
       <div class="progres-bar">
         <div class="progres-fill" style="width:${cfg.mode !== "infinity" ? (this.idx/total)*100 : 0}%"></div>
       </div>
+      <div class="vocab-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
 
     if (mode === "hanzi-indo")   html += this._soalHanziIndo(item);
@@ -295,6 +297,12 @@ var Vocab = {
     }, 100);
   },
 
+  _updateStreak(benar) {
+    if (benar) { this.streak++; } else { this.streak = 0; }
+    setHTML("skor-mini", `✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}`);
+    setTeks("vocab-streak", this.streak > 1 ? `🔥 Streak: ${this.streak}` : "");
+  },
+
   // ── PROSES JAWABAN ───────────────────────────────────────────
   _jawabPilihan(idx, dipilih, jawaban) {
     if (this._sedangTransisi) return;
@@ -311,7 +319,7 @@ var Vocab = {
       : `Salah. Jawaban: <b>${item.arti}</b>${item.pinyin ? " ("+item.pinyin+")" : ""}`;
     const hEl = el("hasil-vocab");
     if (hEl) { hEl.innerHTML = (benar?"✅ ":"❌ ") + msg; hEl.className = "hasil-box " + (benar?"benar":"salah"); }
-    setHTML("skor-mini", `✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}`);
+    this._updateStreak(benar);
     this._nextOrRetry(benar);
   },
 
@@ -331,7 +339,7 @@ var Vocab = {
       hEl.className = "hasil-box " + (benar?"benar":"salah");
     }
     if (inp) inp.disabled = true;
-    setHTML("skor-mini", `✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}`);
+    this._updateStreak(benar);
     this._nextOrRetry(benar);
   },
 
@@ -349,6 +357,7 @@ var Vocab = {
         : `❌ Salah. Pinyin benar: <b>${item.pinyin}</b>`;
       hEl.className = "hasil-box " + (benar?"benar":"salah");
     }
+    this._updateStreak(benar);
     this._nextOrRetry(benar);
   },
 
@@ -370,6 +379,7 @@ var Vocab = {
           hEl.className = "hasil-box " + (benar?"benar":"salah");
         }
         if (btnMic) btnMic.innerText = "✔ Selesai";
+        this._updateStreak(benar);
         this._nextOrRetry(benar);
       },
       err => { setTeks("hasil-vocab", "❌ Error mic: "+err); if(btnMic){btnMic.disabled=false;btnMic.innerText="🎤 Coba Lagi";} },
@@ -385,7 +395,7 @@ var Vocab = {
       hEl.innerHTML = `⏭ Di-skip. Jawaban: <b>${item.hanzi}</b>${item.arti ? " = "+item.arti : ""}`;
       hEl.className = "hasil-box benar";
     }
-    setHTML("skor-mini", `✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}`);
+    this._updateStreak(true);
     setTimeout(() => { this.idx++; this.tampilSoal(); }, 1500);
   },
 
@@ -406,6 +416,7 @@ var Vocab = {
         // Benar → jika tadi retry, reset ke soal pertama; jika normal, increment
         if (this._infinityRetry) {
           this._infinityRetry = false;
+          this.streak = 0;
           TTS.berhenti();
           STT.berhenti();
           setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
