@@ -133,6 +133,7 @@ var Vocab = {
   tampilSoal() {
     this._sedangTransisi = false;   // pastikan selalu reset saat soal baru tampil
     const cfg = SetSoal.get("vocab");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
     // Semua soal sudah dijawab → tampil layar selesai
     if (this.idx >= this.soalList.length) { this.tampilSelesai(); return; }
 
@@ -142,11 +143,11 @@ var Vocab = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${cfg.mode === \"infinity\" ? this._soalSelesai+1 : this.idx+1} / ${total}</div>
+        <div class="progres-teks">Soal ${modeRetry ? this._soalSelesai+1 : this.idx+1} / ${total}</div>
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${cfg.mode === \"infinity\" ? (this._soalSelesai/total)*100 : (this.idx/total)*100}%"></div>
+        <div class="progres-fill" style="width:${modeRetry ? (this._soalSelesai/total)*100 : (this.idx/total)*100}%"></div>
       </div>
       <div class="quiz-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
