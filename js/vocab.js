@@ -444,7 +444,7 @@ var Vocab = {
     if (this._sedangTransisi) return;
     this._sedangTransisi = true;
     const cfg = SetSoal.get("vocab");
-    const modeRetry = cfg.mode === "infinity";
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
 
     if (modeRetry) {
       if (!benar) {
