@@ -1,28 +1,23 @@
 // ================================================================
 //  SETSOAL.JS — UI Pemilih Set Soal & Mode Permainan
-//  Komponen reusable untuk semua modul
-//  Cara pakai:
-//    SetSoal.render(tipe, onMulai)  → kembalikan HTML string
-//    SetSoal.pasangEvent(tipe, onMulai)  → pasang event setelah render
 // ================================================================
 
 var SetSoal = {
 
-  // state saat ini
-  _cfg: {},   // key: tipe → { sheet, mode, jumlah }
+  _cfg: {},   // key: tipe → { sheet, mode, jumlah, offset }
 
   get(tipe) {
     if (!this._cfg[tipe]) {
-      this._cfg[tipe] = { sheet: DataMgr.sheetsUntuk(tipe)[0]?.id || "lokal", mode: "sekali", jumlah: 10 };
+      this._cfg[tipe] = { sheet: DataMgr.sheetsUntuk(tipe)[0]?.id || "lokal", mode: "jumlah", jumlah: 10, offset: 0 };
     }
     return this._cfg[tipe];
   },
 
   // ── RENDER HTML widget ───────────────────────────────────────
   renderWidget(tipe, idPrefix) {
-    const cfg   = this.get(tipe);
+    const cfg    = this.get(tipe);
     const sheets = DataMgr.sheetsUntuk(tipe);
-    const pfx   = idPrefix || ("ss-" + tipe);
+    const pfx    = idPrefix || ("ss-" + tipe);
 
     return `
       <div class="ss-widget" id="${pfx}-widget">
@@ -51,11 +46,6 @@ var SetSoal = {
         <div class="ss-section">
           <div class="ss-label">🎮 Mode</div>
           <div class="ss-opsi-row">
-            <button class="ss-btn ${cfg.mode === 'sekali' ? 'aktif' : ''}"
-              id="${pfx}-mode-sekali"
-              onclick="SetSoal._pilihMode('${tipe}','sekali','${pfx}')">
-              1× Sekali
-            </button>
             <button class="ss-btn ${cfg.mode === 'jumlah' ? 'aktif' : ''}"
               id="${pfx}-mode-jumlah"
               onclick="SetSoal._pilihMode('${tipe}','jumlah','${pfx}')">
@@ -64,18 +54,28 @@ var SetSoal = {
             <button class="ss-btn ${cfg.mode === 'infinity' ? 'aktif' : ''}"
               id="${pfx}-mode-infinity"
               onclick="SetSoal._pilihMode('${tipe}','infinity','${pfx}')">
-              ♾ Infinity
+              ♾ Semua Soal
             </button>
           </div>
-          <div id="${pfx}-mode-extra" style="margin-top:8px;display:${cfg.mode === 'jumlah' ? 'flex' : 'none'};align-items:center;gap:8px">
-            <label style="font-size:13px;color:#555">Jumlah soal:</label>
-            <input type="number" id="${pfx}-jumlah" min="1" max="999" value="${cfg.jumlah}"
-              class="ss-input-num"
-              onchange="SetSoal._pilihJumlah('${tipe}','${pfx}')">
+
+          <!-- Extra: N Soal -->
+          <div id="${pfx}-mode-extra" style="margin-top:8px;display:${cfg.mode === 'jumlah' ? 'block' : 'none'}">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <label style="font-size:13px;color:#555">Jumlah soal:</label>
+              <input type="number" id="${pfx}-jumlah" min="1" max="999" value="${cfg.jumlah}"
+                class="ss-input-num"
+                onchange="SetSoal._pilihJumlah('${tipe}','${pfx}')">
+            </div>
+            <div id="${pfx}-range-wrap" style="display:none">
+              <div class="ss-label" style="margin-bottom:6px">📌 Pilih soal ke:</div>
+              <div class="ss-opsi-row" id="${pfx}-range-btns"></div>
+            </div>
           </div>
+
+          <!-- Info: Semua Soal -->
           <div id="${pfx}-info-infinity" class="ss-info-box"
             style="display:${cfg.mode === 'infinity' ? 'block' : 'none'}">
-            Jika salah, ulangi soal itu dulu — lalu kembali ke soal pertama.
+            Semua soal dimainkan berurutan. Jika salah, ulangi soal itu dulu — lalu kembali ke soal pertama.
           </div>
         </div>
 
@@ -122,9 +122,8 @@ var SetSoal = {
     const edWrap = document.getElementById(pfx + "-editor-wrap");
     if (edWrap) edWrap.style.display = (sheetId === "lokal") ? "block" : "none";
 
-    // Cek status sheet
+    const statusEl = document.getElementById(pfx + "-status");
     if (sheetId !== "lokal") {
-      const statusEl = document.getElementById(pfx + "-status");
       if (statusEl) statusEl.textContent = "⏳ Mengambil data...";
       DataMgr.fetchSheet(sheetId).then(data => {
         if (statusEl) {
@@ -132,10 +131,17 @@ var SetSoal = {
             ? `✅ ${data.length} soal ditemukan`
             : `⚠️ Gagal ambil data, akan pakai soal lokal`;
         }
+        // Render ulang tombol range setelah tahu total soal
+        if (this.get(tipe).mode === "jumlah") {
+          this._renderRangeBtns(tipe, pfx, data ? data.length : 0);
+        }
       });
     } else {
-      const statusEl = document.getElementById(pfx + "-status");
-      if (statusEl) statusEl.textContent = `📝 ${(DataMgr._lokal[tipe] || []).length} soal lokal`;
+      const n = (DataMgr._lokal[tipe] || []).length;
+      if (statusEl) statusEl.textContent = `📝 ${n} soal lokal`;
+      if (this.get(tipe).mode === "jumlah") {
+        this._renderRangeBtns(tipe, pfx, n);
+      }
     }
   },
 
@@ -150,13 +156,77 @@ var SetSoal = {
     }
     const extraEl = document.getElementById(pfx + "-mode-extra");
     const infEl   = document.getElementById(pfx + "-info-infinity");
-    if (extraEl) extraEl.style.display = mode === "jumlah" ? "flex" : "none";
+    if (extraEl) extraEl.style.display = mode === "jumlah" ? "block" : "none";
     if (infEl)   infEl.style.display   = mode === "infinity" ? "block" : "none";
+
+    if (mode === "jumlah") {
+      // Ambil total soal sekarang untuk render tombol range
+      this._ambilTotalDanRender(tipe, pfx);
+    }
   },
 
   _pilihJumlah(tipe, pfx) {
     const inp = document.getElementById(pfx + "-jumlah");
-    if (inp) this.get(tipe).jumlah = Math.max(1, parseInt(inp.value) || 10);
+    if (inp) {
+      this.get(tipe).jumlah = Math.max(1, parseInt(inp.value) || 10);
+      this.get(tipe).offset = 0;   // reset pilihan range
+      this._ambilTotalDanRender(tipe, pfx);
+    }
+  },
+
+  // Ambil total soal sheet aktif, lalu render tombol range
+  async _ambilTotalDanRender(tipe, pfx) {
+    const cfg = this.get(tipe);
+    let total = 0;
+    if (cfg.sheet === "lokal") {
+      total = (DataMgr._lokal[tipe] || []).length;
+    } else {
+      const data = await DataMgr.fetchSheet(cfg.sheet);
+      total = data ? data.length : 0;
+    }
+    this._renderRangeBtns(tipe, pfx, total);
+  },
+
+  // Render tombol-tombol range (1-50, 51-100, dst)
+  _renderRangeBtns(tipe, pfx, total) {
+    const cfg      = this.get(tipe);
+    const jumlah   = cfg.jumlah;
+    const wrapEl   = document.getElementById(pfx + "-range-wrap");
+    const btnsEl   = document.getElementById(pfx + "-range-btns");
+    if (!wrapEl || !btnsEl) return;
+
+    if (!total || jumlah >= total) {
+      // Tidak perlu pilih range — pakai semua
+      wrapEl.style.display = "none";
+      cfg.offset = 0;
+      return;
+    }
+
+    wrapEl.style.display = "block";
+    const tombol = [];
+    for (let start = 0; start < total; start += jumlah) {
+      const end    = Math.min(start + jumlah, total);
+      const label  = `${start + 1}–${end}`;
+      const aktif  = cfg.offset === start ? "aktif" : "";
+      tombol.push(
+        `<button class="ss-btn ${aktif}" id="${pfx}-range-${start}"
+          onclick="SetSoal._pilihRange('${tipe}','${pfx}',${start})">${label}</button>`
+      );
+    }
+    btnsEl.innerHTML = tombol.join("");
+
+    // Pastikan offset yang tersimpan masih valid
+    if (cfg.offset >= total) cfg.offset = 0;
+  },
+
+  _pilihRange(tipe, pfx, offset) {
+    this.get(tipe).offset = offset;
+    const btnsEl = document.getElementById(pfx + "-range-btns");
+    if (btnsEl) {
+      btnsEl.querySelectorAll(".ss-btn").forEach(b => b.classList.remove("aktif"));
+      const btn = document.getElementById(pfx + "-range-" + offset);
+      if (btn) btn.classList.add("aktif");
+    }
   },
 
   // ── EDITOR ──────────────────────────────────────────────────
@@ -194,7 +264,6 @@ var SetSoal = {
     const raw  = await DataMgr.ambilSoal(cfg.sheet, tipe);
     if (!raw || !raw.length) return [];
 
-    // Konversi ke format internal sesuai tipe
     if (tipe === "vocab") {
       return this._konversiVocab(raw);
     } else {
@@ -205,19 +274,16 @@ var SetSoal = {
   // ── KONVERSI DATA VOCAB ──────────────────────────────────────
   _konversiVocab(raw) {
     return raw.map(r => {
-      // Format spreadsheet: pertanyaan=Hanzi, kunci="hanzi/pinyin || arti"
       const fullKunci = r.kunci || "";
       const parts     = fullKunci.split("||");
-      const kunciAlt  = (parts[0] || "").trim();   // hanzi/pinyin
+      const kunciAlt  = (parts[0] || "").trim();
       const arti      = (parts[1] || r.translate || "").trim();
 
-      // Cari hanzi dan pinyin dari kunci
       const slashIdx = kunciAlt.indexOf("/");
       let hanzi  = r.pertanyaan;
       let pinyin = "";
       if (slashIdx > -1) {
         const kalt = kunciAlt.split("/");
-        // Cek mana yang hanzi (ada karakter CJK) dan mana pinyin
         if (/[\u4e00-\u9fff]/.test(kalt[0])) {
           hanzi  = kalt[0].trim();
           pinyin = kalt[1] ? kalt[1].trim() : "";
@@ -227,15 +293,7 @@ var SetSoal = {
         }
       }
 
-      return {
-        hanzi,
-        pinyin,
-        arti:   arti || r.translate || "",
-        kunci:  fullKunci,
-        level:  1,
-        tag:    "spreadsheet",
-        _raw:   r,
-      };
+      return { hanzi, pinyin, arti: arti || r.translate || "", kunci: fullKunci, level: 1, tag: "spreadsheet", _raw: r };
     });
   },
 
@@ -256,9 +314,12 @@ var SetSoal = {
   // ── POTONG SOAL sesuai mode ─────────────────────────────────
   potongSoal(arr, tipe) {
     const cfg = this.get(tipe);
-    const acakArr = acak(arr);
-    if (cfg.mode === "infinity") return acakArr;     // semua, akan loop
-    if (cfg.mode === "jumlah")  return acakArr.slice(0, cfg.jumlah);
-    return acakArr;   // sekali = semua soal 1x (bisa dibatasi modul)
+    if (cfg.mode === "infinity") {
+      // Semua soal, urutan asli (tidak diacak)
+      return arr.slice();
+    }
+    // mode jumlah: ambil slice sesuai offset + jumlah, urutan asli
+    const offset = cfg.offset || 0;
+    return arr.slice(offset, offset + cfg.jumlah);
   },
 };
