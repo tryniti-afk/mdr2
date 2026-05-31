@@ -12,7 +12,7 @@
 var Quiz = {
 
   // ── STATE ──────────────────────────────────────────────────
-  cfg: { soal: "suara", jawab: "suara", mode: "sekali" },
+  cfg: { soal: "suara", jawab: "suara", mode: "jumlah", jumlah: 10, offset: 0 },
   state: { nomor: 0, skor: 0, salah: 0, streak: 0, ulangiSoal: -1, putaran: 1, maxPutaran: 1 },
   daftarSoal: [],
   ulangiCb: null,
@@ -60,20 +60,26 @@ var Quiz = {
         <div class="card">
           <h3>🎮 Mode Permainan</h3>
           <div class="opsi-grup">
-            <button class="opsi aktif-ungu ${this.cfg.mode==='sekali'?'aktif':''}" id="qopsi-mode-sekali"
-              onclick="Quiz._pilihOpsi('mode','sekali')">1× Sekali</button>
-            <button class="opsi aktif-ungu ${this.cfg.mode==='bebas'?'aktif':''}" id="qopsi-mode-bebas"
-              onclick="Quiz._pilihOpsi('mode','bebas')">🔢 Putaran</button>
+            <button class="opsi aktif-ungu ${this.cfg.mode==='jumlah'?'aktif':''}" id="qopsi-mode-jumlah"
+              onclick="Quiz._pilihOpsi('mode','jumlah')">🔢 N Soal</button>
             <button class="opsi aktif-ungu ${this.cfg.mode==='infinity'?'aktif':''}" id="qopsi-mode-infinity"
-              onclick="Quiz._pilihOpsi('mode','infinity')">♾ Infinity</button>
+              onclick="Quiz._pilihOpsi('mode','infinity')">♾ Semua Soal</button>
           </div>
-          <div id="quiz-input-putaran" style="display:${this.cfg.mode==='bebas'?'block':'none'};margin-top:10px">
-            <input type="number" id="quiz-jml-putaran" min="1" value="3"
-              class="input-jawab" style="max-width:140px" placeholder="Jumlah putaran">
+          <div id="quiz-input-jumlah" style="display:${this.cfg.mode==='jumlah'?'block':'none'};margin-top:10px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <label style="font-size:13px;color:#555">Jumlah soal:</label>
+              <input type="number" id="quiz-jml-soal" min="1" value="${this.cfg.jumlah||10}"
+                class="input-jawab" style="max-width:100px"
+                onchange="Quiz._onGantiJumlah()">
+            </div>
+            <div id="quiz-range-wrap" style="display:none">
+              <div style="font-size:13px;color:#555;margin-bottom:6px">📌 Pilih soal ke:</div>
+              <div class="opsi-grup" id="quiz-range-btns" style="flex-wrap:wrap"></div>
+            </div>
           </div>
           <div id="quiz-info-infinity" class="quiz-info-box"
             style="display:${this.cfg.mode==='infinity'?'block':'none'}">
-            <b>Infinity Mode:</b> Jika salah harus mengulang sampai benar, lalu soal kembali ke awal.
+            <b>Semua Soal:</b> Semua soal dimainkan berurutan. Jika salah harus mengulang sampai benar, lalu soal kembali ke awal.
           </div>
         </div>
 
@@ -120,15 +126,60 @@ var Quiz = {
     if (!statusEl) return;
     if (sheet === "lokal") {
       statusEl.textContent = `📝 Menggunakan ${this.soalLokal.length} soal lokal.`;
+      this._totalSoal = this.soalLokal.length;
+      this._renderRangeBtns();
       return;
     }
     statusEl.textContent = "⏳ Mencoba mengambil data dari spreadsheet...";
     const data = await this._fetchSheet(sheet);
     if (data && data.length > 0) {
       statusEl.innerHTML = `✅ Berhasil memuat <b>${data.length}</b> soal dari sheet <b>${sheet}</b>.`;
+      this._totalSoal = data.length;
     } else {
       statusEl.innerHTML = `⚠️ Gagal ambil spreadsheet. Akan pakai data fallback.`;
+      this._totalSoal = this.soalLokal.length;
     }
+    this._renderRangeBtns();
+  },
+
+  _onGantiJumlah() {
+    const inp = el("quiz-jml-soal");
+    if (inp) {
+      this.cfg.jumlah = Math.max(1, parseInt(inp.value) || 10);
+      this.cfg.offset = 0;
+      this._renderRangeBtns();
+    }
+  },
+
+  _renderRangeBtns() {
+    if (this.cfg.mode !== "jumlah") return;
+    const total    = this._totalSoal || 0;
+    const jumlah   = this.cfg.jumlah || 10;
+    const wrapEl   = el("quiz-range-wrap");
+    const btnsEl   = el("quiz-range-btns");
+    if (!wrapEl || !btnsEl) return;
+    if (!total || jumlah >= total) {
+      wrapEl.style.display = "none";
+      this.cfg.offset = 0;
+      return;
+    }
+    wrapEl.style.display = "block";
+    let html = "";
+    for (let start = 0; start < total; start += jumlah) {
+      const end   = Math.min(start + jumlah, total);
+      const aktif = this.cfg.offset === start ? "aktif" : "";
+      html += `<button class="opsi aktif-ungu ${aktif}" id="quiz-range-${start}"
+        onclick="Quiz._pilihRange(${start})">${start+1}–${end}</button>`;
+    }
+    btnsEl.innerHTML = html;
+    if (this.cfg.offset >= total) this.cfg.offset = 0;
+  },
+
+  _pilihRange(offset) {
+    this.cfg.offset = offset;
+    document.querySelectorAll("[id^='quiz-range-']").forEach(b => b.classList.remove("aktif"));
+    const btn = el("quiz-range-" + offset);
+    if (btn) btn.classList.add("aktif");
   },
 
   async _fetchSheet(sheetName) {
@@ -160,10 +211,11 @@ var Quiz = {
     if (target) target.classList.add("aktif");
 
     if (grup === "mode") {
-      const inp = el("quiz-input-putaran");
+      const inp = el("quiz-input-jumlah");
       const inf = el("quiz-info-infinity");
-      if (inp) inp.style.display = nilai === "bebas" ? "block" : "none";
+      if (inp) inp.style.display = nilai === "jumlah" ? "block" : "none";
       if (inf) inf.style.display = nilai === "infinity" ? "block" : "none";
+      if (nilai === "jumlah") Quiz._renderRangeBtns();
     }
     if (grup === "jawab") {
       const pinInfo = el("quiz-info-pinyin");
@@ -178,11 +230,22 @@ var Quiz = {
     const sel = el("quiz-pilih-sheet");
     const sheet = sel ? sel.value : "lokal";
 
+    let rawSoal;
     if (sheet === "lokal") {
-      this.daftarSoal = [...this.soalLokal];
+      rawSoal = [...this.soalLokal];
     } else {
       const data = await this._fetchSheet(sheet);
-      this.daftarSoal = (data && data.length > 0) ? data : this.soalLokal;
+      rawSoal = (data && data.length > 0) ? data : this.soalLokal;
+    }
+
+    // Potong soal sesuai mode
+    if (this.cfg.mode === "jumlah") {
+      const offset = this.cfg.offset || 0;
+      const jumlah = this.cfg.jumlah || 10;
+      this.daftarSoal = rawSoal.slice(offset, offset + jumlah);
+    } else {
+      // infinity: semua soal, urutan asli
+      this.daftarSoal = rawSoal.slice();
     }
 
     if (!this.daftarSoal.length) {
@@ -190,12 +253,11 @@ var Quiz = {
       return;
     }
 
-    const jmlPutEl = el("quiz-jml-putaran");
     this.state = {
       nomor: 0, skor: 0, salah: 0, streak: 0, ulangiSoal: -1, putaran: 1,
-      maxPutaran: this.cfg.mode === "bebas" ? (parseInt(jmlPutEl?.value) || 1) : 1,
-      sheet: sheet
+      maxPutaran: 1, sheet: sheet
     };
+    this._infinityRetry  = false;
     this.ulangiCb = null;
     this._sedangTransisi = false;
     resetSkor();
@@ -272,8 +334,7 @@ var Quiz = {
     setTeks("quiz-nomor", nomorTeks);
     setTeks("quiz-label-sheet", "📋 " + (this.state.sheet || "lokal"));
     setTeks("quiz-label-mode",
-      this.cfg.mode === "sekali" ? "1× Sekali" :
-      this.cfg.mode === "bebas"  ? `🔢 ${this.state.maxPutaran}× Putaran` : "♾ Infinity");
+      this.cfg.mode === "jumlah" ? `🔢 ${this.daftarSoal.length} Soal` : "♾ Semua Soal");
     const progress = el("quiz-progress");
     if (progress) progress.style.width = ((this.state.nomor / total) * 100) + "%";
 
@@ -466,7 +527,7 @@ var Quiz = {
       setTeks("quiz-streak", "");
       this._updateSkorMini();
 
-      if (this.cfg.mode === "infinity") {
+      if (this.cfg.mode === "infinity" || this.cfg.mode === "jumlah") {
         this.state.ulangiSoal = this.state.nomor;
         setTimeout(() => {
           if (hasilEl) hasilEl.innerText += "\n\n🔄 Jawab ulang soal ini dulu...";
@@ -567,23 +628,8 @@ var Quiz = {
     const total = this.daftarSoal.length;
 
     if (this.state.nomor >= total) {
-      if (this.cfg.mode === "sekali") {
-        this._tampilSelesai();
-      } else if (this.cfg.mode === "bebas") {
-        if (this.state.putaran < this.state.maxPutaran) {
-          this.state.putaran++;
-          this.state.nomor = 0;
-          this._tampilSoal();
-        } else {
-          this._tampilSelesai();
-        }
-      } else {
-        // Infinity: loop terus
-        this.state.nomor = 0;
-        const hasilEl = el("quiz-hasil");
-        if (hasilEl) { hasilEl.style.display = "block"; hasilEl.className = "hasil-box info"; hasilEl.innerText = "🎉 Semua benar! Mulai dari soal 1 lagi..."; }
-        setTimeout(() => this._tampilSoal(), 2000);
-      }
+      // Semua soal sudah selesai → tampil selesai (untuk kedua mode)
+      this._tampilSelesai();
     } else {
       this._tampilSoal();
     }
@@ -623,6 +669,7 @@ var Quiz = {
     this.state.putaran = 1;
     this.state.ulangiSoal = -1;
     this.ulangiCb = null;
+    this._infinityRetry  = false;
     this._sedangTransisi = false;
     resetSkor();
     this._tampilSoal();
