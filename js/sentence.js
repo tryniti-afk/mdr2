@@ -324,7 +324,7 @@ var Sentence = {
           this._soalSelesai++;
           TTS.berhenti();
           STT.berhenti();
-          setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1800);
+          setTimeout(() => { this.idx = 0; this._soalSelesai = 0; this.tampilSoal(); }, 1800);
         } else {
           this._soalSelesai++;
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
