@@ -402,25 +402,27 @@ var Vocab = {
   // ── NEXT / INFINITY RETRY ────────────────────────────────────
   _nextOrRetry(benar) {
     if (this._sedangTransisi) return;
-    this._sedangTransisi = true;   // blokir input selama animasi transisi
+    this._sedangTransisi = true;
     const cfg = SetSoal.get("vocab");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
 
-    if (cfg.mode === "infinity") {
+    if (modeRetry) {
       if (!benar) {
-        // Salah → tandai harus ulang, idx tidak berubah
+        // Salah → ulang soal ini sampai benar
         this._infinityRetry = true;
         const hEl = el("hasil-vocab");
         if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
         setTimeout(() => this.tampilSoal(), 2800);
       } else {
-        // Benar → jika tadi retry, reset ke soal pertama; jika normal, increment
         if (this._infinityRetry) {
+          // Setelah retry berhasil → kembali ke soal pertama
           this._infinityRetry = false;
           this.streak = 0;
           TTS.berhenti();
           STT.berhenti();
           setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
         } else {
+          // Benar normal → lanjut soal berikutnya
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
       }
