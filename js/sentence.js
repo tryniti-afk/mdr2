@@ -74,11 +74,11 @@ var Sentence = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${this.idx+1} / ${cfg.mode === "infinity" ? "∞" : total}</div>
+        <div class="progres-teks">Soal ${this.idx+1} / ${total}</div>
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${cfg.mode !== "infinity" ? (this.idx/total)*100 : 0}%"></div>
+        <div class="progres-fill" style="width:${(this.idx/total)*100}%"></div>
       </div>
     `;
 
