@@ -463,8 +463,8 @@ var Vocab = {
             // Soal terakhir → selesai
             setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
           } else {
-            // Bukan soal terakhir → reset ke soal pertama
-            setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
+            // Bukan soal terakhir → reset ke soal pertama + reset progress
+            setTimeout(() => { this.idx = 0; this._soalSelesai = 0; this.tampilSoal(); }, 1600);
           }
         } else {
           // Benar normal → lanjut soal berikutnya (selesai jika sudah habis)
