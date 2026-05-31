@@ -47,6 +47,7 @@ var Sentence = {
     this.modeSaat        = mode;
     this.idx             = 0;
     this._infinityRetry  = false;
+    this._soalSelesai    = 0;
     this._sedangTransisi = false;
     resetSkor();
 
@@ -63,6 +64,7 @@ var Sentence = {
   tampilSoal() {
     this._sedangTransisi = false;   // pastikan selalu reset saat soal baru tampil
     const cfg = SetSoal.get("sentence");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
     if (cfg.mode === "infinity" && this.idx >= this.soalList.length) {
       this.idx = 0;
     }
@@ -74,11 +76,11 @@ var Sentence = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${this.idx+1} / ${total}</div>
+        <div class="progres-teks">Soal ${modeRetry ? this._soalSelesai+1 : this.idx+1} / ${total}</div>
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${(this.idx/total)*100}%"></div>
+        <div class="progres-fill" style="width:${modeRetry ? (this._soalSelesai/total)*100 : (this.idx/total)*100}%"></div>
       </div>
     `;
 
@@ -319,10 +321,12 @@ var Sentence = {
         if (this._infinityRetry) {
           // Setelah retry berhasil → kembali ke soal pertama
           this._infinityRetry = false;
+          this._soalSelesai++;
           TTS.berhenti();
           STT.berhenti();
           setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1800);
         } else {
+          this._soalSelesai++;
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
         }
       }
