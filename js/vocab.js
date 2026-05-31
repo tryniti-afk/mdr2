@@ -115,6 +115,7 @@ var Vocab = {
     this.idx              = 0;
     this.streak           = 0;
     this._infinityRetry   = false;
+    this._retryIdx        = -1;
     this._sedangTransisi  = false;
     resetSkor();
 
@@ -131,10 +132,7 @@ var Vocab = {
   tampilSoal() {
     this._sedangTransisi = false;   // pastikan selalu reset saat soal baru tampil
     const cfg = SetSoal.get("vocab");
-    // infinity: loop dari awal jika sudah habis (tanpa acak ulang agar urutan konsisten)
-    if (cfg.mode === "infinity" && this.idx >= this.soalList.length) {
-      this.idx = 0;
-    }
+    // Semua soal sudah dijawab → tampil layar selesai
     if (this.idx >= this.soalList.length) { this.tampilSelesai(); return; }
 
     const item  = this.soalList[this.idx];
@@ -143,11 +141,11 @@ var Vocab = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${this.idx+1} / ${cfg.mode === "infinity" ? "∞" : total}</div>
+        <div class="progres-teks">Soal ${this.idx+1} / ${total}</div>
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${cfg.mode !== "infinity" ? (this.idx/total)*100 : 0}%"></div>
+        <div class="progres-fill" style="width:${(this.idx/total)*100}%"></div>
       </div>
       <div class="quiz-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
@@ -445,25 +443,28 @@ var Vocab = {
     if (this._sedangTransisi) return;
     this._sedangTransisi = true;
     const cfg = SetSoal.get("vocab");
-    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
+    const modeRetry = cfg.mode === "infinity";
 
     if (modeRetry) {
       if (!benar) {
-        // Salah → ulang soal ini sampai benar
+        // Salah → ulangi soal ini dulu sampai benar, lalu reset ke soal pertama
         this._infinityRetry = true;
         const hEl = el("hasil-vocab");
-        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar...</small>";
+        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...</small>";
         setTimeout(() => this.tampilSoal(), 2800);
       } else {
         if (this._infinityRetry) {
-          // Setelah retry berhasil → kembali ke soal pertama
+          // Setelah retry berhasil → cek apakah ini soal terakhir
           this._infinityRetry = false;
-          this.streak = 0;
-          TTS.berhenti();
-          STT.berhenti();
-          setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
+          if (this.idx >= this.soalList.length - 1) {
+            // Soal terakhir → selesai
+            setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
+          } else {
+            // Bukan soal terakhir → reset ke soal pertama
+            setTimeout(() => { this.idx = 0; this.tampilSoal(); }, 1600);
+          }
         } else {
-          // Benar normal → lanjut soal berikutnya
+          // Benar normal → lanjut soal berikutnya (selesai jika sudah habis)
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
       }
