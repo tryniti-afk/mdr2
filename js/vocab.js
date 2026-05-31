@@ -117,7 +117,7 @@ var Vocab = {
       <div class="progres-bar">
         <div class="progres-fill" style="width:${cfg.mode !== "infinity" ? (this.idx/total)*100 : 0}%"></div>
       </div>
-      <div class="vocab-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
+      <div class="quiz-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
 
     if (mode === "hanzi-indo")   html += this._soalHanziIndo(item);
