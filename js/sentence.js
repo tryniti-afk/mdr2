@@ -304,19 +304,20 @@ var Sentence = {
   // ── INFINITY RETRY ───────────────────────────────────────────
   _nextOrRetry(benar) {
     if (this._sedangTransisi) return;
-    this._sedangTransisi = true;   // blokir input selama animasi transisi
+    this._sedangTransisi = true;
     const cfg = SetSoal.get("sentence");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
 
-    if (cfg.mode === "infinity") {
+    if (modeRetry) {
       if (!benar) {
-        // Salah → ulang soal ini, idx tidak berubah
+        // Salah → ulang soal ini sampai benar
         this._infinityRetry = true;
         const hEl = el("hasil-box");
         if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini...</small>";
         setTimeout(() => this.tampilSoal(), 2200 + 1400);
       } else {
-        // Benar → jika tadi retry, kembali ke soal pertama; jika normal, lanjut
         if (this._infinityRetry) {
+          // Setelah retry berhasil → kembali ke soal pertama
           this._infinityRetry = false;
           TTS.berhenti();
           STT.berhenti();
