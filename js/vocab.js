@@ -164,7 +164,7 @@ var Vocab = {
 
     // Auto-play audio jika mode hanzi-indo dengan audio aktif
     if (mode === "hanzi-indo" && this.audioHanziIndo) {
-      setTimeout(() => TTS.ucap(item.hanzi, "zh-CN"), 300);
+      setTimeout(() => TTS.bicara(item.hanzi, "zh-CN"), 300);
     }
   },
 
@@ -174,7 +174,7 @@ var Vocab = {
     const salahArr = acak(pool.length >= 3 ? pool : (DB.vocab.filter(v => v.arti !== item.arti))).slice(0,3);
     const semua    = acak([item.arti, ...salahArr.map(v => v.arti)]);
     const audioBtn = this.audioHanziIndo
-      ? `<button class="btn btn-abu" style="margin-bottom:8px" onclick="TTS.ucap('${this._esc(item.hanzi)}','zh-CN')">🔊 Putar Audio</button>`
+      ? `<button class="btn btn-abu" style="margin-bottom:8px" onclick="TTS.bicara('${this._esc(item.hanzi)}','zh-CN')">🔊 Putar Audio</button>`
       : "";
     return `
       <div class="soal-wrap">
