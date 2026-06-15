@@ -298,9 +298,10 @@ var SentenceVocab = {
         const raw = await DataMgr.fetchSheet(sheetId);
         if (!raw || !raw.length) continue;
         for (const r of raw) {
-          const hanziRaw = r["Pertanyaan"] || r[0] || "";
-          const kunciRaw = r["Kunci jawaban"] || r[1] || "";
-          const artiRaw  = r["Translate"] || r[2] || "";
+          // DataMgr._parseCSV mengembalikan: pertanyaan, kunci, translate (huruf kecil)
+          const hanziRaw = r.pertanyaan || r["Pertanyaan"] || "";
+          const kunciRaw = r.kunci      || r["Kunci jawaban"] || "";
+          const artiRaw  = r.translate  || r["Translate"] || "";
           const parsed   = this._parseKunci(kunciRaw);
           const hanzi    = parsed.hanzi || hanziRaw.trim();
           const pinyin   = parsed.pinyin;
@@ -323,11 +324,12 @@ var SentenceVocab = {
         const raw = await DataMgr.fetchSheet(grSheet);
         if (!raw) continue;
         for (const r of raw.slice(0, 8)) {
-          const kalimat  = r["Kalimat"]     || r[1] || "";
-          const arti     = r["Translateid"] || r[4] || "";
-          const struktur = r["struktur"]    || r[5] || "";
-          const explain  = r["Explain"]     || r[6] || "";
-          const note     = r["Note"]        || r[7] || "";
+          // DataMgr._parseCSV untuk Grhsk: hanzi/pinyin/arti/struktur/explain/note
+          const kalimat  = r.hanzi    || r["Kalimat"]     || "";
+          const arti     = r.arti     || r["Translateid"] || "";
+          const struktur = r.struktur || r["struktur"]    || "";
+          const explain  = r.explain  || r["Explain"]     || "";
+          const note     = r.note     || r["Note"]        || "";
           if (kalimat && struktur) {
             contoh.push({
               kalimat, arti,
