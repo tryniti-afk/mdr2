@@ -393,9 +393,16 @@ var Sentence = {
 var SentenceVocab = {
 
   // ── CONFIG ───────────────────────────────────────────────────
-  // URL Apps Script (doPost). API key Gemini tersimpan aman di Script Properties,
-  // tidak ada di file JS ini — aman di-push ke GitHub.
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxls_Di7DYdG4pvgYVAL89H9m6OLuPZMzlVGd199qCV6gZfY8L5g9ekflk8YV332yzN/exec",
+  // Gemini API dipanggil langsung dari browser (tidak perlu Apps Script)
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+
+  // Ambil API key dari localStorage
+  _getApiKey() {
+    return localStorage.getItem("gemini_api_key") || "";
+  },
+  _setApiKey(key) {
+    localStorage.setItem("gemini_api_key", key.trim());
+  },
 
   LEVEL_MAP: {
     "hsk1-2": { label: "HSK 1-2", grSheet: "Grhsk1" },
@@ -488,35 +495,48 @@ var SentenceVocab = {
     return contoh;
   },
 
-  // ── CALL GEMINI via APPS SCRIPT ──────────────────────────────
-  // Kirim { prompt } ke Apps Script → diteruskan ke Gemini → balik teks.
-  // API key Gemini aman di Script Properties, tidak terekspos di JS ini.
+  // ── CALL GEMINI LANGSUNG DARI BROWSER ────────────────────────
+  // Tidak pakai Apps Script — panggil Gemini REST API langsung.
+  // API key diambil dari localStorage (user input via UI).
   async _callAI(messages, _maxTokens = 900) {
-    // Gabung semua messages jadi satu prompt teks (Gemini single-turn lewat Apps Script)
-    const prompt = messages.map(m => {
-      const prefix = m.role === "assistant" ? "AI: " : "User: ";
-      return prefix + m.content;
-    }).join("\n\n");
+    const apiKey = this._getApiKey();
+    if (!apiKey) {
+      throw new Error("API key Gemini belum diisi. Masukkan API key dulu di menu pengaturan.");
+    }
+
+    // Bangun Gemini contents dari messages (multi-turn)
+    const contents = messages.map(m => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
     let resp;
     try {
-      resp = await fetch(this.APPS_SCRIPT_URL, {
+      resp = await fetch(`${this.GEMINI_API_URL}?key=${apiKey}`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ prompt }),
+        body: JSON.stringify({
+          contents,
+          generationConfig: { maxOutputTokens: _maxTokens, temperature: 0.7 },
+        }),
       });
     } catch (e) {
-      throw new Error("Gagal terhubung ke server AI. Cek koneksi internet kamu.");
+      throw new Error("Gagal terhubung ke Gemini API. Cek koneksi internet kamu.");
     }
 
     if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`Server error ${resp.status}: ${errText.slice(0, 200)}`);
+      let errMsg = `Gemini error ${resp.status}`;
+      try {
+        const errData = await resp.json();
+        errMsg = errData?.error?.message || errMsg;
+      } catch (_) {}
+      if (resp.status === 400) throw new Error("API key tidak valid atau request salah: " + errMsg);
+      if (resp.status === 403) throw new Error("API key tidak punya akses Gemini. Cek di Google AI Studio.");
+      if (resp.status === 429) throw new Error("Batas penggunaan Gemini tercapai. Coba lagi sebentar.");
+      throw new Error(errMsg);
     }
 
     const data = await resp.json();
-
-    // Response Gemini: data.candidates[0].content.parts[0].text
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     if (!text) throw new Error("AI tidak menghasilkan teks. Coba lagi.");
     return text;
@@ -652,10 +672,22 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
             style="width:100%;accent-color:#1565c0;margin-top:6px">
         </div>
 
-        <div class="sv-section" style="padding:10px;background:#e8f5e9;border-radius:8px;border-left:3px solid #66bb6a">
-          <div style="font-size:12px;color:#2e7d32">
-            🔒 AI ditenagai <b>Gemini 2.5 Flash</b> via server — 
-            tidak perlu input API key. Key tersimpan aman di server.
+        <div class="sv-section" style="padding:10px;background:#fff8e1;border-radius:8px;border-left:3px solid #ffa000">
+          <div style="font-size:13px;color:#5d4037;font-weight:600;margin-bottom:6px">🔑 Gemini API Key</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="password" id="sv-api-key-input"
+              placeholder="Masukkan Gemini API key..."
+              value="${this._getApiKey()}"
+              style="flex:1;padding:8px 10px;border:1.5px solid #ffa000;border-radius:6px;font-size:13px;outline:none"
+              oninput="SentenceVocab._setApiKey(this.value)"
+            >
+            <button onclick="SentenceVocab._toggleApiKeyVisibility()"
+              style="padding:7px 10px;border:1.5px solid #ffa000;border-radius:6px;background:#fff3e0;cursor:pointer;font-size:14px"
+              id="sv-eye-btn" title="Tampilkan/sembunyikan">👁️</button>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:5px">
+            Gratis di <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:#1565c0">Google AI Studio</a>. 
+            Key disimpan di browser kamu saja, tidak dikirim ke server manapun selain Gemini.
           </div>
         </div>
 
@@ -672,6 +704,14 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
   },
 
   // ── OPTIONS ──────────────────────────────────────────────────
+  _toggleApiKeyVisibility() {
+    const inp = document.getElementById("sv-api-key-input");
+    const btn = document.getElementById("sv-eye-btn");
+    if (!inp) return;
+    if (inp.type === "password") { inp.type = "text";     if (btn) btn.textContent = "🙈"; }
+    else                         { inp.type = "password"; if (btn) btn.textContent = "👁️"; }
+  },
+
   _toggleLevel(id) {
     const s = this._state;
     const idx = s.levelDipilih.indexOf(id);
@@ -713,6 +753,15 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
   // ── MULAI SESI ───────────────────────────────────────────────
   async mulai() {
     const s = this._state;
+
+    // Validasi API key sebelum mulai
+    if (!this._getApiKey()) {
+      tampilToast("⚠️ Masukkan Gemini API key dulu ya!");
+      const inp = document.getElementById("sv-api-key-input");
+      if (inp) inp.focus();
+      return;
+    }
+
     s.idx   = 0;
     s.skor  = { benar: 0, salah: 0 };
     s.soalSaat = null;
