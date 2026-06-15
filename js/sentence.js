@@ -443,9 +443,10 @@ var SentenceVocab = {
         const raw = await DataMgr.fetchSheet(sheetId);
         if (!raw || !raw.length) continue;
         for (const r of raw) {
-          const hanziRaw = r["Pertanyaan"] || r[0] || "";
-          const kunciRaw = r["Kunci jawaban"] || r[1] || "";
-          const artiRaw  = r["Translate"] || r[2] || "";
+          // DataMgr._parseCSV mengembalikan objek dengan field: pertanyaan, kunci, translate
+          const hanziRaw = r.pertanyaan || "";
+          const kunciRaw = r.kunci || "";
+          const artiRaw  = r.translate || "";
           const parsed   = this._parseKunci(kunciRaw);
           const hanzi    = parsed.hanzi || hanziRaw.trim();
           const pinyin   = parsed.pinyin;
@@ -468,11 +469,12 @@ var SentenceVocab = {
         const raw = await DataMgr.fetchSheet(grSheet);
         if (!raw) continue;
         for (const r of raw.slice(0, 8)) {
-          const kalimat  = r["Kalimat"]     || r[1] || "";
-          const arti     = r["Translateid"] || r[4] || "";
-          const struktur = r["struktur"]    || r[5] || "";
-          const explain  = r["Explain"]     || r[6] || "";
-          const note     = r["Note"]        || r[7] || "";
+          // DataMgr._parseCSV untuk Gr sheet mengembalikan: hanzi, arti, struktur, explain, note
+          const kalimat  = r.hanzi     || r.pertanyaan || "";
+          const arti     = r.arti      || r.translate  || "";
+          const struktur = r.struktur  || "";
+          const explain  = r.explain   || "";
+          const note     = r.note      || "";
           if (kalimat && struktur) {
             contoh.push({
               kalimat, arti,
