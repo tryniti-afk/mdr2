@@ -250,7 +250,7 @@ var SentenceVocab = {
   // ── CONFIG ───────────────────────────────────────────────────
   // URL Apps Script (doPost). API key Gemini tersimpan aman di Script Properties,
   // tidak ada di file JS ini — aman di-push ke GitHub.
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwhHLeH1hdUsjxpIfylfnmngMUd2fH6Sul6UdoD3p5aKpXFhvwKc9XJLQA9PzF6H-qJ/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby-ngqUoKpRG5TjyTe_nhmEFUHh14dRwyc5FKrTMI7G8sOXSFVqv1SpazQnSVIN-Ird/exec",
 
   LEVEL_MAP: {
     "hsk1-2": { label: "HSK 1-2", grSheet: "Grhsk1" },
