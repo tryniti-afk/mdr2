@@ -250,7 +250,7 @@ var SentenceVocab = {
   // ── CONFIG ───────────────────────────────────────────────────
   // URL Apps Script (doPost). API key Gemini tersimpan aman di Script Properties,
   // tidak ada di file JS ini — aman di-push ke GitHub.
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycby-ngqUoKpRG5TjyTe_nhmEFUHh14dRwyc5FKrTMI7G8sOXSFVqv1SpazQnSVIN-Ird/exec",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbxls_Di7DYdG4pvgYVAL89H9m6OLuPZMzlVGd199qCV6gZfY8L5g9ekflk8YV332yzN/exec",
 
   LEVEL_MAP: {
     "hsk1-2": { label: "HSK 1-2", grSheet: "Grhsk1" },
@@ -347,7 +347,6 @@ var SentenceVocab = {
   // Kirim { prompt } ke Apps Script → diteruskan ke Gemini → balik teks.
   // API key Gemini aman di Script Properties, tidak terekspos di JS ini.
   async _callAI(messages, _maxTokens = 900) {
-    // Gabung semua messages jadi satu prompt teks (Gemini single-turn lewat Apps Script)
     const prompt = messages.map(m => {
       const prefix = m.role === "assistant" ? "AI: " : "User: ";
       return prefix + m.content;
@@ -357,7 +356,7 @@ var SentenceVocab = {
     try {
       resp = await fetch(this.APPS_SCRIPT_URL, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain" },
         body:    JSON.stringify({ prompt }),
       });
     } catch (e) {
