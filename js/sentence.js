@@ -394,7 +394,7 @@ var SentenceVocab = {
 
   // ── CONFIG ───────────────────────────────────────────────────
   // Gemini API dipanggil langsung dari browser (tidak perlu Apps Script)
-  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+  GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
 
   // Ambil API key dari localStorage
   _getApiKey() {
