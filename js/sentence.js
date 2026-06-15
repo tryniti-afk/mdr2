@@ -1,26 +1,250 @@
 // ================================================================
-//  SENTENCE_VOCAB.JS — Generate Kalimat dari Vocab HSK via Gemini (Apps Script)
-//  Versi: 2.1
-//
-//  Fitur:
-//    - Pilih level HSK multi-select (1-2, 3, 4, 5)
-//    - Mode: hanzi→indo atau indo→hanzi
-//    - Tampilan: teks, audio, atau teks+audio
-//    - Jawab: ketik atau suara
-//    - AI generate kalimat natural dari vocab terpilih
-//    - Breakdown vocab + grammar dari sheet Grhsk (+ grammar umum Gemini)
-//    - Tanya AI saat salah (chat mini, multi-turn)
-//    - API key aman: tersimpan di Apps Script, tidak ada di source code JS
-//
-//  Cara pasang:
-//    1. <script src="js/sentence_vocab.js"></script> di index.html
-//       (sebelum </body>, setelah sentence.js)
-//    2. Di sentence.js → renderMenu(), tambahkan card:
-//       { id:"vocab-ai", icon:"🤖", label:"Generate dari Vocab", desc:"AI buat kalimat dari vocab kamu" }
-//    3. Di sentence.js → mulai(mode), tambahkan:
-//       else if (mode === "vocab-ai") { SentenceVocab.mulai(); return; }
+//  SENTENCE.JS — Modul Sentence Training
+//  Object: Sentence (diperlukan oleh app.js → MODUL_CFG.sentence)
 // ================================================================
 
+var Sentence = {
+  idx: 0,
+  modeSaat: null,
+  soalList: [],
+
+  renderMenu() {
+    const sub = [
+      { id: "translate",  icon: "🈯", label: "Translate",         desc: "Terjemahkan kalimat Mandarin ke Indonesia" },
+      { id: "arrange",    icon: "🔀", label: "Arrange Words",      desc: "Susun kata-kata menjadi kalimat yang benar" },
+      { id: "fill",       icon: "📝", label: "Fill in the Blank",  desc: "Lengkapi kalimat dengan kata yang tepat" },
+      { id: "match",      icon: "🔗", label: "Match Sentence",     desc: "Cocokkan kalimat dengan terjemahannya" },
+      { id: "vocab-ai",   icon: "🤖", label: "Generate dari Vocab",desc: "AI buat kalimat dari vocab kamu" },
+    ];
+    return `<div class="sub-menu-grid">${sub.map(f => `
+      <div class="sub-card" onclick="Sentence.mulai('${f.id}')">
+        <div class="sub-icon">${f.icon}</div>
+        <div class="sub-label">${f.label}</div>
+        <div class="sub-desc">${f.desc}</div>
+      </div>`).join("")}</div>`;
+  },
+
+  mulai(mode) {
+    if (mode === "vocab-ai") { SentenceVocab.mulai(); return; }
+    this.modeSaat = mode;
+    this.soalList = acak(DB.sentences).slice(0, 8);
+    this.idx = 0;
+    resetSkor();
+    this.tampilSoal();
+  },
+
+  tampilSoal() {
+    if (this.idx >= this.soalList.length) { this.tampilSelesai(); return; }
+    const s = this.soalList[this.idx];
+    const total = this.soalList.length;
+    const hdr = `
+      <div class="soal-header">
+        <div class="progres-teks">Soal ${this.idx + 1}/${total}</div>
+        <div class="skor-mini" id="skor-mini">✅${sesiSkor.benar} ❌${sesiSkor.salah}</div>
+      </div>
+      <div class="progres-bar"><div class="progres-fill" style="width:${(this.idx / total) * 100}%"></div></div>`;
+    let html = hdr;
+    if (this.modeSaat === "translate")  html += this._translate(s);
+    else if (this.modeSaat === "arrange")    html += this._arrange(s);
+    else if (this.modeSaat === "fill")       html += this._fill(s);
+    else if (this.modeSaat === "match")      html += this._match();
+    el("konten-utama").innerHTML = html;
+  },
+
+  _translate(s) {
+    return `<div class="soal-wrap">
+      <div class="label-mode">🈯 Translate</div>
+      <div class="soal-kalimat">${s.hanzi}</div>
+      <div class="soal-pinyin-hint">${s.pinyin}</div>
+      <div class="audio-btn-wrap">
+        <button class="btn-audio" onclick="TTS.mandarin('${this._esc(s.hanzi)}')">🔊 Putar</button>
+      </div>
+      <div class="soal-hint">Terjemahkan ke bahasa Indonesia:</div>
+      <textarea id="input-jawab" class="input-jawab" rows="3" placeholder="Tulis terjemahan..."></textarea>
+      <div class="hasil-box" id="hasil-box"></div>
+      <div class="btn-row">
+        <button class="btn btn-hijau" onclick="Sentence._jawabTranslate('${this._esc(s.arti)}')">✅ Submit</button>
+        <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
+      </div>
+    </div>`;
+  },
+
+  _arrange(s) {
+    // Pecah kalimat per karakter/kata lalu acak
+    const kata = s.hanzi.match(/[\u4e00-\u9fff]{1,3}|[^\u4e00-\u9fff]+/g) || s.hanzi.split("");
+    const diacak = acak([...kata]);
+    return `<div class="soal-wrap">
+      <div class="label-mode">🔀 Arrange Words</div>
+      <div class="soal-hint">Susun kata-kata berikut menjadi kalimat yang benar:</div>
+      <div class="soal-hint" style="color:#546e7a;font-size:13px">${s.arti}</div>
+      <div class="pilihan-grid" id="kata-pool" style="flex-wrap:wrap;gap:8px;margin:12px 0">
+        ${diacak.map((k, i) => `<button class="btn-pilihan hanzi" id="kata-${i}" onclick="Sentence._pilihKata(this,'${this._esc(k)}')">${k}</button>`).join("")}
+      </div>
+      <div style="min-height:44px;background:#f5f5f5;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:20px;letter-spacing:2px" id="susun-area"></div>
+      <div class="hasil-box" id="hasil-box"></div>
+      <div class="btn-row">
+        <button class="btn btn-hijau" onclick="Sentence._jawabArrange('${this._esc(s.hanzi)}')">✅ Submit</button>
+        <button class="btn btn-kuning" onclick="Sentence._resetArrange()">🔄 Reset</button>
+        <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
+      </div>
+    </div>`;
+  },
+
+  _fill(s) {
+    // Sembunyikan 1 kata dari kalimat
+    const kata = s.hanzi.match(/[\u4e00-\u9fff]{1,3}/g) || [];
+    if (!kata.length) { this.idx++; this.tampilSoal(); return ""; }
+    const target = acak(kata)[0];
+    const blank = s.hanzi.replace(target, "___");
+    const salah = acak(DB.vocab.filter(v => v.hanzi !== target && v.hanzi.length <= 3)).slice(0, 3).map(v => v.hanzi);
+    const semua = acak([target, ...salah]);
+    return `<div class="soal-wrap">
+      <div class="label-mode">📝 Fill in the Blank</div>
+      <div class="soal-kalimat">${blank}</div>
+      <div class="soal-hint" style="color:#546e7a;font-size:13px">${s.arti}</div>
+      <div class="soal-hint">Pilih kata yang tepat untuk mengisi ___:</div>
+      <div class="pilihan-grid" id="pilihan-cont">
+        ${semua.map(p => `<button class="btn-pilihan hanzi lg" onclick="Sentence._jawabFill('${this._esc(p)}','${this._esc(target)}')">${p}</button>`).join("")}
+      </div>
+      <div class="hasil-box" id="hasil-box"></div>
+      <div class="btn-row"><button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button></div>
+    </div>`;
+  },
+
+  _match() {
+    const pool = acak(DB.sentences).slice(0, 4);
+    const hanziList = acak([...pool]);
+    const artiList  = acak([...pool]);
+    return `<div class="soal-wrap">
+      <div class="label-mode">🔗 Match Sentence</div>
+      <div class="soal-hint">Cocokkan kalimat Hanzi dengan terjemahannya:</div>
+      <div style="display:flex;gap:12px;margin:12px 0">
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px" id="kol-hanzi">
+          ${hanziList.map((s, i) => `<button class="btn-pilihan-full" id="mh-${i}" onclick="Sentence._pilihMatch('h','${this._esc(s.hanzi)}','${this._esc(s.arti)}')" style="font-size:16px">${s.hanzi}</button>`).join("")}
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px" id="kol-arti">
+          ${artiList.map((s, i) => `<button class="btn-pilihan-full" id="ma-${i}" onclick="Sentence._pilihMatch('a','${this._esc(s.arti)}','${this._esc(s.hanzi)}')">${s.arti}</button>`).join("")}
+        </div>
+      </div>
+      <div class="hasil-box" id="hasil-box"></div>
+      <div class="btn-row"><button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button></div>
+    </div>`;
+  },
+
+  // ── LOGIKA JAWAB ─────────────────────────────────────────────
+
+  _jawabTranslate(target) {
+    const inp = el("input-jawab");
+    const input = inp ? inp.value.trim() : "";
+    if (!input) return;
+    const benar = input.length >= 3;
+    tambahSkor(benar);
+    setHTML("hasil-box", (benar ? "✅ Bagus! " : "❌ ") + `Terjemahan: <b>${target}</b>`);
+    el("hasil-box").className = "hasil-box " + (benar ? "benar" : "salah");
+    if (inp) inp.disabled = true;
+    setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+  },
+
+  // State untuk arrange
+  _susun: [],
+  _pilihKata(btn, kata) {
+    if (btn.disabled) return;
+    this._susun.push(kata);
+    btn.disabled = true;
+    btn.style.opacity = "0.4";
+    const area = el("susun-area");
+    if (area) area.textContent = this._susun.join("");
+  },
+  _resetArrange() {
+    this._susun = [];
+    const area = el("susun-area");
+    if (area) area.textContent = "";
+    document.querySelectorAll("[id^='kata-']").forEach(b => { b.disabled = false; b.style.opacity = "1"; });
+    setHTML("hasil-box", "");
+  },
+  _jawabArrange(target) {
+    const input = this._susun.join("");
+    if (!input) { tampilToast("Susun katanya dulu!"); return; }
+    const benar = input.replace(/\s/g, "") === target.replace(/\s/g, "");
+    tambahSkor(benar);
+    setHTML("hasil-box", (benar ? "✅ Benar! " : "❌ ") + `Jawaban: <b>${target}</b>`);
+    el("hasil-box").className = "hasil-box " + (benar ? "benar" : "salah");
+    this._susun = [];
+    setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+  },
+
+  _jawabFill(dipilih, jawaban) {
+    const benar = dipilih === jawaban;
+    tambahSkor(benar);
+    el("pilihan-cont").querySelectorAll(".btn-pilihan").forEach(b => {
+      b.disabled = true;
+      if (b.innerText === jawaban) b.classList.add("pilihan-benar");
+      else if (b.innerText === dipilih && !benar) b.classList.add("pilihan-salah");
+    });
+    setHTML("hasil-box", (benar ? "✅ Benar! " : "❌ Salah! ") + `Jawaban: <b>${jawaban}</b>`);
+    el("hasil-box").className = "hasil-box " + (benar ? "benar" : "salah");
+    setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+  },
+
+  // Match state
+  _matchPilih: null,
+  _pilihMatch(tipe, nilai, pasangan) {
+    if (!this._matchPilih) {
+      this._matchPilih = { tipe, nilai, pasangan };
+      // Highlight btn
+      const semua = document.querySelectorAll("#kol-hanzi .btn-pilihan-full, #kol-arti .btn-pilihan-full");
+      semua.forEach(b => { if (b.innerText.trim() === nilai) b.style.background = "#bbdefb"; });
+    } else {
+      const prev = this._matchPilih;
+      this._matchPilih = null;
+      if (prev.tipe !== tipe) {
+        const benar = (tipe === "a" && prev.pasangan === nilai) || (tipe === "h" && pasangan === prev.nilai);
+        tambahSkor(benar);
+        // Warnai
+        const semua = document.querySelectorAll("#kol-hanzi .btn-pilihan-full, #kol-arti .btn-pilihan-full");
+        semua.forEach(b => {
+          const txt = b.innerText.trim();
+          if (txt === prev.nilai || txt === nilai) {
+            b.disabled = true;
+            b.style.background = benar ? "#c8e6c9" : "#ffcdd2";
+          }
+        });
+        setHTML("hasil-box", benar ? "✅ Cocok!" : "❌ Tidak cocok, coba lagi.");
+        el("hasil-box").className = "hasil-box " + (benar ? "benar" : "salah");
+      } else {
+        // Reset pilihan
+        const semua = document.querySelectorAll("#kol-hanzi .btn-pilihan-full, #kol-arti .btn-pilihan-full");
+        semua.forEach(b => { b.style.background = ""; });
+      }
+    }
+  },
+
+  _esc(s) { return (s || "").replace(/'/g, "\\'"); },
+
+  tampilSelesai() {
+    const pct = sesiSkor.total ? Math.round((sesiSkor.benar / sesiSkor.total) * 100) : 0;
+    el("konten-utama").innerHTML = `
+      <div class="selesai-wrap">
+        <div class="selesai-emoji">${pct >= 80 ? "🏆" : pct >= 60 ? "👍" : "💪"}</div>
+        <h2>Sesi Selesai!</h2>
+        <div class="selesai-skor">
+          <div>✅ Benar: <b>${sesiSkor.benar}</b></div>
+          <div>❌ Salah: <b>${sesiSkor.salah}</b></div>
+          <div class="skor-pct">${pct}%</div>
+        </div>
+        <div class="btn-row" style="justify-content:center;margin-top:20px;">
+          <button class="btn btn-hijau" onclick="Sentence.mulai('${this.modeSaat}')">🔄 Ulangi</button>
+          <button class="btn btn-biru" onclick="Sentence.kembaliMenu()">← Menu Sentence</button>
+        </div>
+      </div>`;
+  },
+
+  kembaliMenu() { TTS.berhenti(); App.renderModul("sentence"); }
+};
+
+// ================================================================
+//  SENTENCE_VOCAB.JS — Generate Kalimat dari Vocab HSK via Gemini
+// ================================================================
 var SentenceVocab = {
 
   // ── CONFIG ───────────────────────────────────────────────────
