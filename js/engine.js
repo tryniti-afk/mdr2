@@ -102,14 +102,30 @@ function cekHanzi(input, target) {
   return input.trim() === target.trim();
 }
 
-// ── CEK PINYIN (toleran tanda nada) ─────────────────────────
-function cekPinyin(input, target) {
-  const strip = s => s.toLowerCase()
-    .replace(/[āáǎà]/g,"a").replace(/[ēéěè]/g,"e")
-    .replace(/[īíǐì]/g,"i").replace(/[ōóǒò]/g,"o")
-    .replace(/[ūúǔù]/g,"u").replace(/[ǖǘǚǜ]/g,"u")
-    .replace(/\s+/g," ").trim();
-  return strip(input) === strip(target);
+// ── CEK PINYIN ───────────────────────────────────────────────
+// strict=true  → nada harus tepat (huruf+diakritik harus identik)
+// strict=false → nada diabaikan, hanya huruf dasar yang dibandingkan
+const NADA_KE_POLOS = {
+  "ā":"a","á":"a","ǎ":"a","à":"a",
+  "ē":"e","é":"e","ě":"e","è":"e",
+  "ī":"i","í":"i","ǐ":"i","ì":"i",
+  "ō":"o","ó":"o","ǒ":"o","ò":"o",
+  "ū":"u","ú":"u","ǔ":"u","ù":"u",
+  "ü":"u","ǖ":"u","ǘ":"u","ǚ":"u","ǜ":"u",
+};
+function hilangkanNada(s) {
+  return (s || "").split("").map(ch => NADA_KE_POLOS[ch] || ch).join("");
+}
+function cekPinyin(input, target, strict = true) {
+  const norm = s => (s || "")
+    .toLowerCase()
+    .normalize("NFC")           // pastikan bentuk unicode konsisten (huruf+nada gabungan)
+    .replace(/\s+/g, " ")
+    .trim();
+  const a = norm(input);
+  const b = norm(target);
+  if (strict) return a === b;
+  return hilangkanNada(a) === hilangkanNada(b);
 }
 
 // ── UI HELPERS ───────────────────────────────────────────────
