@@ -425,6 +425,11 @@ var SentenceVocab = {
     // Untuk chat tanya AI saat salah
     chatHistory: [],
     sedangChat: false,
+    // Opsi tambahan
+    tampilkanPinyin: false,   // Tampilkan pinyin di soal hanzi-indo
+    modePermainan: false,     // Mode game: salah → ulang sampai benar
+    _gameRetry: false,        // Flag sedang retry soal saat ini
+    _gameSoalSelesai: 0,      // Counter soal yang sudah diselesaikan
   },
 
   // ── PARSE VOCAB ──────────────────────────────────────────────
@@ -643,6 +648,19 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
           </div>
         </div>
 
+        <div class="sv-section" id="sv-pinyin-section" style="${s.mode !== 'hanzi-indo' ? 'display:none' : ''}">
+          <div class="sv-label">🔠 Tampilkan Pinyin di Soal:</div>
+          <div class="sv-chips">
+            <button class="sv-chip ${s.tampilkanPinyin ? "aktif" : ""}"
+              id="sv-chip-pinyin-ya"
+              onclick="SentenceVocab._setPinyin(true)">✅ Ya, tampilkan</button>
+            <button class="sv-chip ${!s.tampilkanPinyin ? "aktif" : ""}"
+              id="sv-chip-pinyin-tidak"
+              onclick="SentenceVocab._setPinyin(false)">🚫 Tidak</button>
+          </div>
+          <div style="font-size:11px;color:#78909c;margin-top:4px">Pinyin hanya tersedia saat mode Hanzi → Indonesia</div>
+        </div>
+
         <div class="sv-section">
           <div class="sv-label">👁️ Tampilkan Soal:</div>
           <div class="sv-chips">
@@ -670,6 +688,21 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
           <input type="range" min="3" max="20" value="${s.total}"
             oninput="SentenceVocab._setTotal(this.value)"
             style="width:100%;accent-color:#1565c0;margin-top:6px">
+        </div>
+
+        <div class="sv-section" style="padding:10px;background:#f3e5f5;border-radius:8px;border-left:3px solid #9c27b0">
+          <div style="font-size:13px;color:#6a1b9a;font-weight:600;margin-bottom:8px">🎮 Mode Permainan</div>
+          <div class="sv-chips">
+            <button class="sv-chip ${s.modePermainan ? "aktif" : ""}"
+              id="sv-chip-game-ya"
+              onclick="SentenceVocab._setGameMode(true)">🎮 Aktifkan</button>
+            <button class="sv-chip ${!s.modePermainan ? "aktif" : ""}"
+              id="sv-chip-game-tidak"
+              onclick="SentenceVocab._setGameMode(false)">📝 Normal</button>
+          </div>
+          <div style="font-size:11px;color:#78909c;margin-top:6px">
+            Mode permainan: jika jawaban salah, soal diulang sampai benar sebelum lanjut ke soal berikutnya.
+          </div>
         </div>
 
         <div class="sv-section" style="padding:10px;background:#fff8e1;border-radius:8px;border-left:3px solid #ffa000">
@@ -740,6 +773,29 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       if (group) group.querySelectorAll(".sv-chip").forEach(b => b.classList.remove("aktif"));
       btn.classList.add("aktif");
     }
+    // Tampilkan/sembunyikan opsi pinyin berdasarkan mode
+    if (key === "mode") {
+      const pinyinSection = document.getElementById("sv-pinyin-section");
+      if (pinyinSection) {
+        pinyinSection.style.display = val === "hanzi-indo" ? "" : "none";
+      }
+    }
+  },
+
+  _setPinyin(aktif) {
+    this._state.tampilkanPinyin = aktif;
+    const ya    = document.getElementById("sv-chip-pinyin-ya");
+    const tidak = document.getElementById("sv-chip-pinyin-tidak");
+    if (ya)    ya.classList.toggle("aktif", aktif);
+    if (tidak) tidak.classList.toggle("aktif", !aktif);
+  },
+
+  _setGameMode(aktif) {
+    this._state.modePermainan = aktif;
+    const ya    = document.getElementById("sv-chip-game-ya");
+    const tidak = document.getElementById("sv-chip-game-tidak");
+    if (ya)    ya.classList.toggle("aktif", aktif);
+    if (tidak) tidak.classList.toggle("aktif", !aktif);
   },
 
   _setTotal(val) {
@@ -765,6 +821,8 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     s.idx   = 0;
     s.skor  = { benar: 0, salah: 0 };
     s.soalSaat = null;
+    s._gameRetry = false;
+    s._gameSoalSelesai = 0;
 
     el("konten-utama").innerHTML = this._htmlLoading("Mengambil vocab dari spreadsheet...");
 
@@ -785,9 +843,19 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
   async _nextSoal() {
     const s = this._state;
-    if (s.idx >= s.total) { this._tampilSelesai(); return; }
+    // Check completion using game counter or normal idx
+    const selesai = s.modePermainan ? s._gameSoalSelesai : s.idx;
+    if (selesai >= s.total) { this._tampilSelesai(); return; }
 
-    el("konten-utama").innerHTML = this._htmlLoading(`Generating soal ${s.idx + 1} dari ${s.total}...`);
+    // Jika game retry: soal sama, jangan generate ulang
+    if (s._gameRetry && s.soalSaat) {
+      s.chatHistory = [];
+      s.sedangChat  = false;
+      this._tampilSoal();
+      return;
+    }
+
+    el("konten-utama").innerHTML = this._htmlLoading(`Generating soal ${selesai + 1} dari ${s.total}...`);
 
     try {
       s.soalSaat    = await this._generateSoal(s.vocabPool, s.grammarContoh, s.mode);
@@ -814,24 +882,20 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     const mode     = s.mode;
     const tampilan = s.tampilan;
     const jawab    = s.jawab;
+    const isGame   = s.modePermainan;
 
-    const pct = Math.round((s.idx / s.total) * 100);
+    // Progress: di mode game pakai soal selesai, normal pakai idx
+    const soalKe  = isGame ? s._gameSoalSelesai + 1 : s.idx + 1;
+    const pct     = Math.round((isGame ? s._gameSoalSelesai : s.idx) / s.total * 100);
+    const gameTag = isGame ? ` <span style="font-size:11px;background:#9c27b0;color:#fff;padding:2px 6px;border-radius:10px;margin-left:4px">🎮 Game</span>` : "";
     const header = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${s.idx + 1} / ${s.total}</div>
+        <div class="progres-teks">Soal ${soalKe} / ${s.total}${gameTag}</div>
         <div class="skor-mini" id="sv-skor-mini">✅ ${s.skor.benar} ❌ ${s.skor.salah}</div>
       </div>
       <div class="progres-bar">
         <div class="progres-fill" style="width:${pct}%"></div>
       </div>`;
-
-    // Vocab badges
-    const vocabBadges = (soal._vocabDipakai || []).map(v =>
-      `<span class="sv-vocab-badge">${v.hanzi}
-        ${v.pinyin ? `<span class="sv-pinyin">${v.pinyin}</span>` : ""}
-        = ${v.arti}
-      </span>`
-    ).join("");
 
     // Konten soal
     let soalKonten = "";
@@ -841,10 +905,11 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     if (mode === "hanzi-indo") {
       const showTeks  = tampilan !== "audio";
       const showAudio = tampilan !== "teks";
+      const showPinyin = s.tampilkanPinyin && soal.pinyin;
       soalKonten = `
         <div class="label-mode">🈯 Hanzi → Indonesia</div>
         ${showTeks ? `<div class="soal-kalimat">${soal.hanzi}</div>
-          <div class="soal-pinyin-hint">${soal.pinyin || ""}</div>` : ""}
+          ${showPinyin ? `<div class="soal-pinyin-hint">${soal.pinyin}</div>` : ""}` : ""}
         ${showAudio ? `<div class="audio-btn-wrap">
           <button class="btn-audio" onclick="TTS.mandarin('${hanziEsc}')">🔊 Putar Audio</button>
         </div>` : ""}
@@ -866,15 +931,16 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
            placeholder="${mode === "hanzi-indo" ? "Tulis terjemahan Indonesia..." : "Tulis kalimat Hanzi..."}"></textarea>`
       : `<div class="hasil-box" id="sv-hasil-suara">Tekan mic lalu jawab...</div>`;
 
+    const skipLabel = isGame ? "⏭ Lewati (hitung salah)" : "⏭ Skip";
     const tombol = jawab === "ketik"
       ? `<div class="btn-row">
           <button class="btn btn-hijau" onclick="SentenceVocab._jawabKetik()">✅ Submit</button>
-          <button class="btn btn-kuning" onclick="SentenceVocab._skip()">⏭ Skip</button>
+          <button class="btn btn-kuning" onclick="SentenceVocab._skip()">${skipLabel}</button>
           <button class="btn btn-abu" onclick="SentenceVocab.kembaliMenu()">← Menu</button>
         </div>`
       : `<div class="btn-row">
           <button class="btn btn-merah" id="sv-btn-mic" onclick="SentenceVocab._jawabSuara()">🎤 Mulai Bicara</button>
-          <button class="btn btn-kuning" onclick="SentenceVocab._skip()">⏭ Skip</button>
+          <button class="btn btn-kuning" onclick="SentenceVocab._skip()">${skipLabel}</button>
           <button class="btn btn-abu" onclick="SentenceVocab.kembaliMenu()">← Menu</button>
         </div>`;
 
@@ -884,10 +950,6 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
         ${soalKonten}
         ${inputArea}
         <div class="hasil-box" id="sv-hasil-box"></div>
-        <div class="sv-vocab-info">
-          <div class="sv-vocab-label">📚 Vocab dalam soal ini:</div>
-          <div class="sv-vocab-badges">${vocabBadges}</div>
-        </div>
         ${tombol}
       </div>`;
 
@@ -977,23 +1039,56 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
   _tampilHasil(benar, kunci, soal, inputUser) {
     const hEl = el("sv-hasil-box");
     if (!hEl) return;
+    const s = this._state;
+    const isGame = s.modePermainan;
 
     hEl.className = "hasil-box " + (benar ? "benar" : "salah");
 
-    // Breakdown vocab
-    const breakdownHtml = (soal.breakdown || []).map(b => `
+    // Map vocab dipakai untuk lookup HSK level
+    const vocabMap = {};
+    (soal._vocabDipakai || []).forEach(v => { vocabMap[v.hanzi] = v; });
+
+    // Level label helper
+    const levelLabel = (sheetId) => {
+      const m = { "hsk1-2": "HSK 1-2", "Hsk3": "HSK 3", "Hsk4": "HSK 4", "Hsk5": "HSK 5" };
+      return m[sheetId] || sheetId;
+    };
+
+    // Vocab badges (ditampilkan setelah submit, dengan keterangan HSK)
+    const vocabBadgesHasil = (soal._vocabDipakai || []).map(v => {
+      const lvl = v.level ? levelLabel(v.level) : "";
+      return `<div class="sv-vocab-badge-result">
+        <span class="sv-bd-hanzi">${v.hanzi}</span>
+        ${v.pinyin ? `<span class="sv-bd-pinyin">${v.pinyin}</span>` : ""}
+        <span class="sv-bd-arti">${v.arti}</span>
+        ${lvl ? `<span class="sv-bd-hsk-tag">${lvl}</span>` : ""}
+      </div>`;
+    }).join("");
+
+    // Breakdown vocab dengan keterangan HSK
+    const breakdownHtml = (soal.breakdown || []).map(b => {
+      const vocabInfo = vocabMap[b.hanzi];
+      const hskInfo = vocabInfo ? `<span class="sv-bd-hsk-tag">${levelLabel(vocabInfo.level)}</span>` : "";
+      return `
       <div class="sv-breakdown-item ${b.dari_vocab ? "sv-vocab-highlight" : ""}">
         <span class="sv-bd-hanzi">${b.hanzi}</span>
         <span class="sv-bd-pinyin">${b.pinyin || ""}</span>
         <span class="sv-bd-arti">${b.arti}</span>
         ${b.dari_vocab ? '<span class="sv-bd-tag">📚 vocab</span>' : ""}
-      </div>
-    `).join("");
+        ${hskInfo}
+      </div>`;
+    }).join("");
 
     // Label sumber grammar
     const grSumber = soal.grammar_source === "dari_data_user"
       ? '<span style="font-size:11px;color:#388e3c;background:#e8f5e9;padding:2px 6px;border-radius:4px">📂 dari data kamu</span>'
       : '<span style="font-size:11px;color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:4px">🌐 grammar umum</span>';
+
+    // Game mode: jika salah tampilkan notif retry
+    const gameSalahHtml = (!benar && isGame) ? `
+      <div style="margin:8px 0;padding:8px 12px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:6px;font-size:13px;color:#e65100">
+        🎮 <b>Mode Permainan:</b> Soal ini akan diulang sampai kamu benar!
+      </div>` : "";
 
     hEl.innerHTML = `
       ${benar
@@ -1002,6 +1097,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
            <div class="sv-hasil-kunci">Jawaban: <b>${kunci}</b></div>
            ${inputUser ? `<div style="font-size:12px;color:#78909c;margin-top:4px">Jawabanmu: "${this._esc2(inputUser)}"</div>` : ""}`
       }
+      ${gameSalahHtml}
 
       <div class="sv-info-kalimat">
         <div class="sv-info-row"><b>🈯 Hanzi:</b>
@@ -1018,6 +1114,12 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
         </div>` : ""}
       </div>
 
+      ${vocabBadgesHasil ? `
+      <div class="sv-vocab-hasil-wrap">
+        <div class="sv-bd-title">📚 Vocab dalam soal:</div>
+        <div class="sv-vocab-hasil-list">${vocabBadgesHasil}</div>
+      </div>` : ""}
+
       ${breakdownHtml ? `
       <div class="sv-breakdown-wrap">
         <div class="sv-bd-title">📖 Breakdown Kata:</div>
@@ -1028,28 +1130,35 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       <div class="sv-tanya-wrap" id="sv-tanya-wrap">
         <div class="sv-tanya-title">🤔 Ada yang ingin ditanyakan ke AI?</div>
         <div class="sv-chat-area" id="sv-chat-area"></div>
-        <div class="sv-tanya-input-row">
+        <div class="sv-tanya-input-wrap">
           <input type="text" id="sv-tanya-input"
-            placeholder="Contoh: kenapa pakai 在 bukan 是 di sini?"
-            style="flex:1;padding:8px 10px;border:1.5px solid #b0bec5;border-radius:8px;font-size:13px"
+            placeholder="Contoh: kenapa pakai 在 bukan 是?"
             onkeydown="if(event.key==='Enter')SentenceVocab._kirimTanya()">
-          <button class="btn btn-biru" style="padding:8px 12px;font-size:13px"
-            onclick="SentenceVocab._kirimTanya()">💬 Tanya</button>
+          <button onclick="SentenceVocab._kirimTanya()">💬 Tanya</button>
         </div>
       </div>` : ""}
 
       <div class="btn-row" style="margin-top:12px" id="sv-btn-lanjut-wrap">
-        <button class="btn btn-biru" onclick="SentenceVocab._lanjut()">→ Soal Berikutnya</button>
+        ${isGame && !benar
+          ? `<button class="btn btn-hijau" onclick="SentenceVocab._gameRetry()">🔄 Coba Lagi</button>`
+          : `<button class="btn btn-biru" onclick="SentenceVocab._lanjut()">→ Soal Berikutnya</button>`
+        }
         <button class="btn btn-abu" onclick="SentenceVocab.kembaliMenu()">← Menu</button>
       </div>
     `;
 
     // Update skor
     const skorMini = el("sv-skor-mini");
-    if (skorMini) skorMini.innerHTML = `✅ ${this._state.skor.benar} ❌ ${this._state.skor.salah}`;
+    if (skorMini) skorMini.innerHTML = `✅ ${s.skor.benar} ❌ ${s.skor.salah}`;
 
     // Auto TTS kalimat benar
     setTimeout(() => TTS.mandarin(soal.hanzi), 400);
+  },
+
+  // ── GAME MODE RETRY ──────────────────────────────────────────
+  _gameRetry() {
+    this._state._gameRetry = true;
+    this._tampilSoal();
   },
 
   // ── TANYA AI SAAT SALAH ──────────────────────────────────────
@@ -1144,18 +1253,30 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
 
   // ── SKIP ─────────────────────────────────────────────────────
   _skip() {
-    const soal = this._state.soalSaat;
-    this._state.skor.salah++;
+    const s    = this._state;
+    const soal = s.soalSaat;
+    s.skor.salah++;
     const hEl = el("sv-hasil-box");
     if (hEl) {
       hEl.className = "hasil-box salah";
       hEl.innerHTML = `⏭ Di-skip.<br>Kalimat: <b>${soal.hanzi}</b> = ${soal.indonesia}`;
     }
+    // Di mode game, skip = lanjut ke soal berikutnya (hitung salah, reset retry)
+    if (s.modePermainan) {
+      s._gameRetry = false;
+      s._gameSoalSelesai++;
+    }
     setTimeout(() => this._lanjut(), 1800);
   },
 
   _lanjut() {
-    this._state.idx++;
+    const s = this._state;
+    // Mode game: saat benar, tambah counter soal selesai
+    if (s.modePermainan && !s._gameRetry) {
+      s._gameSoalSelesai++;
+    }
+    s._gameRetry = false;
+    s.idx++;
     this._nextSoal();
   },
 
@@ -1247,20 +1368,19 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     .sv-chip.aktif { background:#1565c0; color:#fff; border-color:#1565c0; }
     .sv-chip:hover:not(.aktif) { background:#e3f2fd; border-color:#90caf9; }
 
-    /* ── Vocab Info di soal ── */
-    .sv-vocab-info { margin:10px 0; padding:10px; background:#f5f5f5; border-radius:8px; }
-    .sv-vocab-label { font-size:12px; font-weight:600; color:#546e7a; margin-bottom:6px; }
-    .sv-vocab-badges { display:flex; flex-wrap:wrap; gap:6px; }
-    .sv-vocab-badge {
-      background:#e3f2fd; color:#1565c0; border-radius:6px;
-      padding:3px 8px; font-size:12px; border:1px solid #90caf9;
-    }
-    .sv-pinyin { color:#0277bd; font-size:11px; margin:0 3px; }
-
     /* ── Info kalimat setelah jawab ── */
     .sv-info-kalimat { margin:10px 0; padding:10px; background:#f9fbe7; border-radius:8px; border-left:3px solid #aed581; }
     .sv-info-row { font-size:13px; margin:4px 0; line-height:1.5; }
     .sv-struktur { background:#fff3e0; color:#e65100; padding:2px 8px; border-radius:4px; font-size:12px; }
+
+    /* ── Vocab hasil setelah submit ── */
+    .sv-vocab-hasil-wrap { margin:10px 0; }
+    .sv-vocab-hasil-list { display:flex; flex-wrap:wrap; gap:6px; }
+    .sv-vocab-badge-result {
+      display:flex; flex-direction:column; align-items:center;
+      padding:6px 10px; background:#e3f2fd; border:1px solid #90caf9;
+      border-radius:8px; font-size:12px; min-width:54px; text-align:center;
+    }
 
     /* ── Breakdown ── */
     .sv-breakdown-wrap { margin:10px 0; }
@@ -1276,6 +1396,11 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     .sv-bd-pinyin { font-size:11px; color:#0277bd; }
     .sv-bd-arti { font-size:11px; color:#546e7a; }
     .sv-bd-tag { font-size:10px; color:#388e3c; background:#e8f5e9; padding:1px 4px; border-radius:3px; margin-top:2px; }
+    .sv-bd-hsk-tag {
+      font-size:10px; color:#6a1b9a; background:#f3e5f5;
+      padding:1px 5px; border-radius:3px; margin-top:2px;
+      border:1px solid #ce93d8; font-weight:600;
+    }
 
     /* ── Status hasil ── */
     .sv-hasil-status { font-size:15px; font-weight:600; margin-bottom:8px; }
@@ -1290,14 +1415,14 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     }
     .btn-audio-kecil:hover { opacity:1; }
 
-    /* ── Chat tanya AI ── */
+    /* ── Chat tanya AI — mobile-first ── */
     .sv-tanya-wrap {
       margin:12px 0; padding:12px; background:#f3e5f5;
       border-radius:10px; border:1px solid #ce93d8;
     }
     .sv-tanya-title { font-size:13px; font-weight:600; color:#6a1b9a; margin-bottom:8px; }
     .sv-chat-area {
-      max-height:180px; overflow-y:auto; margin-bottom:8px;
+      max-height:160px; overflow-y:auto; margin-bottom:8px;
       display:flex; flex-direction:column; gap:6px;
     }
     .sv-chat-bubble {
@@ -1307,7 +1432,41 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     .sv-chat-ai { background:#fff; color:#37474f; border:1px solid #e0e0e0; align-self:flex-start; }
     .sv-chat-ai-loading { opacity:.6; }
     .sv-chat-label { font-weight:600; font-size:11px; display:block; margin-bottom:2px; }
-    .sv-tanya-input-row { display:flex; gap:8px; }
+
+    /* Input row chat — stacked on mobile, side-by-side on wider screens */
+    .sv-tanya-input-wrap {
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .sv-tanya-input-wrap input {
+      width:100%;
+      box-sizing:border-box;
+      padding:9px 12px;
+      border:1.5px solid #b0bec5;
+      border-radius:8px;
+      font-size:14px;
+      outline:none;
+    }
+    .sv-tanya-input-wrap input:focus { border-color:#9c27b0; }
+    .sv-tanya-input-wrap button {
+      width:100%;
+      padding:9px 12px;
+      background:#7b1fa2;
+      color:#fff;
+      border:none;
+      border-radius:8px;
+      font-size:14px;
+      font-weight:600;
+      cursor:pointer;
+      transition:background .15s;
+    }
+    .sv-tanya-input-wrap button:hover { background:#6a1b9a; }
+    @media (min-width:480px) {
+      .sv-tanya-input-wrap { flex-direction:row; align-items:center; }
+      .sv-tanya-input-wrap input { flex:1; width:auto; }
+      .sv-tanya-input-wrap button { width:auto; }
+    }
 
     /* ── Spinner ── */
     .sv-spinner {
