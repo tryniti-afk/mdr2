@@ -15,20 +15,20 @@ var Vocab = {
   // ── RENDER MENU ──────────────────────────────────────────────
   renderMenu() {
     const subFitur = [
-      { id:"hanzi-indo",   icon:"🈯", label:"Hanzi → Indonesia",  desc:"Lihat karakter, jawab artinya", fn:"pilihOpsiHanziIndo" },
+      { id:"hanzi-indo",   icon:"🈯", label:"Hanzi → Indonesia",  desc:"Lihat karakter, jawab artinya", fn:"pilihOpsiHanziIndo()" },
       { id:"indo-hanzi",   icon:"🔤", label:"Indonesia → Hanzi",  desc:"Lihat arti, tulis karakternya", fn:"mulai('indo-hanzi')" },
       { id:"hanzi-pinyin", icon:"🔤", label:"Hanzi → Pinyin",     desc:"Tulis cara baca (romanisasi)",  fn:"pilihOpsiPinyin('hanzi-pinyin')" },
       { id:"indo-pinyin",  icon:"🔠", label:"Indonesia → Pinyin", desc:"Lihat arti, tulis pinyin-nya",  fn:"pilihOpsiPinyin('indo-pinyin')" },
       { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya",   fn:"mulai('audio-arti')" },
       { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
-      { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking" },
+      { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking()" },
     ];
     return `
       <div style="padding-bottom:12px">
         ${SetSoal.renderWidget("vocab", "v")}
         <div class="sub-menu-grid" style="margin-top:12px">
           ${subFitur.map(f => `
-            <div class="sub-card" onclick="Vocab.${f.fn}()">
+            <div class="sub-card" onclick="Vocab.${f.fn}">
               <div class="sub-icon">${f.icon}</div>
               <div class="sub-label">${f.label}</div>
               <div class="sub-desc">${f.desc}</div>
