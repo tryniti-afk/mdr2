@@ -1054,18 +1054,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       return m[sheetId] || sheetId;
     };
 
-    // Vocab badges (ditampilkan setelah submit, dengan keterangan HSK)
-    const vocabBadgesHasil = (soal._vocabDipakai || []).map(v => {
-      const lvl = v.level ? levelLabel(v.level) : "";
-      return `<div class="sv-vocab-badge-result">
-        <span class="sv-bd-hanzi">${v.hanzi}</span>
-        ${v.pinyin ? `<span class="sv-bd-pinyin">${v.pinyin}</span>` : ""}
-        <span class="sv-bd-arti">${v.arti}</span>
-        ${lvl ? `<span class="sv-bd-hsk-tag">${lvl}</span>` : ""}
-      </div>`;
-    }).join("");
-
-    // Breakdown vocab dengan keterangan HSK
+    // Breakdown — semua kata, dengan HSK jika diketahui
     const breakdownHtml = (soal.breakdown || []).map(b => {
       const vocabInfo = vocabMap[b.hanzi];
       const hskInfo = vocabInfo ? `<span class="sv-bd-hsk-tag">${levelLabel(vocabInfo.level)}</span>` : "";
@@ -1113,12 +1102,6 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
           <b>💡 Grammar:</b> ${soal.grammar_note}
         </div>` : ""}
       </div>
-
-      ${vocabBadgesHasil ? `
-      <div class="sv-vocab-hasil-wrap">
-        <div class="sv-bd-title">📚 Vocab dalam soal:</div>
-        <div class="sv-vocab-hasil-list">${vocabBadgesHasil}</div>
-      </div>` : ""}
 
       ${breakdownHtml ? `
       <div class="sv-breakdown-wrap">
@@ -1232,7 +1215,7 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     const div = document.createElement("div");
     div.className = `sv-chat-bubble sv-chat-${role} ${extraClass}`;
     div.innerHTML = role === "ai"
-      ? `<span class="sv-chat-label">🤖 AI Guru:</span> ${this._esc2(teks)}`
+      ? `<span class="sv-chat-label">🤖 AI Guru:</span> ${this._mdToHtml(teks)}`
       : `<span class="sv-chat-label">👤 Kamu:</span> ${this._esc2(teks)}`;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
@@ -1244,7 +1227,7 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     const loading = area.querySelector(".sv-chat-ai-loading");
     if (loading) {
       loading.className = "sv-chat-bubble sv-chat-ai";
-      loading.innerHTML = `<span class="sv-chat-label">🤖 AI Guru:</span> ${this._esc2(teks)}`;
+      loading.innerHTML = `<span class="sv-chat-label">🤖 AI Guru:</span> ${this._mdToHtml(teks)}`;
     } else {
       this._appendChat("ai", teks);
     }
@@ -1339,6 +1322,18 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br>");
+  },
+
+  // Render markdown sederhana dari AI: **bold**, *italic*, `code`
+  _mdToHtml(s) {
+    return (s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.+?)\*/g, "<i>$1</i>")
+      .replace(/`(.+?)`/g, "<code style='background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px'>$1</code>")
       .replace(/\n/g, "<br>");
   },
 };
