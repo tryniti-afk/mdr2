@@ -250,6 +250,24 @@ body {
   color: var(--c-sub);
   margin-bottom: 14px;
 }
+.pinyin-mode-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+.pinyin-mode-tag.ketat {
+  background: #ffebee;
+  color: #c62828;
+  border: 1px solid #ef9a9a;
+}
+.pinyin-mode-tag.longgar {
+  background: #e0f2f1;
+  color: #00695c;
+  border: 1px solid #80cbc4;
+}
 .soal-teks-indo {
   font-size: 20px;
   text-align: center;
