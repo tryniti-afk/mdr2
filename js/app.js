@@ -3,6 +3,7 @@
 // ================================================================
 
 var MODUL_CFG = {
+  pintar:    { label:"🧠 Sesi Pintar",  obj:"Pintar",   icon:"🧠" },
   vocab:     { label:"📚 Vocabulary",  obj:"Vocab",    icon:"📚" },
   sentence:  { label:"📝 Sentence",    obj:"Sentence", icon:"📝" },
   grammar:   { label:"📖 Grammar",     obj:"Grammar",  icon:"📖" },
