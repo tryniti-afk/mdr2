@@ -129,7 +129,7 @@ var Sentence = {
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${modeRetry ? (Math.min(this.idx, total)/total)*100}%"></div>
+        <div class="progres-fill" style="width:${(Math.min(this.idx,total)/total*100).toFixed(1)}%"></div>
       </div>
     `;
 
