@@ -356,14 +356,14 @@ var Quiz = {
     const total   = this.daftarSoal.length;
 
     // Header
-    const nomorTeks = `Soal ${this.state.nomor + 1} dari ${total}` +
+    const nomorTeks = `Soal ${Math.min(this.state.nomor + 1, total)} dari ${total}` +
       (this.cfg.mode === "bebas" ? ` | Putaran ${this.state.putaran}/${this.state.maxPutaran}` : "");
     setTeks("quiz-nomor", nomorTeks);
     setTeks("quiz-label-sheet", "📋 " + (this.state.sheet || "lokal"));
     setTeks("quiz-label-mode",
       this.cfg.mode === "jumlah" ? `🔢 ${this.daftarSoal.length} Soal` : "♾ Semua Soal");
     const progress = el("quiz-progress");
-    if (progress) progress.style.width = ((this.state.nomor / total) * 100) + "%";
+    if (progress) progress.style.width = (Math.min(this.state.nomor, total) / total * 100) + "%";
 
     // Soal
     setTeks("quiz-soal", (this.state.ulangiSoal >= 0 ? "🔄 Ulangi: " : "") + soalObj.pertanyaan);
@@ -595,10 +595,10 @@ var Quiz = {
       let nomorTuju = 0; // default hard: kembali ke soal 1 (index 0)
       if (isEasy) {
         // Mundur 2 soal dari posisi soal yang salah ini
-        nomorTuju = Math.max(0, this.state.nomor - 2);
+        nomorTuju = Math.max(0, this.state.nomor - 1);
       }
       const labelTuju = isEasy
-        ? (nomorTuju === this.state.nomor - 2
+        ? (nomorTuju === this.state.nomor - 1
             ? `soal ${nomorTuju + 1}`
             : "soal 1")
         : "soal 1";
