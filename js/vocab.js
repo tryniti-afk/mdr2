@@ -11,6 +11,7 @@ var Vocab = {
   speakingTipe: "arti",
   audioHanziIndo: false,   // preferensi audio di mode hanzi-indo
   pinyinStrict: true,      // mode ketat untuk soal pinyin (true = nada harus tepat)
+  difficulty: "hard",      // "hard" = kembali ke soal 1 | "easy" = mundur 2 soal
 
   // ── RENDER MENU ──────────────────────────────────────────────
   renderMenu() {
@@ -147,7 +148,52 @@ var Vocab = {
     event.currentTarget.classList.add("sub-card-aktif");
   },
 
-  async mulai(mode) {
+  mulai(mode) {
+    const cfg = SetSoal.get("vocab");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
+    if (modeRetry) {
+      this._tanyaDifficulty(mode);
+    } else {
+      this._mulaiLangsung(mode);
+    }
+  },
+
+  _tanyaDifficulty(mode) {
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">⚙️ Pilih Tingkat Kesulitan</div>
+        <div class="soal-hint" style="margin-bottom:14px">
+          Jika jawaban salah, kamu harus menjawab ulang soal tersebut hingga benar.<br>
+          Setelah benar, soal akan dilanjutkan ke mana?
+        </div>
+        <div class="sub-menu-grid">
+          <div class="sub-card ${this.difficulty === 'hard' ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihDifficulty('hard', '${mode}')">
+            <div class="sub-icon">💀</div>
+            <div class="sub-label">Hard</div>
+            <div class="sub-desc">Kembali ke soal 1 dari awal</div>
+          </div>
+          <div class="sub-card ${this.difficulty === 'easy' ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihDifficulty('easy', '${mode}')">
+            <div class="sub-icon">😊</div>
+            <div class="sub-label">Mudah</div>
+            <div class="sub-desc">Mundur 2 soal sebelumnya</div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-hijau" onclick="Vocab._mulaiLangsung('${mode}')">▶ Mulai</button>
+          <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _pilihDifficulty(diff, mode) {
+    this.difficulty = diff;
+    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    event.currentTarget.classList.add("sub-card-aktif");
+  },
+
+  async _mulaiLangsung(mode) {
     this.modeSaat         = mode;
     this.idx              = 0;
     this.streak           = 0;
@@ -517,25 +563,31 @@ var Vocab = {
 
     if (modeRetry) {
       if (!benar) {
-        // Salah → ulangi soal ini dulu sampai benar, lalu reset ke soal pertama
+        // Salah → ulangi soal ini dulu sampai benar
         this._infinityRetry = true;
+        const pesanDiff = this.difficulty === "easy"
+          ? "🔄 Jawab ulang soal ini hingga benar, lalu mundur 2 soal..."
+          : "🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...";
         const hEl = el("hasil-vocab");
-        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...</small>";
+        if (hEl) hEl.innerHTML += `<br><small>${pesanDiff}</small>`;
         setTimeout(() => this.tampilSoal(), 2800);
       } else {
         if (this._infinityRetry) {
-          // Setelah retry berhasil → cek apakah ini soal terakhir
+          // Setelah retry berhasil
           this._infinityRetry = false;
           this._soalSelesai++;
           if (this.idx >= this.soalList.length - 1) {
             // Soal terakhir → selesai
             setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
           } else {
-            // Bukan soal terakhir → reset ke soal pertama + reset progress
-            setTimeout(() => { this.idx = 0; this._soalSelesai = 0; this.tampilSoal(); }, 1600);
+            // Tentukan tujuan berdasarkan difficulty
+            const isEasy = this.difficulty === "easy";
+            const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
+            const resetSelesai = isEasy ? Math.max(0, this._soalSelesai - 2) : 0;
+            setTimeout(() => { this.idx = nomorTuju; this._soalSelesai = resetSelesai; this.tampilSoal(); }, 1600);
           }
         } else {
-          // Benar normal → lanjut soal berikutnya (selesai jika sudah habis)
+          // Benar normal → lanjut soal berikutnya
           this._soalSelesai++;
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
