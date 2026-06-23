@@ -68,12 +68,14 @@ var App = {
   _settings: {
     ttsRate:      0.85,   // kecepatan TTS 0.5 – 1.5
     jawabanDelay: 1600,   // ms sebelum lanjut soal (1000–3000)
+    theme:        "light", // "light" | "dark"
   },
 
   // ── INIT ────────────────────────────────────────────────────
   init() {
     this._muatProgress();
     this._muatSettings();
+    this._applyTheme();
     this._renderStatHome();
     this._cekStreak();
     this._renderBadge();
@@ -256,6 +258,20 @@ var App = {
           </div>
         </div>
 
+        <!-- TEMA -->
+        <div class="card" style="margin-bottom:14px">
+          <h3 style="margin:0 0 12px">🌙 Tampilan</h3>
+          <div style="font-size:13px;color:var(--c-sub);margin-bottom:10px">
+            Pilih tema tampilan sesuai kondisi belajar kamu.
+          </div>
+          <div class="theme-toggle-wrap">
+            <button class="theme-btn ${s.theme !== 'dark' ? 'aktif' : ''}" id="theme-btn-light"
+              onclick="App._pilihTheme('light')">☀️ Siang (Terang)</button>
+            <button class="theme-btn ${s.theme === 'dark' ? 'aktif' : ''}" id="theme-btn-dark"
+              onclick="App._pilihTheme('dark')">🌙 Malam (Gelap)</button>
+          </div>
+        </div>
+
         <!-- RESET -->
         <div class="card" style="margin-bottom:14px">
           <h3 style="margin:0 0 12px">🗑️ Reset Data</h3>
@@ -283,6 +299,22 @@ var App = {
   },
 
   tutupSettings() { this._screen("home"); },
+
+  _applyTheme() {
+    const theme = this._settings.theme || "light";
+    document.documentElement.setAttribute("data-theme", theme === "dark" ? "dark" : "");
+  },
+
+  _pilihTheme(tema) {
+    this._settings.theme = tema;
+    this._simpanSettings();
+    this._applyTheme();
+    // Update tombol aktif
+    const btnLight = el("theme-btn-light");
+    const btnDark  = el("theme-btn-dark");
+    if (btnLight) btnLight.classList.toggle("aktif", tema !== "dark");
+    if (btnDark)  btnDark.classList.toggle("aktif", tema === "dark");
+  },
 
   _previewTTS(val) {
     const rate = parseFloat(val || document.getElementById("set-tts-rate")?.value || this._settings.ttsRate);
