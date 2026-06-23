@@ -595,10 +595,10 @@ var Quiz = {
       let nomorTuju = 0; // default hard: kembali ke soal 1 (index 0)
       if (isEasy) {
         // Mundur 2 soal dari posisi soal yang salah ini
-        nomorTuju = Math.max(0, this.state.nomor - 1);
+        nomorTuju = Math.max(0, this.state.nomor - 2);
       }
       const labelTuju = isEasy
-        ? (nomorTuju === this.state.nomor - 1
+        ? (nomorTuju === this.state.nomor - 2
             ? `soal ${nomorTuju + 1}`
             : "soal 1")
         : "soal 1";
