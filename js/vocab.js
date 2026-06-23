@@ -230,7 +230,7 @@ var Vocab = {
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${modeRetry ? (Math.min(this.idx, total)/total)*100}%"></div>
+        <div class="progres-fill" style="width:${(Math.min(this.idx,total)/total*100).toFixed(1)}%"></div>
       </div>
       <div class="quiz-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
