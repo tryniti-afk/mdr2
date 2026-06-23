@@ -581,7 +581,7 @@ var Vocab = {
           } else {
             // Tentukan tujuan berdasarkan difficulty
             const isEasy = this.difficulty === "easy";
-            const nomorTuju = isEasy ? Math.max(0, this.idx - 1) : 0;
+            const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
             setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1600);
           }
         } else {
