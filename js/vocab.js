@@ -226,11 +226,11 @@ var Vocab = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${modeRetry ? this._soalSelesai+1 : this.idx+1} / ${total}</div>
+        <div class="progres-teks">Soal ${Math.min(this.idx+1, total)} / ${total}</div>
         <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
       </div>
       <div class="progres-bar">
-        <div class="progres-fill" style="width:${modeRetry ? (this._soalSelesai/total)*100 : (this.idx/total)*100}%"></div>
+        <div class="progres-fill" style="width:${modeRetry ? (Math.min(this.idx, total)/total)*100}%"></div>
       </div>
       <div class="quiz-streak" id="vocab-streak">${this.streak > 1 ? "🔥 Streak: "+this.streak : ""}</div>
     `;
@@ -575,20 +575,17 @@ var Vocab = {
         if (this._infinityRetry) {
           // Setelah retry berhasil
           this._infinityRetry = false;
-          this._soalSelesai++;
           if (this.idx >= this.soalList.length - 1) {
             // Soal terakhir → selesai
             setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
           } else {
             // Tentukan tujuan berdasarkan difficulty
             const isEasy = this.difficulty === "easy";
-            const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
-            const resetSelesai = isEasy ? Math.max(0, this._soalSelesai - 2) : 0;
-            setTimeout(() => { this.idx = nomorTuju; this._soalSelesai = resetSelesai; this.tampilSoal(); }, 1600);
+            const nomorTuju = isEasy ? Math.max(0, this.idx - 1) : 0;
+            setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1600);
           }
         } else {
           // Benar normal → lanjut soal berikutnya
-          this._soalSelesai++;
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
       }
