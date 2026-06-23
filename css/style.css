@@ -27,6 +27,142 @@
   --trans:      .15s ease;
 }
 
+/* ── DARK MODE ─────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --c-bg:       #0f1117;
+  --c-card:     #1a1d27;
+  --c-border:   #2a2d3a;
+  --c-text:     #e8eaf0;
+  --c-sub:      #8a8fa8;
+  --c-hijau:    #4caf50;
+  --c-hijau-d:  #388e3c;
+  --c-merah:    #ef5350;
+  --c-biru:     #42a5f5;
+  --c-biru-d:   #1e88e5;
+  --c-kuning:   #ffa726;
+  --c-ungu:     #ab47bc;
+  --c-abu:      #616575;
+  --c-emas:     #ffd54f;
+  --c-hanzi:    #ef5350;
+  --shadow:     0 2px 12px rgba(0,0,0,.45);
+  --shadow-h:   0 4px 20px rgba(0,0,0,.65);
+}
+
+[data-theme="dark"] body {
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .menu-card,
+[data-theme="dark"] .sub-card,
+[data-theme="dark"] .soal-wrap,
+[data-theme="dark"] .quiz-setup-wrap,
+[data-theme="dark"] .global-progress-wrap {
+  background: var(--c-card);
+  border-color: var(--c-border);
+}
+
+[data-theme="dark"] .global-bar {
+  background: #1e2235;
+}
+
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] .input-jawab,
+[data-theme="dark"] .quiz-select {
+  background: #22253a;
+  color: var(--c-text);
+  border-color: var(--c-border);
+}
+
+[data-theme="dark"] .input-jawab::placeholder { color: #555a72; }
+
+[data-theme="dark"] .hasil-box        { background: #1a1d27; border-color: var(--c-border); color: var(--c-text); }
+[data-theme="dark"] .hasil-box.benar  { background: #1b2e1b; border-color: #388e3c; color: #a5d6a7; }
+[data-theme="dark"] .hasil-box.salah  { background: #2e1b1b; border-color: #c62828; color: #ef9a9a; }
+[data-theme="dark"] .hasil-box.info   { background: #1a2030; border-color: #1e88e5; color: #90caf9; }
+
+[data-theme="dark"] .btn-pilihan {
+  background: #22253a;
+  color: var(--c-text);
+  border-color: var(--c-border);
+}
+[data-theme="dark"] .btn-pilihan:hover  { background: #2a2e45; border-color: var(--c-biru); }
+[data-theme="dark"] .pilihan-benar      { background: #1b2e1b !important; border-color: #388e3c !important; color: #a5d6a7 !important; }
+[data-theme="dark"] .pilihan-salah      { background: #2e1b1b !important; border-color: #c62828 !important; color: #ef9a9a !important; }
+
+[data-theme="dark"] .opsi {
+  background: #22253a;
+  color: var(--c-text);
+  border-color: var(--c-border);
+}
+[data-theme="dark"] .opsi.aktif        { background: var(--c-biru);  color: #fff; border-color: var(--c-biru); }
+[data-theme="dark"] .opsi.aktif-ungu.aktif { background: var(--c-ungu);  color: #fff; border-color: var(--c-ungu); }
+[data-theme="dark"] .opsi.aktif-hijau.aktif { background: var(--c-hijau); color: #fff; border-color: var(--c-hijau); }
+[data-theme="dark"] .opsi.aktif-merah.aktif { background: var(--c-merah); color: #fff; border-color: var(--c-merah); }
+
+[data-theme="dark"] .quiz-chip         { background: #22253a; color: var(--c-sub); }
+[data-theme="dark"] .quiz-info-box     { background: #1a2030; border-color: #1e88e5; color: #90caf9; }
+[data-theme="dark"] .quiz-info-box.quiz-info-oren { background: #2a1e10; border-color: #e65100; color: #ffcc80; }
+
+[data-theme="dark"] .soal-hanzi  { color: #ef5350; }
+[data-theme="dark"] .soal-arti   { color: #90caf9; }
+[data-theme="dark"] .soal-hint   { color: var(--c-sub); }
+[data-theme="dark"] .soal-kalimat { color: var(--c-text); }
+
+[data-theme="dark"] .progres-bar  { background: #22253a; }
+[data-theme="dark"] .selesai-wrap { background: var(--c-card); }
+
+[data-theme="dark"] .topbar        { background: #13161f; border-bottom: 1px solid var(--c-border); }
+[data-theme="dark"] .bottom-nav    { background: #13161f; border-top: 1px solid var(--c-border); }
+[data-theme="dark"] .nav-btn       { color: var(--c-sub); }
+[data-theme="dark"] .nav-btn.aktif { color: var(--c-biru); }
+
+[data-theme="dark"] .ss-info-box   { background: #1a2030; border-color: #1e88e5; color: #90caf9; }
+[data-theme="dark"] .quiz-soal-box { color: var(--c-text); }
+[data-theme="dark"] .label-mode    { color: var(--c-biru); }
+[data-theme="dark"] .quiz-streak   { color: #ffa726; }
+
+[data-theme="dark"] code {
+  background: #22253a;
+  color: #ef9a9a;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* Tombol theme toggle di settings */
+.theme-toggle-wrap {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.theme-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 2px solid var(--c-border);
+  background: var(--c-card);
+  color: var(--c-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+  text-align: center;
+}
+.theme-btn:hover { border-color: var(--c-biru); }
+.theme-btn.aktif {
+  border-color: var(--c-biru);
+  background: var(--c-biru);
+  color: #fff;
+}
+[data-theme="dark"] .theme-btn.aktif {
+  background: var(--c-biru);
+  color: #fff;
+}
+
 html { scroll-behavior: smooth; }
 body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
