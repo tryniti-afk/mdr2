@@ -11,6 +11,7 @@ var Sentence = {
   soalList: [],
   idx: 0,
   modeSaat: null,
+  difficulty: "hard",      // "hard" = kembali ke soal 1 | "easy" = mundur 2 soal
 
   // ── RENDER MENU ──────────────────────────────────────────────
   renderMenu() {
@@ -44,7 +45,53 @@ var Sentence = {
   },
 
   // ── MULAI ─────────────────────────────────────────────────────
-  async mulai(mode) {
+  mulai(mode) {
+    if (mode === "vocab-ai") { el("konten-utama").innerHTML = SentenceVocab.renderMenu(); return; }
+    const cfg = SetSoal.get("sentence");
+    const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
+    if (modeRetry) {
+      this._tanyaDifficulty(mode);
+    } else {
+      this._mulaiLangsung(mode);
+    }
+  },
+
+  _tanyaDifficulty(mode) {
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">⚙️ Pilih Tingkat Kesulitan</div>
+        <div class="soal-hint" style="margin-bottom:14px">
+          Jika jawaban salah, kamu harus menjawab ulang soal tersebut hingga benar.<br>
+          Setelah benar, soal akan dilanjutkan ke mana?
+        </div>
+        <div class="sub-menu-grid">
+          <div class="sub-card ${this.difficulty === 'hard' ? 'sub-card-aktif' : ''}"
+               onclick="Sentence._pilihDifficulty('hard', '${mode}')">
+            <div class="sub-icon">💀</div>
+            <div class="sub-label">Hard</div>
+            <div class="sub-desc">Kembali ke soal 1 dari awal</div>
+          </div>
+          <div class="sub-card ${this.difficulty === 'easy' ? 'sub-card-aktif' : ''}"
+               onclick="Sentence._pilihDifficulty('easy', '${mode}')">
+            <div class="sub-icon">😊</div>
+            <div class="sub-label">Mudah</div>
+            <div class="sub-desc">Mundur 2 soal sebelumnya</div>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-hijau" onclick="Sentence._mulaiLangsung('${mode}')">▶ Mulai</button>
+          <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _pilihDifficulty(diff, mode) {
+    this.difficulty = diff;
+    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    event.currentTarget.classList.add("sub-card-aktif");
+  },
+
+  async _mulaiLangsung(mode) {
     if (mode === "vocab-ai") { el("konten-utama").innerHTML = SentenceVocab.renderMenu(); return; }
     this.modeSaat        = mode;
     this.idx             = 0;
@@ -316,17 +363,28 @@ var Sentence = {
       if (!benar) {
         // Salah → ulang soal ini sampai benar
         this._infinityRetry = true;
+        const pesanDiff = this.difficulty === "easy"
+          ? "🔄 Jawab ulang soal ini hingga benar, lalu mundur 2 soal..."
+          : "🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...";
         const hEl = el("hasil-box");
-        if (hEl) hEl.innerHTML += "<br><small>🔄 Jawab ulang soal ini...</small>";
+        if (hEl) hEl.innerHTML += `<br><small>${pesanDiff}</small>`;
         setTimeout(() => this.tampilSoal(), 2200 + 1400);
       } else {
         if (this._infinityRetry) {
-          // Setelah retry berhasil → kembali ke soal pertama
+          // Setelah retry berhasil
           this._infinityRetry = false;
           this._soalSelesai++;
           TTS.berhenti();
           STT.berhenti();
-          setTimeout(() => { this.idx = 0; this._soalSelesai = 0; this.tampilSoal(); }, 1800);
+          if (this.idx >= this.soalList.length - 1) {
+            // Soal terakhir → selesai
+            setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+          } else {
+            const isEasy = this.difficulty === "easy";
+            const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
+            const resetSelesai = isEasy ? Math.max(0, this._soalSelesai - 2) : 0;
+            setTimeout(() => { this.idx = nomorTuju; this._soalSelesai = resetSelesai; this.tampilSoal(); }, 1800);
+          }
         } else {
           this._soalSelesai++;
           setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
