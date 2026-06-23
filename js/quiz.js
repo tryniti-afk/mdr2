@@ -12,7 +12,7 @@
 var Quiz = {
 
   // ── STATE ──────────────────────────────────────────────────
-  cfg: { soal: "suara", jawab: "suara", mode: "jumlah", jumlah: 10, offset: 0 },
+  cfg: { soal: "suara", jawab: "suara", mode: "jumlah", jumlah: 10, offset: 0, difficulty: "hard" },
   state: { nomor: 0, skor: 0, salah: 0, streak: 0, ulangiSoal: -1, putaran: 1, maxPutaran: 1 },
   daftarSoal: [],
   ulangiCb: null,
@@ -79,7 +79,24 @@ var Quiz = {
           </div>
           <div id="quiz-info-infinity" class="quiz-info-box"
             style="display:${this.cfg.mode==='infinity'?'block':'none'}">
-            <b>Semua Soal:</b> Semua soal dimainkan berurutan. Jika salah harus mengulang sampai benar, lalu soal kembali ke awal.
+            <b>Semua Soal:</b> Semua soal dimainkan berurutan. Jika salah harus mengulang sampai benar.
+          </div>
+          <div id="quiz-difficulty-wrap"
+            style="display:${this.cfg.mode==='infinity'?'block':'none'};margin-top:12px">
+            <div style="font-size:13px;color:#555;margin-bottom:6px;font-weight:600">⚙️ Tingkat Kesulitan:</div>
+            <div class="opsi-grup">
+              <button class="opsi aktif-merah ${this.cfg.difficulty==='hard'?'aktif':''}"
+                id="qopsi-difficulty-hard"
+                onclick="Quiz._pilihOpsi('difficulty','hard')">💀 Hard — Kembali ke soal 1</button>
+              <button class="opsi aktif-hijau ${this.cfg.difficulty==='easy'?'aktif':''}"
+                id="qopsi-difficulty-easy"
+                onclick="Quiz._pilihOpsi('difficulty','easy')">😊 Mudah — Mundur 2 soal</button>
+            </div>
+            <div id="quiz-info-difficulty" class="quiz-info-box" style="margin-top:8px;font-size:12px">
+              ${this.cfg.difficulty==='hard'
+                ? '💀 <b>Hard:</b> Jika salah, jawab ulang sampai benar, lalu <b>kembali ke soal 1</b>.'
+                : '😊 <b>Mudah:</b> Jika salah, jawab ulang sampai benar, lalu <b>mundur 2 soal sebelumnya</b>.'}
+            </div>
           </div>
         </div>
 
@@ -213,13 +230,23 @@ var Quiz = {
     if (grup === "mode") {
       const inp = el("quiz-input-jumlah");
       const inf = el("quiz-info-infinity");
+      const diffWrap = el("quiz-difficulty-wrap");
       if (inp) inp.style.display = nilai === "jumlah" ? "block" : "none";
       if (inf) inf.style.display = nilai === "infinity" ? "block" : "none";
+      if (diffWrap) diffWrap.style.display = nilai === "infinity" ? "block" : "none";
       if (nilai === "jumlah") Quiz._renderRangeBtns();
     }
     if (grup === "jawab") {
       const pinInfo = el("quiz-info-pinyin");
       if (pinInfo) pinInfo.style.display = nilai === "pinyin" ? "block" : "none";
+    }
+    if (grup === "difficulty") {
+      const infoEl = el("quiz-info-difficulty");
+      if (infoEl) {
+        infoEl.innerHTML = nilai === "hard"
+          ? '💀 <b>Hard:</b> Jika salah, jawab ulang sampai benar, lalu <b>kembali ke soal 1</b>.'
+          : '😊 <b>Mudah:</b> Jika salah, jawab ulang sampai benar, lalu <b>mundur 2 soal sebelumnya</b>.';
+      }
     }
   },
 
@@ -562,10 +589,24 @@ var Quiz = {
 
     this.ulangiCb = (jawaban) => {
       const benar = cekJawaban(jawaban, aturan);
+
+      // Tentukan nomor soal tujuan setelah berhasil menjawab benar
+      const isEasy = this.cfg.difficulty === "easy";
+      let nomorTuju = 0; // default hard: kembali ke soal 1 (index 0)
+      if (isEasy) {
+        // Mundur 2 soal dari posisi soal yang salah ini
+        nomorTuju = Math.max(0, this.state.nomor - 2);
+      }
+      const labelTuju = isEasy
+        ? (nomorTuju === this.state.nomor - 2
+            ? `soal ${nomorTuju + 1}`
+            : "soal 1")
+        : "soal 1";
+
       if (hasilEl) {
         hasilEl.className = "hasil-box " + (benar ? "benar" : "salah");
         hasilEl.innerText = benar
-          ? `✅ Benar! Kembali ke soal 1...${tambahan ? "\n📌 Info: " + tambahan : ""}`
+          ? `✅ Benar! Kembali ke ${labelTuju}...${tambahan ? "\n📌 Info: " + tambahan : ""}`
           : `❌ Masih salah!\nJawaban: ${aturan}${tambahan ? "\n📌 Info: " + tambahan : ""}\nCoba lagi...`;
       }
       if (benar) {
@@ -576,7 +617,7 @@ var Quiz = {
         STT.berhenti();
         setTimeout(() => {
           this._sedangTransisi = false;
-          this.state.nomor = 0;
+          this.state.nomor = nomorTuju;
           this.state.streak = 0;
           this._tampilSoal();
         }, 1800);
