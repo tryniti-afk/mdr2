@@ -133,6 +133,72 @@
   border-radius: 4px;
 }
 
+/* ── DARK MODE: SET SOAL WIDGET ────────────────────────────── */
+[data-theme="dark"] .ss-widget {
+  background: #1a1d27;
+  border-color: #2a2d3a;
+}
+
+[data-theme="dark"] .ss-label {
+  color: #6b7090;
+}
+
+[data-theme="dark"] .ss-btn {
+  background: #22253a;
+  border-color: #2a2d3a;
+  color: #b0b4cc;
+}
+[data-theme="dark"] .ss-btn:hover {
+  border-color: var(--c-biru);
+  color: var(--c-biru);
+}
+[data-theme="dark"] .ss-btn.aktif {
+  background: var(--c-biru);
+  border-color: var(--c-biru);
+  color: #fff;
+}
+
+[data-theme="dark"] .ss-btn-sm {
+  background: #22253a;
+  border-color: #3a3d50;
+  color: #8a8fa8;
+}
+[data-theme="dark"] .ss-btn-sm:hover {
+  border-color: var(--c-biru);
+  color: var(--c-biru);
+}
+
+[data-theme="dark"] .ss-status {
+  color: #6b7090;
+}
+
+[data-theme="dark"] .ss-info-box {
+  background: #1a2030;
+  border-color: #1e3a5f;
+  color: #90caf9;
+}
+
+[data-theme="dark"] .ss-input-num {
+  background: #22253a;
+  border-color: #2a2d3a;
+  color: var(--c-text);
+}
+
+[data-theme="dark"] .ss-fmt-hint {
+  background: #1e2130;
+  color: #8a8fa8;
+}
+
+[data-theme="dark"] .ss-fmt-hint code {
+  background: #2a2e45;
+  color: #ef9a9a;
+}
+
+/* label inline "Jumlah soal:" di setsoal yang pakai hardcoded color:#555 */
+[data-theme="dark"] .ss-section label {
+  color: #8a8fa8;
+}
+
 /* Tombol theme toggle di settings */
 .theme-toggle-wrap {
   display: flex;
