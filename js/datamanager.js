@@ -120,13 +120,35 @@ var DataMgr = {
   // ── SIMPAN SOAL LOKAL ────────────────────────────────────────
   simpanLokal(tipe, teks) {
     const baris = teks.trim().split("\n").map(b => {
-      const bg = b.split("|");
-      if (bg.length < 2 || !bg[0].trim()) return null;
+      // Split on single | tapi hindari memecah ||
+      // Format: "Pertanyaan | kunci/jawaban || terjemahan"
+      const pipeIdx = b.indexOf("|");
+      if (pipeIdx === -1) return null;
+      const pertanyaan = b.slice(0, pipeIdx).trim();
+      if (!pertanyaan) return null;
+      const sisanya = b.slice(pipeIdx + 1).trim();
+      // sisanya bisa berupa "kunci || translate" atau hanya "kunci"
+      const dblIdx = sisanya.indexOf("||");
+      let kunci, translate;
+      if (dblIdx !== -1) {
+        kunci     = sisanya.slice(0, dblIdx).trim();
+        translate = sisanya.slice(dblIdx + 2).trim();
+      } else {
+        // Cek apakah ada | tunggal lagi (kolom ke-3)
+        const pipeIdx2 = sisanya.indexOf("|");
+        if (pipeIdx2 !== -1) {
+          kunci     = sisanya.slice(0, pipeIdx2).trim();
+          translate = sisanya.slice(pipeIdx2 + 1).trim();
+        } else {
+          kunci     = sisanya;
+          translate = "";
+        }
+      }
       return {
-        pertanyaan: bg[0].trim(),
-        kunci:      bg[1].trim(),
-        translate:  (bg[2] || "").trim(),
-        _tipe:      tipe,
+        pertanyaan,
+        kunci,
+        translate,
+        _tipe: tipe,
       };
     }).filter(Boolean);
     if (!baris.length) return 0;
@@ -137,7 +159,16 @@ var DataMgr = {
   // ── FORMAT teks lokal untuk edit ─────────────────────────────
   toEditTeks(tipe) {
     return (this._lokal[tipe] || [])
-      .map(s => `${s.pertanyaan} | ${s.kunci}${s.translate ? " | " + s.translate : ""}`)
+      .map(s => {
+        let baris = `${s.pertanyaan} | ${s.kunci}`;
+        // Sertakan translate dengan pemisah || jika ada dan belum ada di kunci
+        if (s.translate && !s.kunci.includes("||")) {
+          baris += ` || ${s.translate}`;
+        } else if (s.translate && s.kunci.includes("||")) {
+          baris += ``;  // sudah ada di kunci, tidak tambahkan lagi
+        }
+        return baris;
+      })
       .join("\n");
   },
 
