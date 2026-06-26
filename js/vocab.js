@@ -23,6 +23,7 @@ var Vocab = {
       { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya",   fn:"mulai('audio-arti')" },
       { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
       { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking()" },
+      { id:"all-in",       icon:"🔥", label:"All In",              desc:"Review + 6 tipe soal sekaligus!",fn:"mulaiAllIn()" },
     ];
     return `
       <div style="padding-bottom:12px">
@@ -644,4 +645,822 @@ var Vocab = {
 
   kembaliMenu() { TTS.berhenti(); STT.berhenti(); App.renderModul("vocab"); },
   _esc(s) { return (s||"").replace(/'/g,"\\'").replace(/"/g,"&quot;"); },
+
+  // ── ALL IN entry point ───────────────────────────────────────
+  async mulaiAllIn() {
+    await AllIn.init();
+  },
+};
+
+// ================================================================
+//  ALL IN — 7-step vocab mastery mode
+// ================================================================
+var AllIn = {
+
+  soalList: [],           // kata-kata yang dipakai di sesi ini
+  pinyinStrict: true,     // true = nada diperhatikan
+  difficulty: "easy",     // "easy" = mundur 2 | "hard" = ulang dari awal step | "ambil" = kata salah 2x muncul di akhir
+  stepIdx: 0,             // step saat ini (0-5)
+  wordIdx: 0,             // kata saat ini dalam step
+  _sedang: false,
+
+  // statistik per kata per step
+  // _stat[wordIdx][stepIdx] = { salah: 0, waktuMulai: 0, waktuTotal: 0, salahKe: [] }
+  _stat: [],
+  _errorCount: [],        // _errorCount[wordIdx][stepIdx] = jumlah salah
+  _ambilQueue: [],        // kata yang harus muncul di akhir step (mode ambil)
+  _retryMode: false,      // sedang retry kata yang salah
+  _infinityRetry: false,  // menunggu jawab ulang soal ini benar dulu
+
+  STEPS: [
+    { id:"audio-arti",   label:"Audio → Arti",       icon:"🔊", tipe:"pilihan" },
+    { id:"hanzi-indo",   label:"Hanzi → Arti",        icon:"🈯", tipe:"pilihan" },
+    { id:"audio-hanzi",  label:"Audio → Hanzi",       icon:"🎧", tipe:"ketik-hanzi" },
+    { id:"hanzi-pinyin", label:"Hanzi → Pinyin",      icon:"🔤", tipe:"ketik-pinyin" },
+    { id:"indo-pinyin",  label:"Indo → Pinyin",       icon:"🔠", tipe:"ketik-pinyin" },
+    { id:"arti-hanzi",   label:"Arti → Hanzi",        icon:"✍️", tipe:"ketik-hanzi" },
+  ],
+
+  // ── INIT ─────────────────────────────────────────────────────
+  async init() {
+    const raw = await SetSoal.getSoalSiap("vocab", "hanzi-indo");
+    if (!raw || !raw.length) {
+      tampilToast("Tidak ada soal! Cek set soal yang dipilih.");
+      return;
+    }
+    this.soalList = SetSoal.potongSoal(raw, "vocab");
+    this._renderOpsiAwalAllIn();
+  },
+
+  // ── HALAMAN OPSI SEBELUM PREVIEW ────────────────────────────
+  _renderOpsiAwalAllIn() {
+    const n = this.soalList.length;
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🔥 All In — ${n} Kata</div>
+        <div class="soal-hint" style="margin-bottom:14px">
+          Kamu akan mereview semua ${n} kata, lalu menjalani <b>6 tahap latihan</b> secara berurutan.
+        </div>
+
+        <div class="ss-section" style="margin-bottom:12px">
+          <div class="ss-label">🎯 Pengecekan Pinyin</div>
+          <div class="ss-opsi-row">
+            <button class="ss-btn ${this.pinyinStrict ? 'aktif' : ''}"
+              onclick="AllIn._setPinyinStrict(true)">🎯 Hard (nada wajib)</button>
+            <button class="ss-btn ${!this.pinyinStrict ? 'aktif' : ''}"
+              onclick="AllIn._setPinyinStrict(false)">🌊 Longgar (tanpa nada)</button>
+          </div>
+        </div>
+
+        <div class="ss-section" style="margin-bottom:16px">
+          <div class="ss-label">⚙️ Mode Jika Salah</div>
+          <div class="ss-opsi-row" style="flex-wrap:wrap;gap:8px">
+            <button class="ss-btn ${this.difficulty==='easy'?'aktif':''}"
+              onclick="AllIn._setDifficulty('easy')">😊 Mudah (mundur 2 soal)</button>
+            <button class="ss-btn ${this.difficulty==='hard'?'aktif':''}"
+              onclick="AllIn._setDifficulty('hard')">💀 Hard (ulang dari awal step)</button>
+            <button class="ss-btn ${this.difficulty==='ambil'?'aktif':''}"
+              onclick="AllIn._setDifficulty('ambil')">🎴 Ambil (salah 2x → muncul di akhir)</button>
+          </div>
+        </div>
+
+        <div class="btn-row" style="justify-content:center">
+          <button class="btn btn-hijau" onclick="AllIn.mulaiPreview()">▶ Mulai Review Kata</button>
+          <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _setPinyinStrict(v) {
+    this.pinyinStrict = v;
+    this._renderOpsiAwalAllIn();
+  },
+  _setDifficulty(v) {
+    this.difficulty = v;
+    this._renderOpsiAwalAllIn();
+  },
+
+  // ── PREVIEW SEMUA KATA ───────────────────────────────────────
+  mulaiPreview() {
+    this._previewIdx = 0;
+    this._tampilPreview();
+  },
+
+  _tampilPreview() {
+    const list = this.soalList;
+    const n = list.length;
+
+    let tabelBaris = list.map((item, i) => `
+      <tr>
+        <td style="text-align:center;font-weight:700;color:var(--c-sub);padding:8px 6px">${i+1}</td>
+        <td style="font-size:22px;font-weight:900;color:var(--c-hanzi);padding:8px 6px">
+          ${item.hanzi}
+          <button style="background:none;border:none;cursor:pointer;font-size:16px;vertical-align:middle;margin-left:4px"
+            onclick="TTS.mandarin('${(item.hanzi||'').replace(/'/g,"\\'")}')">🔊</button>
+        </td>
+        <td style="font-size:14px;color:var(--c-biru);padding:8px 6px">${item.pinyin||'-'}</td>
+        <td style="font-size:14px;padding:8px 6px">${item.arti||'-'}</td>
+      </tr>
+    `).join("");
+
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap" style="max-width:520px">
+        <div class="label-mode">📖 Review Kata — ${n} Kata</div>
+        <div class="soal-hint" style="margin-bottom:10px">Pelajari semua kata di bawah, lalu tekan <b>Mulai Latihan</b>.</div>
+        <div style="overflow-x:auto;border-radius:10px;border:1.5px solid var(--c-border)">
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <thead>
+              <tr style="background:var(--c-biru);color:#fff">
+                <th style="padding:8px 6px;text-align:center">#</th>
+                <th style="padding:8px 6px;text-align:left">Hanzi</th>
+                <th style="padding:8px 6px;text-align:left">Pinyin</th>
+                <th style="padding:8px 6px;text-align:left">Arti</th>
+              </tr>
+            </thead>
+            <tbody>${tabelBaris}</tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="justify-content:center;margin-top:16px">
+          <button class="btn btn-hijau" onclick="AllIn.mulaiLatihan()">▶ Mulai Latihan</button>
+          <button class="btn btn-abu" onclick="AllIn._renderOpsiAwalAllIn()">← Opsi</button>
+        </div>
+      </div>`;
+  },
+
+  // ── MULAI LATIHAN ────────────────────────────────────────────
+  mulaiLatihan() {
+    this.stepIdx = 0;
+    this.wordIdx = 0;
+    this._sedang = false;
+    this._infinityRetry = false;
+    this._inAmbilExtra = false;
+    this._ambilExtraList = [];
+    this._ambilExtraIdx = 0;
+    this._ambilQueue = this.STEPS.map(() => []);
+    this._errorCount = this.soalList.map(() => this.STEPS.map(() => 0));
+    this._stat = this.soalList.map(() => this.STEPS.map(() => ({
+      salah: 0, waktuMulai: 0, waktuTotal: 0
+    })));
+    this._tampilStepIntro();
+  },
+
+  // ── INTRO STEP ───────────────────────────────────────────────
+  _tampilStepIntro() {
+    const step = this.STEPS[this.stepIdx];
+    const n = this.soalList.length;
+    const progBar = this.STEPS.map((s, i) => `
+      <div style="flex:1;height:8px;border-radius:99px;
+        background:${i < this.stepIdx ? 'var(--c-hijau)' : i === this.stepIdx ? 'var(--c-biru)' : 'var(--c-border)'}"></div>
+    `).join("");
+
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div style="display:flex;gap:4px;margin-bottom:16px">${progBar}</div>
+        <div class="selesai-emoji" style="font-size:48px">${step.icon}</div>
+        <div class="label-mode">Tahap ${this.stepIdx+1} / ${this.STEPS.length} — ${step.label}</div>
+        <div class="soal-hint" style="margin:10px 0 18px">
+          Kamu akan menjawab <b>${n} soal</b> untuk tahap ini.<br>
+          ${this._deskStep(step.id)}
+        </div>
+        ${step.tipe === 'ketik-pinyin' ? `
+          <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px">
+            <button class="ss-btn ${this.pinyinStrict?'aktif':''}"
+              onclick="AllIn._setPinyinStrictInline(true)">🎯 Hard</button>
+            <button class="ss-btn ${!this.pinyinStrict?'aktif':''}"
+              onclick="AllIn._setPinyinStrictInline(false)">🌊 Longgar</button>
+          </div>` : ''}
+        <div class="btn-row" style="justify-content:center">
+          <button class="btn btn-hijau" onclick="AllIn._mulaiStep()">▶ Mulai Tahap Ini</button>
+          <button class="btn btn-abu" onclick="AllIn.mulaiPreview()">← Review Kata Lagi</button>
+        </div>
+      </div>`;
+  },
+
+  _setPinyinStrictInline(v) {
+    this.pinyinStrict = v;
+    this._tampilStepIntro();
+  },
+
+  _deskStep(id) {
+    const m = {
+      "audio-arti":   "Dengarkan audio → pilih arti yang benar (4 pilihan).",
+      "hanzi-indo":   "Lihat karakter Hanzi → pilih artinya (4 pilihan).",
+      "audio-hanzi":  "Dengarkan audio → ketik karakter Hanzi-nya.",
+      "hanzi-pinyin": "Lihat Hanzi → ketik Pinyin-nya.",
+      "indo-pinyin":  "Lihat arti Indonesia → ketik Pinyin-nya.",
+      "arti-hanzi":   "Lihat arti Indonesia → ketik karakter Hanzi-nya.",
+    };
+    return m[id] || "";
+  },
+
+  // ── MULAI STEP (setup wordIdx, ambilQueue per step) ──────────
+  _mulaiStep() {
+    this.wordIdx = 0;
+    this._infinityRetry = false;
+    this._ambilQueue[this.stepIdx] = [];
+    this._tampilSoalAllIn();
+  },
+
+  // ── TAMPIL SOAL ──────────────────────────────────────────────
+  _tampilSoalAllIn() {
+    this._sedang = false;
+    this._inAmbilExtra = false;
+    const step = this.STEPS[this.stepIdx];
+    const stepList = this._buildStepList();
+
+    if (this.wordIdx >= stepList.length) {
+      // Cek apakah ada ambilQueue untuk step ini
+      if (this.difficulty === 'ambil' && this._ambilQueue[this.stepIdx].length > 0) {
+        const extra = this._ambilQueue[this.stepIdx];
+        this._ambilQueue[this.stepIdx] = [];
+        // Insert ekstra di posisi sekarang (akhir step)
+        // Kita restart step dari ekstra tersebut
+        this._ambilExtraList = extra;
+        this._ambilExtraIdx = 0;
+        this._tampilSoalAmbilExtra();
+        return;
+      }
+      // Selesai step ini
+      this._selesaiStep();
+      return;
+    }
+
+    const item = stepList[this.wordIdx];
+    const total = stepList.length;
+    const nStep = this.stepIdx;
+    const cfg = App._settings;
+
+    const progBar = this.STEPS.map((s, i) => `
+      <div style="flex:1;height:6px;border-radius:99px;margin:0 1px;
+        background:${i < nStep ? 'var(--c-hijau)' : i === nStep ? 'var(--c-biru)' : 'var(--c-border)'}"></div>
+    `).join("");
+
+    let html = `
+      <div class="soal-header">
+        <div class="progres-teks">${step.icon} ${step.label} — ${this.wordIdx+1}/${total}</div>
+        <div class="skor-mini" id="ai-skor"></div>
+      </div>
+      <div class="progres-bar">
+        <div class="progres-fill" style="width:${(this.wordIdx/total*100).toFixed(1)}%"></div>
+      </div>
+      <div style="display:flex;gap:3px;margin:6px 0">${progBar}</div>
+    `;
+
+    // Rekam waktu mulai
+    this._stat[this._origIdx(item)][this.stepIdx].waktuMulai = Date.now();
+
+    html += this._renderSoalStep(step, item);
+    el("konten-utama").innerHTML = html;
+    this._pasangEventAllIn(step, item);
+
+    // Auto-play audio
+    if (step.id === "audio-arti" || step.id === "audio-hanzi") {
+      setTimeout(() => TTS.mandarin(item.hanzi), 350);
+    }
+  },
+
+  // ── Ambil Extra (kata yang salah 2x di akhir step) ──────────
+  _tampilSoalAmbilExtra() {
+    this._sedang = false;
+    this._inAmbilExtra = true;
+    const extra = this._ambilExtraList;
+    const step = this.STEPS[this.stepIdx];
+    const cfg = App._settings;
+
+    if (this._ambilExtraIdx >= extra.length) {
+      this._inAmbilExtra = false;
+      this._selesaiStep();
+      return;
+    }
+
+    const item = extra[this._ambilExtraIdx];
+    const total = extra.length;
+    const nStep = this.stepIdx;
+
+    const progBar = this.STEPS.map((s, i) => `
+      <div style="flex:1;height:6px;border-radius:99px;margin:0 1px;
+        background:${i < nStep ? 'var(--c-hijau)' : i === nStep ? 'var(--c-biru)' : 'var(--c-border)'}"></div>
+    `).join("");
+
+    let html = `
+      <div class="soal-header">
+        <div class="progres-teks">🎴 Kata Ekstra — ${this._ambilExtraIdx+1}/${total}</div>
+        <div class="skor-mini" id="ai-skor"></div>
+      </div>
+      <div class="progres-bar">
+        <div class="progres-fill" style="width:${(this._ambilExtraIdx/total*100).toFixed(1)}%"></div>
+      </div>
+      <div style="display:flex;gap:3px;margin:6px 0">${progBar}</div>
+      <div style="background:#fff3e0;border-radius:10px;padding:6px 12px;margin-bottom:8px;font-size:13px;color:#e65100">
+        🎴 Kata ini kamu salah 2×, coba lagi!
+      </div>
+    `;
+
+    this._stat[this._origIdx(item)][this.stepIdx].waktuMulai = Date.now();
+    html += this._renderSoalStep(step, item);
+    el("konten-utama").innerHTML = html;
+    this._pasangEventAllIn(step, item, true);
+
+    if (step.id === "audio-arti" || step.id === "audio-hanzi") {
+      setTimeout(() => TTS.mandarin(item.hanzi), 350);
+    }
+  },
+
+  // ── Daftar kata untuk step (urutan asli) ────────────────────
+  _buildStepList() {
+    return [...this.soalList];
+  },
+
+  // ── Cari index asli kata di soalList ────────────────────────
+  _origIdx(item) {
+    return this.soalList.findIndex(s => s.hanzi === item.hanzi);
+  },
+
+  // ── RENDER SOAL BERDASAR STEP ────────────────────────────────
+  _renderSoalStep(step, item) {
+    const id = step.id;
+    const pool = this.soalList.filter(v => v.arti !== item.arti);
+    const safeEsc = s => (s||"").replace(/'/g,"\\'").replace(/"/g,"&quot;");
+
+    if (id === "audio-arti") {
+      const sarr = acak(pool.length >= 3 ? pool : DB.vocab.filter(v=>v.arti!==item.arti)).slice(0,3);
+      const semua = acak([item.arti, ...sarr.map(v=>v.arti)]);
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">🔊 Audio → Arti</div>
+          <div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
+          </div>
+          <div class="soal-hint">Dengarkan lalu pilih artinya:</div>
+          <div class="pilihan-grid" id="pilihan-cont">
+            ${semua.map(p=>`<button class="btn-pilihan"
+              onclick="AllIn._jawabPilihan('${safeEsc(p)}','${safeEsc(item.arti)}')">${p}</button>`).join("")}
+          </div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row"><button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button></div>
+        </div>`;
+    }
+
+    if (id === "hanzi-indo") {
+      const sarr = acak(pool.length >= 3 ? pool : DB.vocab.filter(v=>v.arti!==item.arti)).slice(0,3);
+      const semua = acak([item.arti, ...sarr.map(v=>v.arti)]);
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">🈯 Hanzi → Arti</div>
+          <div class="soal-hanzi">${item.hanzi}</div>
+          <div class="soal-hint">Apa arti kata di atas?</div>
+          <div class="pilihan-grid" id="pilihan-cont">
+            ${semua.map(p=>`<button class="btn-pilihan"
+              onclick="AllIn._jawabPilihan('${safeEsc(p)}','${safeEsc(item.arti)}')">${p}</button>`).join("")}
+          </div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row"><button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button></div>
+        </div>`;
+    }
+
+    if (id === "audio-hanzi") {
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">🎧 Audio → Hanzi</div>
+          <div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
+          </div>
+          <div class="soal-hint">Dengarkan lalu ketik Hanzi-nya:</div>
+          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off">
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
+    if (id === "hanzi-pinyin") {
+      const modeTag = this.pinyinStrict
+        ? `<span class="pinyin-mode-tag ketat">🎯 Ketat</span>`
+        : `<span class="pinyin-mode-tag longgar">🌊 Longgar</span>`;
+      const inputArea = this.pinyinStrict
+        ? `<div id="kb-pinyin-cont"></div>`
+        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">🔤 Hanzi → Pinyin ${modeTag}</div>
+          <div class="soal-hanzi">${item.hanzi}</div>
+          <div class="soal-hint">Tulis Pinyin${this.pinyinStrict?" (dengan tanda nada)":""}:</div>
+          ${inputArea}
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="AllIn._jawabPinyin()">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
+    if (id === "indo-pinyin") {
+      const modeTag = this.pinyinStrict
+        ? `<span class="pinyin-mode-tag ketat">🎯 Ketat</span>`
+        : `<span class="pinyin-mode-tag longgar">🌊 Longgar</span>`;
+      const inputArea = this.pinyinStrict
+        ? `<div id="kb-pinyin-cont"></div>`
+        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">🔠 Indo → Pinyin ${modeTag}</div>
+          <div class="soal-arti">${item.arti}</div>
+          <div class="soal-hint">Tulis Pinyin kata di atas${this.pinyinStrict?" (dengan tanda nada)":""}:</div>
+          ${inputArea}
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="AllIn._jawabPinyin()">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
+    if (id === "arti-hanzi") {
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">✍️ Arti → Hanzi</div>
+          <div class="soal-arti">${item.arti}</div>
+          <div class="soal-hint">Ketik karakter Hanzi-nya:</div>
+          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off">
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
+    return `<div class="soal-wrap"><div class="soal-hint">Step tidak dikenal.</div></div>`;
+  },
+
+  // ── PASANG EVENT ─────────────────────────────────────────────
+  _pasangEventAllIn(step, item, isExtra) {
+    const id = step.id;
+    if (id === "hanzi-pinyin" || id === "indo-pinyin") {
+      if (this.pinyinStrict) {
+        setTimeout(() => buildKbPinyin("kb-display", null), 50);
+      } else {
+        setTimeout(() => {
+          const inp = el("input-ai");
+          if (inp) { inp.focus(); inp.onkeydown = e => { if(e.key==="Enter") AllIn._jawabPinyin(); }; }
+        }, 100);
+      }
+    } else {
+      setTimeout(() => {
+        const inp = el("input-ai");
+        if (inp) { inp.focus(); inp.onkeydown = e => { if(e.key==="Enter") AllIn._jawabKetikHanzi(); }; }
+      }, 100);
+    }
+  },
+
+  // ── JAWAB PILIHAN ─────────────────────────────────────────────
+  _jawabPilihan(dipilih, jawaban) {
+    if (this._sedang) return;
+    const benar = dipilih === jawaban;
+    el("pilihan-cont")?.querySelectorAll(".btn-pilihan").forEach(b => {
+      b.disabled = true;
+      if (b.innerText === jawaban) b.classList.add("pilihan-benar");
+      else if (b.innerText === dipilih && !benar) b.classList.add("pilihan-salah");
+    });
+    const item = this._currentItem();
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      hEl.innerHTML = benar
+        ? `✅ Benar! <b>${item.hanzi}</b> = ${item.arti}`
+        : `❌ Salah. Jawaban: <b>${item.arti}</b>`;
+      hEl.className = "hasil-box " + (benar?"benar":"salah");
+    }
+    this._prosesJawab(benar, item);
+  },
+
+  // ── JAWAB KETIK HANZI ─────────────────────────────────────────
+  _jawabKetikHanzi() {
+    if (this._sedang) return;
+    const inp = el("input-ai");
+    const input = inp ? inp.value.trim() : "";
+    if (!input) return;
+    const item = this._currentItem();
+    const benar = cekHanzi(input, item.hanzi);
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      hEl.innerHTML = benar
+        ? `✅ Benar! <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}`
+        : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}`;
+      hEl.className = "hasil-box " + (benar?"benar":"salah");
+    }
+    if (inp) inp.disabled = true;
+    this._prosesJawab(benar, item);
+  },
+
+  // ── JAWAB PINYIN ──────────────────────────────────────────────
+  _jawabPinyin() {
+    if (this._sedang) return;
+    let input;
+    if (this.pinyinStrict) {
+      input = (typeof getKbTeks === 'function') ? getKbTeks() : "";
+    } else {
+      const inp = el("input-ai");
+      input = inp ? inp.value.trim() : "";
+    }
+    if (!input) return;
+    const item = this._currentItem();
+    const benar = cekPinyin(input, item.pinyin, this.pinyinStrict);
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      hEl.innerHTML = benar
+        ? `✅ Benar! Pinyin: <b>${item.pinyin}</b>`
+        : `❌ Salah. Pinyin benar: <b>${item.pinyin}</b>`;
+      hEl.className = "hasil-box " + (benar?"benar":"salah");
+    }
+    this._prosesJawab(benar, item);
+  },
+
+  // ── SKIP ──────────────────────────────────────────────────────
+  _skipAllIn() {
+    if (this._sedang) return;
+    const item = this._currentItem();
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      hEl.innerHTML = `⏭ Di-skip. Jawaban: <b>${item.hanzi}</b> = ${item.arti}`;
+      hEl.className = "hasil-box benar";
+    }
+    this._sedang = true;
+    setTimeout(() => this._lanjutKata(true, item, true), 1500);
+  },
+
+  // ── ITEM SAAT INI ─────────────────────────────────────────────
+  _currentItem() {
+    // Jika sedang mode ambil extra
+    if (this._inAmbilExtra && this._ambilExtraList && this._ambilExtraIdx < this._ambilExtraList.length) {
+      return this._ambilExtraList[this._ambilExtraIdx];
+    }
+    return this._buildStepList()[this.wordIdx];
+  },
+
+  // ── PROSES JAWABAN ────────────────────────────────────────────
+  _prosesJawab(benar, item) {
+    if (this._sedang) return;
+    this._sedang = true;
+
+    const si = this.stepIdx;
+    const wi = this._origIdx(item);
+
+    // Catat waktu
+    const waktuMulai = this._stat[wi][si].waktuMulai || Date.now();
+    this._stat[wi][si].waktuTotal += (Date.now() - waktuMulai);
+
+    if (!benar) {
+      this._errorCount[wi][si]++;
+      this._stat[wi][si].salah++;
+    }
+
+    // Jika sedang dalam retry mode
+    if (this._infinityRetry) {
+      this._prosesJawabRetry(benar, item);
+      return;
+    }
+
+    setTimeout(() => this._lanjutKata(benar, item, false), benar ? 1500 : 2200);
+  },
+
+  // ── LANJUT KATA ───────────────────────────────────────────────
+  _lanjutKata(benar, item, isSkip) {
+    this._sedang = false;
+    const si = this.stepIdx;
+    const wi = this._origIdx(item);
+
+    // Jika sedang mode ambil extra
+    if (this._inAmbilExtra && this._ambilExtraList && this._ambilExtraIdx < this._ambilExtraList.length) {
+      if (benar || isSkip) {
+        this._ambilExtraIdx++;
+        this._tampilSoalAmbilExtra();
+      } else {
+        // salah di extra, tampil soal lagi
+        this._tampilSoalAmbilExtra();
+      }
+      return;
+    }
+
+    if (benar || isSkip) {
+      this.wordIdx++;
+      this._tampilSoalAllIn();
+      return;
+    }
+
+    // Salah
+    const errCount = this._errorCount[wi][si];
+
+    if (this.difficulty === 'ambil') {
+      if (errCount >= 2 && !this._ambilQueue[si].find(x=>x.hanzi===item.hanzi)) {
+        this._ambilQueue[si].push(item);
+      }
+      // Lanjut soal berikutnya (tidak retry)
+      this.wordIdx++;
+      this._tampilSoalAllIn();
+      return;
+    }
+
+    // easy/hard: retry soal ini dulu
+    if (this.difficulty === 'easy') {
+      const hEl = el("hasil-ai");
+      if (hEl) hEl.innerHTML += `<br><small>🔄 Coba lagi soal ini, lalu mundur 2 soal...</small>`;
+      this._infinityRetry = true;
+      setTimeout(() => this._retryKata(), 2000);
+    } else {
+      // hard
+      const hEl = el("hasil-ai");
+      if (hEl) hEl.innerHTML += `<br><small>💀 Coba lagi, lalu kembali ke kata pertama step ini!</small>`;
+      this._infinityRetry = true;
+      setTimeout(() => this._retryKata(), 2000);
+    }
+  },
+
+  _retryKata() {
+    // tampil soal yang sama lagi
+    this._sedang = false;
+    this._tampilSoalAllIn();
+    // Setelah jawab benar saat retry, _lanjutKataSetelahRetry dipanggil lewat _prosesJawabRetry
+  },
+
+  // Override proses jawab saat sedang infinityRetry
+  _prosesJawabRetry(benar, item) {
+    this._sedang = true;
+    const si = this.stepIdx;
+    const wi = this._origIdx(item);
+    const waktuMulai = this._stat[wi][si].waktuMulai || Date.now();
+    this._stat[wi][si].waktuTotal += (Date.now() - waktuMulai);
+    if (!benar) { this._errorCount[wi][si]++; this._stat[wi][si].salah++; }
+
+    if (!benar) {
+      // Masih salah, retry lagi
+      setTimeout(() => { this._sedang = false; this._tampilSoalAllIn(); }, 2200);
+      return;
+    }
+    // Benar setelah retry
+    this._infinityRetry = false;
+    setTimeout(() => {
+      const stepList = this._buildStepList();
+      if (this.difficulty === 'easy') {
+        this.wordIdx = Math.max(0, this.wordIdx - 2);
+      } else {
+        // hard: kembali ke kata 0
+        this.wordIdx = 0;
+      }
+      this._sedang = false;
+      this._tampilSoalAllIn();
+    }, 1600);
+  },
+
+  // ── SELESAI STEP ─────────────────────────────────────────────
+  _selesaiStep() {
+    const step = this.STEPS[this.stepIdx];
+    const stepIdx = this.stepIdx;
+    const n = this.soalList.length;
+    const salahStep = this.soalList.reduce((acc, _, wi) => acc + this._stat[wi][stepIdx].salah, 0);
+    const benarStep = n - Math.min(salahStep, n);
+
+    const progBar = this.STEPS.map((s, i) => `
+      <div style="flex:1;height:8px;border-radius:99px;margin:0 1px;
+        background:${i <= stepIdx ? 'var(--c-hijau)' : 'var(--c-border)'}"></div>
+    `).join("");
+
+    if (this.stepIdx < this.STEPS.length - 1) {
+      el("konten-utama").innerHTML = `
+        <div class="soal-wrap" style="text-align:center">
+          <div style="display:flex;gap:3px;margin-bottom:16px">${progBar}</div>
+          <div class="selesai-emoji">✅</div>
+          <div class="label-mode">Tahap ${stepIdx+1} Selesai!</div>
+          <div class="soal-hint" style="margin:12px 0">
+            <b>${step.icon} ${step.label}</b><br>
+            Benar: ${benarStep} / ${n}
+          </div>
+          <div class="btn-row" style="justify-content:center">
+            <button class="btn btn-hijau" onclick="AllIn._nextStep()">▶ Tahap Berikutnya</button>
+          </div>
+        </div>`;
+    } else {
+      this._tampilHasilAkhir();
+    }
+  },
+
+  _nextStep() {
+    this.stepIdx++;
+    this.wordIdx = 0;
+    this._infinityRetry = false;
+    this._tampilStepIntro();
+  },
+
+  // ── HASIL AKHIR ──────────────────────────────────────────────
+  _tampilHasilAkhir() {
+    const stat = this._stat;
+    const steps = this.STEPS;
+    const soal = this.soalList;
+    const n = soal.length;
+
+    // Hitung total salah per kata (across all steps)
+    const totalSalahPerKata = soal.map((item, wi) =>
+      steps.reduce((acc, _, si) => acc + stat[wi][si].salah, 0)
+    );
+
+    // Kata paling banyak salah
+    const maxSalah = Math.max(...totalSalahPerKata);
+    const kataSalahBanyak = soal
+      .map((item, wi) => ({ item, wi, total: totalSalahPerKata[wi] }))
+      .filter(x => x.total > 0)
+      .sort((a,b) => b.total - a.total)
+      .slice(0, 5);
+
+    // Kata paling cepat (waktu rata-rata rendah, salah = 0)
+    const kataCepat = soal
+      .map((item, wi) => {
+        const totalSalah = totalSalahPerKata[wi];
+        const totalWaktu = steps.reduce((acc, _, si) => acc + (stat[wi][si].waktuTotal||0), 0);
+        const rataWaktu = totalWaktu / steps.length;
+        return { item, wi, totalSalah, rataWaktu };
+      })
+      .filter(x => x.totalSalah === 0 && x.rataWaktu > 0)
+      .sort((a,b) => a.rataWaktu - b.rataWaktu)
+      .slice(0, 5);
+
+    // Detail salah per step
+    const detailStep = steps.map((step, si) => {
+      const salahDiStep = soal
+        .map((item, wi) => ({ item, wi, salah: stat[wi][si].salah }))
+        .filter(x => x.salah > 0)
+        .sort((a,b) => b.salah - a.salah);
+      return { step, si, salahDiStep };
+    }).filter(x => x.salahDiStep.length > 0);
+
+    const totalBenar = stat.flat().reduce((a,s)=>a+(s.salah===0?1:0),0);
+    const totalSoalAll = n * steps.length;
+    const pct = Math.round((totalBenar / totalSoalAll) * 100);
+    const emoji = pct >= 85 ? "🏆" : pct >= 65 ? "👍" : "💪";
+
+    let htmlSalahBanyak = "";
+    if (kataSalahBanyak.length) {
+      htmlSalahBanyak = `
+        <div class="review-section" style="background:#ffebee;margin:10px 0">
+          <h3>❌ Kata Paling Sering Salah</h3>
+          ${kataSalahBanyak.map(({item, wi, total}) => {
+            const stepSalah = steps.map((s,si)=>stat[wi][si].salah>0?`${s.icon}${stat[wi][si].salah}×`:"").filter(Boolean).join(", ");
+            return `<div class="review-item">
+              <b>${item.hanzi}</b> (${item.pinyin}) = ${item.arti}
+              <span style="color:var(--c-merah);margin-left:6px">${total}× salah</span>
+              <div style="font-size:12px;color:var(--c-sub)">Step: ${stepSalah}</div>
+            </div>`;
+          }).join("")}
+        </div>`;
+    }
+
+    let htmlStepDetail = "";
+    if (detailStep.length) {
+      htmlStepDetail = `
+        <div class="review-section" style="background:#fff8e1;margin:10px 0">
+          <h3>📊 Detail Kesalahan per Tahap</h3>
+          ${detailStep.map(({step, salahDiStep}) => `
+            <div style="margin-bottom:8px">
+              <div style="font-weight:700;margin-bottom:4px">${step.icon} ${step.label}</div>
+              ${salahDiStep.slice(0,3).map(({item,salah})=>`
+                <div class="review-item">
+                  <b>${item.hanzi}</b> = ${item.arti}
+                  <span style="color:var(--c-merah);margin-left:6px">${salah}× salah</span>
+                </div>`).join("")}
+              ${salahDiStep.length > 3 ? `<div style="font-size:12px;color:var(--c-sub)">...dan ${salahDiStep.length-3} kata lainnya</div>` : ""}
+            </div>
+          `).join("")}
+        </div>`;
+    }
+
+    let htmlCepat = "";
+    if (kataCepat.length) {
+      htmlCepat = `
+        <div class="review-section" style="background:#e8f5e9;margin:10px 0">
+          <h3>⚡ Kata yang Cepat Dikuasai (0 kesalahan)</h3>
+          ${kataCepat.map(({item, rataWaktu}) => `
+            <div class="review-item">
+              <b>${item.hanzi}</b> (${item.pinyin}) = ${item.arti}
+              <span style="color:var(--c-hijau);margin-left:6px">~${(rataWaktu/1000).toFixed(1)}s/step</span>
+            </div>`).join("")}
+        </div>`;
+    }
+
+    el("konten-utama").innerHTML = `
+      <div class="selesai-wrap">
+        <div class="selesai-emoji">${emoji}</div>
+        <h2>All In — Selesai! 🔥</h2>
+        <div class="selesai-skor">
+          <div>📚 Kata dipelajari: <b>${n}</b></div>
+          <div>🎯 Skor keseluruhan: <b class="skor-pct">${pct}%</b></div>
+        </div>
+        ${htmlSalahBanyak}
+        ${htmlStepDetail}
+        ${htmlCepat}
+        <div class="btn-row" style="justify-content:center;margin-top:16px">
+          <button class="btn btn-hijau" onclick="AllIn.init()">🔄 Ulangi All In</button>
+          <button class="btn btn-biru" onclick="Vocab.kembaliMenu()">← Menu Vocab</button>
+        </div>
+      </div>`;
+  },
 };
