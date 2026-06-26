@@ -327,13 +327,13 @@ var Vocab = {
       ? `<div id="kb-pinyin-cont"></div>`
       : `<input type="text" id="input-jawab" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
     return `
-      <div class="soal-wrap">
+      <div class="soal-wrap" style="text-align:center">
         <div class="label-mode">🔠 Indonesia → Pinyin</div>
         <div class="soal-arti">${item.arti}</div>
         <div class="soal-hint">Tulis Pinyin kata di atas${this.pinyinStrict ? " (dengan tanda nada)" : ""}: ${modeTag}</div>
         ${inputArea}
         <div class="hasil-box" id="hasil-vocab"></div>
-        <div class="btn-row">
+        <div class="btn-row" style="justify-content:center">
           <button class="btn btn-hijau" onclick="Vocab._jawabPinyin()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
@@ -659,7 +659,7 @@ var AllIn = {
 
   soalList: [],           // kata-kata yang dipakai di sesi ini
   pinyinStrict: true,     // true = nada diperhatikan
-  difficulty: "easy",     // "easy" = mundur 2 | "hard" = ulang dari awal step | "ambil" = kata salah 2x muncul di akhir
+  difficulty: "easy",     // "easy" = mundur 2 | "hard" = ulang dari awal step | "ambil" = kata salah 1x langsung muncul di akhir step
   stepIdx: 0,             // step saat ini (0-5)
   wordIdx: 0,             // kata saat ini dalam step
   _sedang: false,
@@ -720,7 +720,7 @@ var AllIn = {
             <button class="ss-btn ${this.difficulty==='hard'?'aktif':''}"
               onclick="AllIn._setDifficulty('hard')">💀 Hard (ulang dari awal step)</button>
             <button class="ss-btn ${this.difficulty==='ambil'?'aktif':''}"
-              onclick="AllIn._setDifficulty('ambil')">🎴 Ambil (salah 2x → muncul di akhir)</button>
+              onclick="AllIn._setDifficulty('ambil')">🎴 Ambil (salah 1x → muncul di akhir step)</button>
           </div>
         </div>
 
@@ -752,14 +752,16 @@ var AllIn = {
 
     let tabelBaris = list.map((item, i) => `
       <tr>
-        <td style="text-align:center;font-weight:700;color:var(--c-sub);padding:8px 6px">${i+1}</td>
-        <td style="font-size:22px;font-weight:900;color:var(--c-hanzi);padding:8px 6px">
-          ${item.hanzi}
-          <button style="background:none;border:none;cursor:pointer;font-size:16px;vertical-align:middle;margin-left:4px"
-            onclick="TTS.mandarin('${(item.hanzi||'').replace(/'/g,"\\'")}')">🔊</button>
+        <td style="text-align:center;font-weight:700;color:var(--c-sub);padding:8px 6px;white-space:nowrap;width:32px">${i+1}</td>
+        <td style="padding:8px 6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:22px;font-weight:900;color:var(--c-hanzi);line-height:1.2">${item.hanzi}</span>
+            <button style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;display:inline-flex;align-items:center"
+              onclick="TTS.mandarin('${(item.hanzi||'').replace(/'/g,"\\'")}')">🔊</button>
+          </div>
         </td>
-        <td style="font-size:14px;color:var(--c-biru);padding:8px 6px">${item.pinyin||'-'}</td>
-        <td style="font-size:14px;padding:8px 6px">${item.arti||'-'}</td>
+        <td style="font-size:13px;color:var(--c-biru);padding:8px 6px;vertical-align:middle">${item.pinyin||'-'}</td>
+        <td style="font-size:13px;padding:8px 6px;vertical-align:middle;color:var(--c-text)">${item.arti||'-'}</td>
       </tr>
     `).join("");
 
@@ -919,7 +921,7 @@ var AllIn = {
     }
   },
 
-  // ── Ambil Extra (kata yang salah 2x di akhir step) ──────────
+  // ── Ambil Extra (kata yang salah 1x di akhir step) ──────────
   _tampilSoalAmbilExtra() {
     this._sedang = false;
     this._inAmbilExtra = true;
@@ -952,7 +954,7 @@ var AllIn = {
       </div>
       <div style="display:flex;gap:3px;margin:6px 0">${progBar}</div>
       <div style="background:#fff3e0;border-radius:10px;padding:6px 12px;margin-bottom:8px;font-size:13px;color:#e65100">
-        🎴 Kata ini kamu salah 2×, coba lagi!
+        🎴 Kata ini kamu salah sebelumnya, coba lagi!
       </div>
     `;
 
@@ -1062,15 +1064,15 @@ var AllIn = {
         : `<span class="pinyin-mode-tag longgar">🌊 Longgar</span>`;
       const inputArea = this.pinyinStrict
         ? `<div id="kb-pinyin-cont"></div>`
-        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off" style="display:block;margin:0 auto;">`;
       return `
-        <div class="soal-wrap">
+        <div class="soal-wrap" style="text-align:center">
           <div class="label-mode">🔠 Indo → Pinyin ${modeTag}</div>
           <div class="soal-arti">${item.arti}</div>
           <div class="soal-hint">Tulis Pinyin kata di atas${this.pinyinStrict?" (dengan tanda nada)":""}:</div>
           ${inputArea}
           <div class="hasil-box" id="hasil-ai"></div>
-          <div class="btn-row">
+          <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="AllIn._jawabPinyin()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
@@ -1253,7 +1255,7 @@ var AllIn = {
     const errCount = this._errorCount[wi][si];
 
     if (this.difficulty === 'ambil') {
-      if (errCount >= 2 && !this._ambilQueue[si].find(x=>x.hanzi===item.hanzi)) {
+      if (errCount >= 1 && !this._ambilQueue[si].find(x=>x.hanzi===item.hanzi)) {
         this._ambilQueue[si].push(item);
       }
       // Lanjut soal berikutnya (tidak retry)
@@ -1364,13 +1366,16 @@ var AllIn = {
       steps.reduce((acc, _, si) => acc + stat[wi][si].salah, 0)
     );
 
-    // Kata paling banyak salah
-    const maxSalah = Math.max(...totalSalahPerKata);
-    const kataSalahBanyak = soal
+    // Kata yang salah di semua step (totalSalah > 0)
+    const kataSalah = soal
       .map((item, wi) => ({ item, wi, total: totalSalahPerKata[wi] }))
       .filter(x => x.total > 0)
-      .sort((a,b) => b.total - a.total)
-      .slice(0, 5);
+      .sort((a,b) => b.total - a.total);
+
+    // Kata yang sempurna (0 salah di semua step)
+    const kataSempurna = soal
+      .map((item, wi) => ({ item, wi, total: totalSalahPerKata[wi] }))
+      .filter(x => x.total === 0);
 
     // Kata paling cepat (waktu rata-rata rendah, salah = 0)
     const kataCepat = soal
@@ -1398,51 +1403,48 @@ var AllIn = {
     const pct = Math.round((totalBenar / totalSoalAll) * 100);
     const emoji = pct >= 85 ? "🏆" : pct >= 65 ? "👍" : "💪";
 
-    let htmlSalahBanyak = "";
-    if (kataSalahBanyak.length) {
-      htmlSalahBanyak = `
-        <div class="review-section" style="background:#ffebee;margin:10px 0">
-          <h3>❌ Kata Paling Sering Salah</h3>
-          ${kataSalahBanyak.map(({item, wi, total}) => {
-            const stepSalah = steps.map((s,si)=>stat[wi][si].salah>0?`${s.icon}${stat[wi][si].salah}×`:"").filter(Boolean).join(", ");
-            return `<div class="review-item">
-              <b>${item.hanzi}</b> (${item.pinyin}) = ${item.arti}
-              <span style="color:var(--c-merah);margin-left:6px">${total}× salah</span>
-              <div style="font-size:12px;color:var(--c-sub)">Step: ${stepSalah}</div>
+    // ── SEKSI PENYEMANGAT: kata yang betul semua ──
+    let htmlSempurna = "";
+    if (kataSempurna.length > 0) {
+      const semua = kataSempurna.length === n;
+      htmlSempurna = `
+        <div class="review-section" style="margin:10px 0;border:2px solid var(--c-hijau)">
+          <h3>🌟 ${semua ? "Luar Biasa! Semua Kata Dikuasai! 🎉" : `Kata yang Sudah Dikuasai (${kataSempurna.length}/${n})`}</h3>
+          ${semua
+            ? `<div style="font-size:14px;margin-bottom:6px">Kamu berhasil menjawab semua ${n} kata dengan benar di setiap tahap! Kerja keras kamu terbayar! 💪</div>`
+            : `<div style="font-size:13px;margin-bottom:8px">Kata-kata ini tidak ada salah satu pun di semua tahap — pertahankan! ✨</div>
+               <div style="display:flex;flex-wrap:wrap;gap:6px">
+                 ${kataSempurna.map(({item})=>`<span style="background:var(--c-hijau);color:#fff;border-radius:20px;padding:3px 10px;font-size:13px;font-weight:700">${item.hanzi}</span>`).join("")}
+               </div>`
+          }
+        </div>`;
+    }
+
+    // ── SEKSI KESIMPULAN: dari parah ke tidak parah ──
+    let htmlKesimpulan = "";
+    if (kataSalah.length > 0) {
+      const tingkatPadam = (total) => {
+        if (total >= 4) return { label: "🔴 Perlu banyak latihan", color: "#c62828" };
+        if (total >= 2) return { label: "🟠 Cukup sulit", color: "#e65100" };
+        return { label: "🟡 Sedikit perlu diulang", color: "#f57f17" };
+      };
+      htmlKesimpulan = `
+        <div class="review-section" style="margin:10px 0">
+          <h3>📋 Kesimpulan — Kata yang Perlu Diperbaiki</h3>
+          <div style="font-size:12px;margin-bottom:10px;opacity:.8">Diurutkan dari yang paling perlu perhatian:</div>
+          ${kataSalah.map(({item, wi, total}) => {
+            const tk = tingkatPadam(total);
+            const stepSalah = steps.map((s,si)=>stat[wi][si].salah>0?`${s.icon} ${s.label}: ${stat[wi][si].salah}×`:"").filter(Boolean).join(" · ");
+            return `<div class="review-item" style="padding:8px 0">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:18px;font-weight:900">${item.hanzi}</span>
+                <span style="font-size:12px;color:var(--c-sub)">${item.pinyin}</span>
+                <span style="font-size:13px">= ${item.arti}</span>
+                <span style="font-size:11px;font-weight:700;color:${tk.color};margin-left:auto">${tk.label}</span>
+              </div>
+              <div style="font-size:11px;color:var(--c-sub);margin-top:3px">${stepSalah}</div>
             </div>`;
           }).join("")}
-        </div>`;
-    }
-
-    let htmlStepDetail = "";
-    if (detailStep.length) {
-      htmlStepDetail = `
-        <div class="review-section" style="background:#fff8e1;margin:10px 0">
-          <h3>📊 Detail Kesalahan per Tahap</h3>
-          ${detailStep.map(({step, salahDiStep}) => `
-            <div style="margin-bottom:8px">
-              <div style="font-weight:700;margin-bottom:4px">${step.icon} ${step.label}</div>
-              ${salahDiStep.slice(0,3).map(({item,salah})=>`
-                <div class="review-item">
-                  <b>${item.hanzi}</b> = ${item.arti}
-                  <span style="color:var(--c-merah);margin-left:6px">${salah}× salah</span>
-                </div>`).join("")}
-              ${salahDiStep.length > 3 ? `<div style="font-size:12px;color:var(--c-sub)">...dan ${salahDiStep.length-3} kata lainnya</div>` : ""}
-            </div>
-          `).join("")}
-        </div>`;
-    }
-
-    let htmlCepat = "";
-    if (kataCepat.length) {
-      htmlCepat = `
-        <div class="review-section" style="background:#e8f5e9;margin:10px 0">
-          <h3>⚡ Kata yang Cepat Dikuasai (0 kesalahan)</h3>
-          ${kataCepat.map(({item, rataWaktu}) => `
-            <div class="review-item">
-              <b>${item.hanzi}</b> (${item.pinyin}) = ${item.arti}
-              <span style="color:var(--c-hijau);margin-left:6px">~${(rataWaktu/1000).toFixed(1)}s/step</span>
-            </div>`).join("")}
         </div>`;
     }
 
@@ -1454,9 +1456,8 @@ var AllIn = {
           <div>📚 Kata dipelajari: <b>${n}</b></div>
           <div>🎯 Skor keseluruhan: <b class="skor-pct">${pct}%</b></div>
         </div>
-        ${htmlSalahBanyak}
-        ${htmlStepDetail}
-        ${htmlCepat}
+        ${htmlSempurna}
+        ${htmlKesimpulan}
         <div class="btn-row" style="justify-content:center;margin-top:16px">
           <button class="btn btn-hijau" onclick="AllIn.init()">🔄 Ulangi All In</button>
           <button class="btn btn-biru" onclick="Vocab.kembaliMenu()">← Menu Vocab</button>
