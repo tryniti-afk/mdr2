@@ -125,7 +125,9 @@ function cekPinyin(input, target, strict = true) {
   const a = norm(input);
   const b = norm(target);
   if (strict) return a === b;
-  return hilangkanNada(a) === hilangkanNada(b);
+  // Mode longgar: hilangkan nada DAN spasi antar suku kata
+  // sehingga "ni hao" == "nihao" == "nǐ hǎo"
+  return hilangkanNada(a).replace(/\s/g, "") === hilangkanNada(b).replace(/\s/g, "");
 }
 
 // ── UI HELPERS ───────────────────────────────────────────────
