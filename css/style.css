@@ -1131,3 +1131,82 @@ body {
   color: #888;
   margin: 4px 0 10px;
 }
+
+/* ================================================================
+   ALL IN — Fitur Latihan Lengkap
+   ================================================================ */
+
+/* Card menu All In */
+.sub-card[data-id="all-in"] {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  border: 2px solid var(--c-kuning);
+}
+
+/* Tabel preview kata */
+.allin-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.allin-preview-table thead tr {
+  background: var(--c-biru);
+  color: #fff;
+}
+.allin-preview-table th, .allin-preview-table td {
+  padding: 8px 6px;
+  text-align: left;
+}
+.allin-preview-table tbody tr:nth-child(even) {
+  background: rgba(0,0,0,.03);
+}
+[data-theme="dark"] .allin-preview-table tbody tr:nth-child(even) {
+  background: rgba(255,255,255,.04);
+}
+
+/* Step progress bar besar */
+.allin-step-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.allin-step-seg {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  transition: background .3s;
+}
+
+/* Intro step card */
+.allin-intro-wrap {
+  text-align: center;
+  padding-bottom: 20px;
+}
+
+/* Ekstra kata (ambil mode) banner */
+.allin-ekstra-banner {
+  background: #fff3e0;
+  border-left: 4px solid var(--c-kuning);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #e65100;
+  font-weight: 600;
+}
+[data-theme="dark"] .allin-ekstra-banner {
+  background: #2a2010;
+  color: #ffb74d;
+  border-color: var(--c-kuning);
+}
+
+/* Hasil akhir */
+.allin-result-wrap {
+  padding-bottom: 30px;
+}
+.allin-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: 14px;
+}
