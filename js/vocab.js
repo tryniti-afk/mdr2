@@ -753,7 +753,7 @@ var AllIn = {
     let tabelBaris = list.map((item, i) => `
       <tr>
         <td style="text-align:center;font-weight:700;color:var(--c-sub);padding:8px 6px;white-space:nowrap;width:32px">${i+1}</td>
-        <td style="padding:8px 6px">
+        <td style="padding:8px 6px;white-space:nowrap;min-width:120px">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:22px;font-weight:900;color:var(--c-hanzi);line-height:1.2">${item.hanzi}</span>
             <button style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;display:inline-flex;align-items:center"
@@ -946,7 +946,7 @@ var AllIn = {
 
     let html = `
       <div class="soal-header">
-        <div class="progres-teks">🎴 Kata Ekstra — ${this._ambilExtraIdx+1}/${total}</div>
+        <div class="progres-teks">🎴 Kata Ekstra — sisa ${extra.length - this._ambilExtraIdx}/${extra.length}</div>
         <div class="skor-mini" id="ai-skor"></div>
       </div>
       <div class="progres-bar">
@@ -1022,15 +1022,15 @@ var AllIn = {
 
     if (id === "audio-hanzi") {
       return `
-        <div class="soal-wrap">
+        <div class="soal-wrap" style="text-align:center">
           <div class="label-mode">🎧 Audio → Hanzi</div>
           <div class="audio-btn-wrap">
             <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
           </div>
           <div class="soal-hint">Dengarkan lalu ketik Hanzi-nya:</div>
-          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off">
+          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off" style="display:block;margin:0 auto;">
           <div class="hasil-box" id="hasil-ai"></div>
-          <div class="btn-row">
+          <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
@@ -1043,15 +1043,15 @@ var AllIn = {
         : `<span class="pinyin-mode-tag longgar">🌊 Longgar</span>`;
       const inputArea = this.pinyinStrict
         ? `<div id="kb-pinyin-cont"></div>`
-        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off" style="display:block;margin:0 auto;">`;
       return `
-        <div class="soal-wrap">
+        <div class="soal-wrap" style="text-align:center">
           <div class="label-mode">🔤 Hanzi → Pinyin ${modeTag}</div>
           <div class="soal-hanzi">${item.hanzi}</div>
           <div class="soal-hint">Tulis Pinyin${this.pinyinStrict?" (dengan tanda nada)":""}:</div>
           ${inputArea}
           <div class="hasil-box" id="hasil-ai"></div>
-          <div class="btn-row">
+          <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="AllIn._jawabPinyin()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
@@ -1081,13 +1081,13 @@ var AllIn = {
 
     if (id === "arti-hanzi") {
       return `
-        <div class="soal-wrap">
+        <div class="soal-wrap" style="text-align:center">
           <div class="label-mode">✍️ Arti → Hanzi</div>
           <div class="soal-arti">${item.arti}</div>
           <div class="soal-hint">Ketik karakter Hanzi-nya:</div>
-          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off">
+          <input type="text" id="input-ai" class="input-jawab" placeholder="Ketik Hanzi..." autocomplete="off" style="display:block;margin:0 auto;">
           <div class="hasil-box" id="hasil-ai"></div>
-          <div class="btn-row">
+          <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
@@ -1236,10 +1236,16 @@ var AllIn = {
     // Jika sedang mode ambil extra
     if (this._inAmbilExtra && this._ambilExtraList && this._ambilExtraIdx < this._ambilExtraList.length) {
       if (benar || isSkip) {
+        // Benar/skip → lanjut ke kata ekstra berikutnya
         this._ambilExtraIdx++;
         this._tampilSoalAmbilExtra();
       } else {
-        // salah di extra, tampil soal lagi
+        // Salah di extra → geser kata ini ke belakang antrean, lanjut ke berikutnya
+        const salahItem = this._ambilExtraList[this._ambilExtraIdx];
+        this._ambilExtraList.splice(this._ambilExtraIdx, 1);
+        this._ambilExtraList.push(salahItem);
+        // Tidak increment idx, tapi karena item dihapus dari posisi ini,
+        // idx sekarang sudah menunjuk ke kata berikutnya otomatis
         this._tampilSoalAmbilExtra();
       }
       return;
