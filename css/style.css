@@ -114,7 +114,14 @@
 [data-theme="dark"] .soal-kalimat { color: var(--c-text); }
 
 [data-theme="dark"] .progres-bar  { background: #22253a; }
-[data-theme="dark"] .selesai-wrap { background: var(--c-card); }
+[data-theme="dark"] .selesai-wrap { background: var(--c-card); color: var(--c-text); }
+[data-theme="dark"] .selesai-wrap h2 { color: var(--c-text); }
+[data-theme="dark"] .selesai-skor { color: var(--c-text); }
+[data-theme="dark"] .review-section { background: #1e2133 !important; border: 1px solid var(--c-border); color: var(--c-text); }
+[data-theme="dark"] .review-section h3 { color: var(--c-text); }
+[data-theme="dark"] .review-item { border-bottom-color: var(--c-border); color: var(--c-text); }
+[data-theme="dark"] .review-item b { color: #90caf9; }
+[data-theme="dark"] .review-section[style*="border:2px solid"] { background: #1b2e1b !important; }
 
 [data-theme="dark"] .topbar        { background: #13161f; border-bottom: 1px solid var(--c-border); }
 [data-theme="dark"] .bottom-nav    { background: #13161f; border-top: 1px solid var(--c-border); }
