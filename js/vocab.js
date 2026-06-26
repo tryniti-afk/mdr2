@@ -755,7 +755,7 @@ var AllIn = {
         <td style="text-align:center;font-weight:700;color:var(--c-sub);padding:8px 6px;white-space:nowrap;width:32px">${i+1}</td>
         <td style="padding:8px 6px;white-space:nowrap;min-width:120px">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:22px;font-weight:900;color:var(--c-hanzi);line-height:1.2">${item.hanzi}</span>
+            <span style="font-size:22px;font-weight:900;color:var(--c-hanzi);line-height:1.2;white-space:nowrap">${item.hanzi}</span>
             <button style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;flex-shrink:0;display:inline-flex;align-items:center"
               onclick="TTS.mandarin('${(item.hanzi||'').replace(/'/g,"\\'")}')">🔊</button>
           </div>
@@ -770,7 +770,7 @@ var AllIn = {
         <div class="label-mode">📖 Review Kata — ${n} Kata</div>
         <div class="soal-hint" style="margin-bottom:10px">Pelajari semua kata di bawah, lalu tekan <b>Mulai Latihan</b>.</div>
         <div style="overflow-x:auto;border-radius:10px;border:1.5px solid var(--c-border)">
-          <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;table-layout:auto">
             <thead>
               <tr style="background:var(--c-biru);color:#fff">
                 <th style="padding:8px 6px;text-align:center">#</th>
