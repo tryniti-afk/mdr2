@@ -210,7 +210,7 @@ const NADA_MAP = {
   u: ["u","ū","ú","ǔ","ù"],
   ü: ["ü","ǖ","ǘ","ǚ","ǜ"],
 };
-const KONSONAN = ["b","p","m","f","d","t","n","l","g","k","h","j","q","x","zh","ch","sh","r","z","c","s","y","w"];
+const KONSONAN = ["b","p","m","f","d","t","n","l","g","k","h","j","q","x","r","z","c","s","y","w"];
 
 let kbState = { nada: 0, teks: "" };
 
