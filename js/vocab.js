@@ -457,10 +457,13 @@ var Vocab = {
     if (mode === "speaking" && (this.speakingTipe === "hanzi-audio" || this.speakingTipe === "audio")) {
       setTimeout(() => TTS.bicara(this.soalList[this.idx].hanzi, "zh-CN", cfg.ttRate || 0.85), 400);
     }
-    setTimeout(() => {
-      const inp = el("input-jawab");
-      if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === "Enter") this._jawabKetikHanzi(); }; }
-    }, 100);
+    // Pasang Enter handler untuk mode ketik hanzi (bukan pinyin — sudah dipasang di atas)
+    if (mode !== "hanzi-pinyin" && mode !== "indo-pinyin") {
+      setTimeout(() => {
+        const inp = el("input-jawab");
+        if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === "Enter") this._jawabKetikHanzi(); }; }
+      }, 100);
+    }
   },
 
   _updateStreak(benar) {
