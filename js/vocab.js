@@ -301,7 +301,7 @@ var Vocab = {
       : `<span class="pinyin-mode-tag longgar">🌊 Mode Longgar (nada diabaikan)</span>`;
     const inputArea = this.pinyinStrict
       ? `<div id="kb-pinyin-cont"></div>`
-      : `<input type="text" id="input-pinyin-longgar" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+      : `<input type="text" id="input-jawab" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
     return `
       <div class="soal-wrap">
         <div class="label-mode">Hanzi → Pinyin</div>
@@ -324,7 +324,7 @@ var Vocab = {
       : `<span class="pinyin-mode-tag longgar">🌊 Mode Longgar (nada diabaikan)</span>`;
     const inputArea = this.pinyinStrict
       ? `<div id="kb-pinyin-cont"></div>`
-      : `<input type="text" id="input-pinyin-longgar" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
+      : `<input type="text" id="input-jawab" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
     return `
       <div class="soal-wrap">
         <div class="label-mode">🔠 Indonesia → Pinyin</div>
@@ -442,7 +442,7 @@ var Vocab = {
         setTimeout(() => buildKbPinyin("kb-display", null), 50);
       } else {
         setTimeout(() => {
-          const inp = el("input-pinyin-longgar");
+          const inp = el("input-jawab");
           if (inp) {
             inp.focus();
             inp.onkeydown = e => { if (e.key === "Enter") this._jawabPinyin(); };
@@ -515,7 +515,7 @@ var Vocab = {
     if (this.pinyinStrict) {
       input = getKbTeks();
     } else {
-      const inp = el("input-pinyin-longgar");
+      const inp = el("input-jawab");
       input = inp ? inp.value.trim() : "";
     }
     if (!input) return;
