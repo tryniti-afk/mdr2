@@ -299,12 +299,15 @@ var Vocab = {
     const modeTag = this.pinyinStrict
       ? `<span class="pinyin-mode-tag ketat">🎯 Mode Ketat (nada wajib sesuai)</span>`
       : `<span class="pinyin-mode-tag longgar">🌊 Mode Longgar (nada diabaikan)</span>`;
+    const inputArea = this.pinyinStrict
+      ? `<div id="kb-pinyin-cont"></div>`
+      : `<input type="text" id="input-pinyin-longgar" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
     return `
       <div class="soal-wrap">
         <div class="label-mode">Hanzi → Pinyin</div>
         <div class="soal-hanzi">${item.hanzi}</div>
-        <div class="soal-hint">Tulis Pinyin (dengan tanda nada): ${modeTag}</div>
-        <div id="kb-pinyin-cont"></div>
+        <div class="soal-hint">Tulis Pinyin${this.pinyinStrict ? " (dengan tanda nada)" : ""}: ${modeTag}</div>
+        ${inputArea}
         <div class="hasil-box" id="hasil-vocab"></div>
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Vocab._jawabPinyin()">✅ Submit</button>
@@ -319,12 +322,15 @@ var Vocab = {
     const modeTag = this.pinyinStrict
       ? `<span class="pinyin-mode-tag ketat">🎯 Mode Ketat (nada wajib sesuai)</span>`
       : `<span class="pinyin-mode-tag longgar">🌊 Mode Longgar (nada diabaikan)</span>`;
+    const inputArea = this.pinyinStrict
+      ? `<div id="kb-pinyin-cont"></div>`
+      : `<input type="text" id="input-pinyin-longgar" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off">`;
     return `
       <div class="soal-wrap">
         <div class="label-mode">🔠 Indonesia → Pinyin</div>
         <div class="soal-arti">${item.arti}</div>
-        <div class="soal-hint">Tulis Pinyin kata di atas (dengan tanda nada): ${modeTag}</div>
-        <div id="kb-pinyin-cont"></div>
+        <div class="soal-hint">Tulis Pinyin kata di atas${this.pinyinStrict ? " (dengan tanda nada)" : ""}: ${modeTag}</div>
+        ${inputArea}
         <div class="hasil-box" id="hasil-vocab"></div>
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Vocab._jawabPinyin()">✅ Submit</button>
@@ -431,7 +437,19 @@ var Vocab = {
   _pasangEvent() {
     const mode = this.modeSaat;
     const cfg  = App._settings;
-    if (mode === "hanzi-pinyin" || mode === "indo-pinyin") setTimeout(() => buildKbPinyin("kb-display", null), 50);
+    if (mode === "hanzi-pinyin" || mode === "indo-pinyin") {
+      if (this.pinyinStrict) {
+        setTimeout(() => buildKbPinyin("kb-display", null), 50);
+      } else {
+        setTimeout(() => {
+          const inp = el("input-pinyin-longgar");
+          if (inp) {
+            inp.focus();
+            inp.onkeydown = e => { if (e.key === "Enter") this._jawabPinyin(); };
+          }
+        }, 100);
+      }
+    }
     if (mode === "audio-arti" || mode === "audio-hanzi") {
       setTimeout(() => TTS.bicara(this.soalList[this.idx].hanzi, "zh-CN", cfg.ttRate || 0.85), 300);
     }
@@ -493,7 +511,13 @@ var Vocab = {
 
   _jawabPinyin() {
     if (this._sedangTransisi) return;
-    const input = getKbTeks();
+    let input;
+    if (this.pinyinStrict) {
+      input = getKbTeks();
+    } else {
+      const inp = el("input-pinyin-longgar");
+      input = inp ? inp.value.trim() : "";
+    }
     if (!input) return;
     const item  = this.soalList[this.idx];
     const benar = cekPinyin(input, item.pinyin, this.pinyinStrict);
