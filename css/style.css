@@ -93,6 +93,7 @@
 [data-theme="dark"] .btn-pilihan:hover  { background: #2a2e45; border-color: var(--c-biru); }
 [data-theme="dark"] .pilihan-benar      { background: #1b2e1b !important; border-color: #388e3c !important; color: #a5d6a7 !important; }
 [data-theme="dark"] .pilihan-salah      { background: #2e1b1b !important; border-color: #c62828 !important; color: #ef9a9a !important; }
+[data-theme="dark"] .btn-pilihan.dipilih { background: #1a2a3a !important; border-color: var(--c-biru) !important; border-width: 2px !important; }
 
 [data-theme="dark"] .opsi {
   background: #22253a;
@@ -547,6 +548,7 @@ body {
 .btn-pilihan:hover, .btn-pilihan-full:hover { background: #e3f2fd; border-color: var(--c-biru); }
 .pilihan-benar { background: #e8f5e9 !important; border-color: var(--c-hijau) !important; color: var(--c-hijau-d) !important; }
 .pilihan-salah { background: #ffebee !important; border-color: var(--c-merah) !important; color: var(--c-merah) !important; }
+.btn-pilihan.dipilih { background: #e3f2fd !important; border-color: var(--c-biru) !important; border-width: 2px !important; font-weight: 700; }
 
 /* ── INPUT TEKS ──────────────────────────────────────────────── */
 .input-teks {
