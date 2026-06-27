@@ -674,14 +674,14 @@ var AllIn = {
 
   // Semua step yang tersedia
   ALL_STEPS: [
-    { id:"audio-arti",      label:"Audio → Arti (Pilihan)",  icon:"🔊", tipe:"pilihan" },
-    { id:"audio-arti-suara",label:"Audio → Arti (Suara)",    icon:"🎤", tipe:"speaking-arti" },
-    { id:"hanzi-indo",      label:"Hanzi → Arti",            icon:"🈯", tipe:"pilihan" },
-    { id:"audio-hanzi",     label:"Audio → Hanzi",           icon:"🎧", tipe:"ketik-hanzi" },
-    { id:"hanzi-pinyin",    label:"Hanzi → Pinyin",          icon:"🔤", tipe:"ketik-pinyin" },
-    { id:"indo-pinyin",     label:"Indo → Pinyin",           icon:"🔠", tipe:"ketik-pinyin" },
-    { id:"arti-hanzi",      label:"Arti → Hanzi",            icon:"✍️", tipe:"ketik-hanzi" },
-    { id:"hanzi-arti-suara",label:"Hanzi → Arti (Suara)",    icon:"🗣️", tipe:"speaking-arti" },
+    { id:"audio-arti",      label:"Audio → Arti (Pilihan)",  icon:"🔊", tipe:"pilihan",       star:true },
+    { id:"hanzi-indo",      label:"Hanzi → Arti (Pilihan)",  icon:"🈯", tipe:"pilihan",       star:false },
+    { id:"hanzi-arti-suara",label:"Hanzi → Arti (Suara)",    icon:"🗣️", tipe:"speaking-arti", star:false },
+    { id:"audio-arti-suara",label:"Audio → Arti (Suara)",    icon:"🎤", tipe:"speaking-arti", star:false },
+    { id:"audio-hanzi",     label:"Audio → Hanzi",           icon:"🎧", tipe:"ketik-hanzi",   star:true },
+    { id:"hanzi-pinyin",    label:"Hanzi → Pinyin",          icon:"🔤", tipe:"ketik-pinyin",  star:false },
+    { id:"indo-pinyin",     label:"Arti → Pinyin",           icon:"🔠", tipe:"ketik-pinyin",  star:false },
+    { id:"arti-hanzi",      label:"Arti → Hanzi",            icon:"✍️", tipe:"ketik-hanzi",   star:true },
   ],
 
   // Step default yang aktif (bisa diubah user di opsi)
@@ -707,9 +707,11 @@ var AllIn = {
     const n = this.soalList.length;
     const stepChecks = this.ALL_STEPS.map(s => {
       const aktif = this.activeStepIds.includes(s.id);
+      const starBadge = s.star ? `<span style="color:#f59e0b;font-size:13px;font-weight:700" title="Rekomendasi">⭐</span>` : `<span style="display:inline-block;width:18px"></span>`;
       return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:14px">
         <input type="checkbox" value="${s.id}" ${aktif?'checked':''} onchange="AllIn._toggleStep('${s.id}',this.checked)"
           style="width:18px;height:18px;cursor:pointer">
+        ${starBadge}
         <span>${s.icon} ${s.label}</span>
       </label>`;
     }).join("");
