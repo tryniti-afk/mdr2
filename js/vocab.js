@@ -679,6 +679,7 @@ var AllIn = {
     { id:"hanzi-arti-suara", label:"Hanzi → Arti (Suara)",   icon:"🗣️", tipe:"speaking-arti", star:false },
     { id:"audio-hanzi-suara",label:"Audio → Hanzi (Suara)",  icon:"🎤", tipe:"speaking-hanzi",star:true },
     { id:"audio-hanzi",      label:"Audio → Hanzi",          icon:"🎧", tipe:"ketik-hanzi",   star:false },
+    { id:"audio-pinyin",     label:"Audio → Pinyin",         icon:"🎵", tipe:"ketik-pinyin",  star:false },
     { id:"hanzi-pinyin",     label:"Hanzi → Pinyin",         icon:"🔤", tipe:"ketik-pinyin",  star:false },
     { id:"indo-pinyin",      label:"Arti → Pinyin",          icon:"🔠", tipe:"ketik-pinyin",  star:false },
     { id:"arti-hanzi",       label:"Arti → Hanzi",           icon:"✍️", tipe:"ketik-hanzi",   star:true },
@@ -688,7 +689,10 @@ var AllIn = {
   activeStepIds: ["audio-arti","hanzi-indo","audio-hanzi","hanzi-pinyin","indo-pinyin","arti-hanzi"],
 
   get STEPS() {
-    return this.ALL_STEPS.filter(s => this.activeStepIds.includes(s.id));
+    const order = this._stepOrder && this._stepOrder.length
+      ? this._stepOrder
+      : this.activeStepIds;
+    return order.map(id => this.ALL_STEPS.find(s=>s.id===id)).filter(Boolean);
   },
 
   // ── INIT ─────────────────────────────────────────────────────
@@ -707,12 +711,12 @@ var AllIn = {
     const n = this.soalList.length;
     const stepChecks = this.ALL_STEPS.map(s => {
       const aktif = this.activeStepIds.includes(s.id);
-      const starBadge = s.star ? `<span style="color:#f59e0b;font-size:13px;font-weight:700" title="Rekomendasi">⭐</span>` : '';
+      const starBadge = s.star ? `<span style="color:#f59e0b;font-size:13px" title="Rekomendasi">⭐</span>` : `<span style="display:inline-block;width:16px"></span>`;
       return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:14px">
         <input type="checkbox" value="${s.id}" ${aktif?'checked':''} onchange="AllIn._toggleStep('${s.id}',this.checked)"
-          style="width:18px;height:18px;cursor:pointer">
-        <span>${s.icon} ${s.label}</span>
+          style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
         ${starBadge}
+        <span>${s.icon} ${s.label}</span>
       </label>`;
     }).join("");
     el("konten-utama").innerHTML = `
@@ -746,10 +750,54 @@ var AllIn = {
         </div>
 
         <div class="btn-row" style="justify-content:center">
-          <button class="btn btn-hijau" onclick="AllIn._validasiDanMulai()">▶ Mulai Review Kata</button>
+          <button class="btn btn-hijau" onclick="AllIn._validasiDanLanjutUrutan()">Atur Urutan Step ▶</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
         </div>
       </div>`;
+  },
+
+  _renderUrutanStep() {
+    const aktif = this.ALL_STEPS.filter(s => this.activeStepIds.includes(s.id));
+    // Gunakan stepOrder jika sudah ada dan masih valid, else default urutan activeStepIds
+    if (!this._stepOrder || this._stepOrder.length !== aktif.length ||
+        !this._stepOrder.every(id => aktif.find(s=>s.id===id))) {
+      this._stepOrder = aktif.map(s=>s.id);
+    }
+    const rows = this._stepOrder.map((id, i) => {
+      const s = this.ALL_STEPS.find(x=>x.id===id);
+      const isFirst = i === 0, isLast = i === this._stepOrder.length - 1;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--c-border);border-radius:8px;margin-bottom:6px;background:var(--c-card)">
+        <span style="font-size:18px">${s.icon}</span>
+        <span style="flex:1;font-size:14px">${s.label}</span>
+        <span style="font-size:12px;color:var(--c-sub);min-width:28px;text-align:center">
+          ${i+1}
+        </span>
+        <button onclick="AllIn._moveStep('${id}',-1)" ${isFirst?'disabled':''} 
+          style="background:none;border:1px solid var(--c-border);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:14px;opacity:${isFirst?'0.3':'1'}">▲</button>
+        <button onclick="AllIn._moveStep('${id}',1)" ${isLast?'disabled':''}
+          style="background:none;border:1px solid var(--c-border);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:14px;opacity:${isLast?'0.3':'1'}">▼</button>
+      </div>`;
+    }).join("");
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🔥 All In — Urutan Step</div>
+        <div class="soal-hint" style="margin-bottom:14px">
+          Atur urutan step latihan menggunakan tombol ▲ ▼. Step paling atas dikerjakan pertama.
+        </div>
+        <div style="margin-bottom:16px">${rows}</div>
+        <div class="btn-row" style="justify-content:center">
+          <button class="btn btn-hijau" onclick="AllIn.mulaiPreview()">▶ Mulai Review Kata</button>
+          <button class="btn btn-abu" onclick="AllIn._renderOpsiAwalAllIn()">← Kembali</button>
+        </div>
+      </div>`;
+  },
+
+  _moveStep(id, dir) {
+    const idx = this._stepOrder.indexOf(id);
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= this._stepOrder.length) return;
+    [this._stepOrder[idx], this._stepOrder[newIdx]] = [this._stepOrder[newIdx], this._stepOrder[idx]];
+    this._renderUrutanStep();
   },
 
   _toggleStep(id, checked) {
@@ -758,21 +806,22 @@ var AllIn = {
     } else {
       this.activeStepIds = this.activeStepIds.filter(x => x !== id);
     }
-    // Pertahankan urutan sesuai ALL_STEPS
     this.activeStepIds = this.ALL_STEPS.map(s=>s.id).filter(id => this.activeStepIds.includes(id));
+    this._stepOrder = null; // reset urutan saat pilihan berubah
   },
 
   _selectAllSteps(all) {
     this.activeStepIds = all ? this.ALL_STEPS.map(s=>s.id) : [];
+    this._stepOrder = null;
     this._renderOpsiAwalAllIn();
   },
 
-  _validasiDanMulai() {
+  _validasiDanLanjutUrutan() {
     if (this.activeStepIds.length === 0) {
       tampilToast("Pilih minimal 1 step dulu!");
       return;
     }
-    this.mulaiPreview();
+    this._renderUrutanStep();
   },
 
   _setDifficulty(v) {
@@ -909,6 +958,7 @@ var AllIn = {
       "audio-hanzi-suara": "Dengarkan audio → ucapkan kembali dalam Mandarin (shadowing).",
       "hanzi-indo":       "Lihat karakter Hanzi → pilih artinya (4 pilihan).",
       "audio-hanzi":      "Dengarkan audio → ketik karakter Hanzi-nya.",
+      "audio-pinyin":     "Dengarkan audio → ketik Pinyin-nya.",
       "hanzi-pinyin":     "Lihat Hanzi → ketik Pinyin-nya.",
       "indo-pinyin":      "Lihat arti Indonesia → ketik Pinyin-nya.",
       "arti-hanzi":       "Lihat arti Indonesia → ketik karakter Hanzi-nya.",
@@ -978,7 +1028,7 @@ var AllIn = {
     this._pasangEventAllIn(step, item);
 
     // Auto-play audio
-    if (["audio-arti","audio-hanzi","audio-hanzi-suara"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1025,7 +1075,7 @@ var AllIn = {
     el("konten-utama").innerHTML = html;
     this._pasangEventAllIn(step, item, true);
 
-    if (["audio-arti","audio-hanzi","audio-hanzi-suara"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1094,6 +1144,29 @@ var AllIn = {
           <div class="hasil-box" id="hasil-ai"></div>
           <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
+    if (id === "audio-pinyin") {
+      const modeTag = this.pinyinStrict
+        ? `<span class="pinyin-mode-tag ketat">🎯 Ketat</span>`
+        : `<span class="pinyin-mode-tag longgar">🌊 Longgar</span>`;
+      const inputArea = this.pinyinStrict
+        ? `<div id="kb-pinyin-cont"></div>`
+        : `<input type="text" id="input-ai" class="input-jawab" placeholder="Ketik pinyin..." autocomplete="off" style="display:block;margin:0 auto;">`;
+      return `
+        <div class="soal-wrap" style="text-align:center">
+          <div class="label-mode">🎵 Audio → Pinyin ${modeTag}</div>
+          <div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
+          </div>
+          <div class="soal-hint">Dengarkan lalu tulis Pinyin-nya${this.pinyinStrict?" (dengan tanda nada)":""}:</div>
+          ${inputArea}
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row" style="justify-content:center">
+            <button class="btn btn-hijau" onclick="AllIn._jawabPinyin()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
         </div>`;
@@ -1204,7 +1277,7 @@ var AllIn = {
       // Speaking step — tidak perlu pasang input event
       return;
     }
-    if (id === "hanzi-pinyin" || id === "indo-pinyin") {
+    if (id === "hanzi-pinyin" || id === "indo-pinyin" || id === "audio-pinyin") {
       if (this.pinyinStrict) {
         setTimeout(() => buildKbPinyin("kb-display", null), 50);
       } else {
