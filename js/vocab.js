@@ -677,6 +677,7 @@ var AllIn = {
     { id:"audio-arti",       label:"Audio → Arti (Pilihan)", icon:"🔊", tipe:"pilihan",       star:true },
     { id:"hanzi-indo",       label:"Hanzi → Arti (Pilihan)", icon:"🈯", tipe:"pilihan",       star:false },
     { id:"hanzi-arti-suara", label:"Hanzi → Arti (Suara)",   icon:"🗣️", tipe:"speaking-arti", star:false },
+    { id:"arti-audio",        label:"Arti → Audio (Pilihan)", icon:"🔉", tipe:"pilihan-audio",  star:false },
     { id:"audio-hanzi-suara",label:"Audio → Hanzi (Suara)",  icon:"🎤", tipe:"speaking-hanzi",star:true },
     { id:"audio-hanzi",      label:"Audio → Hanzi",          icon:"🎧", tipe:"ketik-hanzi",   star:false },
     { id:"audio-pinyin",     label:"Audio → Pinyin",         icon:"🎵", tipe:"ketik-pinyin",  star:false },
@@ -919,6 +920,20 @@ var AllIn = {
             <button class="ss-btn ${!this.pinyinStrict?'aktif':''}"
               onclick="AllIn._setPinyinStrictInline(false)">🌊 Longgar</button>
           </div>` : ''}
+        ${(['audio-pinyin','audio-hanzi'].includes(step.id)) ? (() => {
+          const sid = step.id;
+          const val = (AllIn._tampilArtiDiKunci||{})[sid] || false;
+          const label = sid === 'audio-pinyin' ? 'pinyin' : 'hanzi';
+          return `<div style="margin-bottom:14px">
+            <div style="font-size:13px;color:var(--c-sub);margin-bottom:6px">📌 Kunci Jawaban — tampilkan arti juga?</div>
+            <div style="display:flex;gap:8px;justify-content:center">
+              <button class="ss-btn ${val?'aktif':''}"
+                onclick="AllIn._setTampilArtiDiKunci('${sid}',true)">📖 Ya, tampilkan</button>
+              <button class="ss-btn ${!val?'aktif':''}"
+                onclick="AllIn._setTampilArtiDiKunci('${sid}',false)">🚫 Tidak</button>
+            </div>
+          </div>`;
+        })() : ''}
         ${step.tipe === 'pilihan' ? (() => {
           const sid = step.id;
           const val = (AllIn._pinyinDiKunci||{})[sid] || false;
@@ -950,9 +965,16 @@ var AllIn = {
     this._tampilStepIntro();
   },
 
+  _setTampilArtiDiKunci(stepId, v) {
+    if (!this._tampilArtiDiKunci) this._tampilArtiDiKunci = {};
+    this._tampilArtiDiKunci[stepId] = v;
+    this._tampilStepIntro();
+  },
+
   _deskStep(id) {
     const m = {
       "audio-arti":       "Dengarkan audio → pilih arti yang benar (4 pilihan).",
+      "arti-audio":        "Lihat arti → pilih audio (hanzi) yang benar (4 pilihan).",
       "audio-hanzi-suara": "Dengarkan audio → ucapkan kembali dalam Mandarin (shadowing).",
       "hanzi-indo":       "Lihat karakter Hanzi → pilih artinya (4 pilihan).",
       "audio-hanzi":      "Dengarkan audio → ketik karakter Hanzi-nya.",
@@ -1130,6 +1152,25 @@ var AllIn = {
         </div>`;
     }
 
+    if (id === "arti-audio") {
+      const sarr = acak(pool.length >= 3 ? pool : DB.vocab.filter(v=>v.arti!==item.arti)).slice(0,3);
+      const kandidat = acak([item, ...sarr]);
+      return `
+        <div class="soal-wrap" style="text-align:center">
+          <div class="label-mode">🔉 Arti → Audio (Pilihan)</div>
+          <div class="soal-arti">${item.arti}</div>
+          <div class="soal-hint">Pilih audio yang sesuai dengan arti di atas:</div>
+          <div class="pilihan-grid" id="pilihan-cont">
+            ${kandidat.map(v=>`<button class="btn-pilihan"
+              onclick="AllIn._jawabPilihanAudio('${safeEsc(v.hanzi)}','${safeEsc(item.hanzi)}','${safeEsc(v.hanzi)}')">
+              🔊 <span style="font-size:18px;font-weight:900">${v.hanzi}</span>
+            </button>`).join("")}
+          </div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row" style="justify-content:center"><button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button></div>
+        </div>`;
+    }
+
     if (id === "audio-hanzi") {
       return `
         <div class="soal-wrap" style="text-align:center">
@@ -1293,6 +1334,29 @@ var AllIn = {
   },
 
   // ── JAWAB PILIHAN ─────────────────────────────────────────────
+  _jawabPilihanAudio(hanziDipilih, hanziBenar, hanziDisplay) {
+    // Play audio pilihan yang diklik dulu
+    TTS.mandarin(hanziDipilih);
+    const benar = hanziDipilih === hanziBenar;
+    // Tandai pilihan
+    el("pilihan-cont")?.querySelectorAll(".btn-pilihan").forEach(b => {
+      b.disabled = true;
+      const h = b.querySelector("span")?.innerText || b.innerText.replace("🔊","").trim();
+      if (h === hanziBenar) b.classList.add("pilihan-benar");
+      else if (h === hanziDipilih && !benar) b.classList.add("pilihan-salah");
+    });
+    const item = this._currentItem();
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      const py = item.pinyin ? ` (${item.pinyin})` : "";
+      hEl.innerHTML = benar
+        ? `✅ Benar! <b>${item.hanzi}</b>${py} = ${item.arti}`
+        : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${py} = ${item.arti}`;
+      hEl.className = "hasil-box " + (benar ? "benar" : "salah");
+    }
+    this._prosesJawab(benar, item);
+  },
+
   _jawabPilihan(dipilih, jawaban) {
     if (this._sedang) return;
     const benar = dipilih === jawaban;
@@ -1330,9 +1394,12 @@ var AllIn = {
     const benar = cekHanzi(input, item.hanzi);
     const hEl = el("hasil-ai");
     if (hEl) {
+      const stepIdH = this.STEPS[this.stepIdx]?.id;
+      const tampilArtiH = (this._tampilArtiDiKunci||{})[stepIdH];
+      const artiInfoH = tampilArtiH && item.arti ? ` = ${item.arti}` : "";
       hEl.innerHTML = benar
-        ? `✅ Benar! <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}`
-        : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}`;
+        ? `✅ Benar! <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}${artiInfoH}`
+        : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${item.pinyin?" ("+item.pinyin+")":""}${artiInfoH}`;
       hEl.className = "hasil-box " + (benar?"benar":"salah");
     }
     if (inp) inp.disabled = true;
@@ -1354,9 +1421,12 @@ var AllIn = {
     const benar = cekPinyin(input, item.pinyin, this.pinyinStrict);
     const hEl = el("hasil-ai");
     if (hEl) {
+      const stepIdP = this.STEPS[this.stepIdx]?.id;
+      const tampilArtiP = (this._tampilArtiDiKunci||{})[stepIdP];
+      const artiInfoP = tampilArtiP && item.arti ? ` = ${item.arti}` : "";
       hEl.innerHTML = benar
-        ? `✅ Benar! Pinyin: <b>${item.pinyin}</b>`
-        : `❌ Salah. Pinyin benar: <b>${item.pinyin}</b>`;
+        ? `✅ Benar! Pinyin: <b>${item.pinyin}</b>${artiInfoP}`
+        : `❌ Salah. Pinyin benar: <b>${item.pinyin}</b>${artiInfoP}`;
       hEl.className = "hasil-box " + (benar?"benar":"salah");
     }
     this._prosesJawab(benar, item);
