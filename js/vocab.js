@@ -659,7 +659,6 @@ var AllIn = {
 
   soalList: [],           // kata-kata yang dipakai di sesi ini
   pinyinStrict: true,     // true = nada diperhatikan
-  showPinyinKunci: false,  // tampilkan pinyin di kunci jawaban pilihan
   difficulty: "easy",     // "easy" = mundur 2 | "hard" = ulang dari awal step | "ambil" = kata salah 1x langsung muncul di akhir step
   stepIdx: 0,             // step saat ini (0-5)
   wordIdx: 0,             // kata saat ini dalam step
@@ -873,16 +872,19 @@ var AllIn = {
             <button class="ss-btn ${!this.pinyinStrict?'aktif':''}"
               onclick="AllIn._setPinyinStrictInline(false)">🌊 Longgar</button>
           </div>` : ''}
-        ${step.tipe === 'pilihan' ? `
-          <div style="margin-bottom:14px">
-            <div style="font-size:13px;color:var(--c-sub);margin-bottom:6px">📌 Kunci Jawaban</div>
+        ${step.tipe === 'pilihan' ? (() => {
+          const sid = step.id;
+          const val = (AllIn._pinyinDiKunci||{})[sid] || false;
+          return `<div style="margin-bottom:14px">
+            <div style="font-size:13px;color:var(--c-sub);margin-bottom:6px">📌 Kunci Jawaban — tampilkan pinyin?</div>
             <div style="display:flex;gap:8px;justify-content:center">
-              <button class="ss-btn ${this.showPinyinKunci?'aktif':''}"
-                onclick="AllIn._setShowPinyinKunci(true)">🔤 Tampilkan Pinyin</button>
-              <button class="ss-btn ${!this.showPinyinKunci?'aktif':''}"
-                onclick="AllIn._setShowPinyinKunci(false)">🚫 Tanpa Pinyin</button>
+              <button class="ss-btn ${val?'aktif':''}"
+                onclick="AllIn._setPinyinDiKunci('${sid}',true)">🔤 Ya, tampilkan</button>
+              <button class="ss-btn ${!val?'aktif':''}"
+                onclick="AllIn._setPinyinDiKunci('${sid}',false)">🚫 Tidak</button>
             </div>
-          </div>` : ''}
+          </div>`;
+        })() : ''}
         <div class="btn-row" style="justify-content:center">
           <button class="btn btn-hijau" onclick="AllIn._mulaiStep()">▶ Mulai Tahap Ini</button>
           <button class="btn btn-abu" onclick="AllIn.mulaiPreview()">← Review Kata Lagi</button>
@@ -895,8 +897,9 @@ var AllIn = {
     this._tampilStepIntro();
   },
 
-  _setShowPinyinKunci(v) {
-    this.showPinyinKunci = v;
+  _setPinyinDiKunci(stepId, v) {
+    if (!this._pinyinDiKunci) this._pinyinDiKunci = {};
+    this._pinyinDiKunci[stepId] = v;
     this._tampilStepIntro();
   },
 
@@ -1228,12 +1231,19 @@ var AllIn = {
       else if (b.innerText === dipilih && !benar) b.classList.add("pilihan-salah");
     });
     const item = this._currentItem();
+    const step = this.STEPS[this.stepIdx];
     const hEl = el("hasil-ai");
     if (hEl) {
-      const py = this.showPinyinKunci && item.pinyin ? ` (${item.pinyin})` : "";
-      hEl.innerHTML = benar
-        ? `✅ Benar! <b>${item.hanzi}</b>${py} = ${item.arti}`
-        : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${py} = ${item.arti}`;
+      const tampilPinyin = (this._pinyinDiKunci||{})[step.id] && item.pinyin;
+      if (benar) {
+        // Benar: selalu tampil hanzi + arti (tanpa pinyin)
+        hEl.innerHTML = `✅ Benar! <b>${item.hanzi}</b> = ${item.arti}`;
+      } else {
+        // Salah: jika pilih pinyin → pinyin + arti; jika tidak → arti saja
+        hEl.innerHTML = tampilPinyin
+          ? `❌ Salah. <span style="color:var(--c-biru)">${item.pinyin}</span> = ${item.arti}`
+          : `❌ Salah. Jawaban: ${item.arti}`;
+      }
       hEl.className = "hasil-box " + (benar?"benar":"salah");
     }
     this._prosesJawab(benar, item);
