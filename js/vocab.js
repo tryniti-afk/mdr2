@@ -1159,15 +1159,19 @@ var AllIn = {
         <div class="soal-wrap" style="text-align:center">
           <div class="label-mode">🔉 Arti → Audio (Pilihan)</div>
           <div class="soal-arti">${item.arti}</div>
-          <div class="soal-hint">Pilih audio yang sesuai dengan arti di atas:</div>
+          <div class="soal-hint">Dengarkan lalu pilih yang sesuai:</div>
           <div class="pilihan-grid" id="pilihan-cont">
-            ${kandidat.map(v=>`<button class="btn-pilihan"
-              onclick="AllIn._jawabPilihanAudio('${safeEsc(v.hanzi)}','${safeEsc(item.hanzi)}','${safeEsc(v.hanzi)}')">
+            ${kandidat.map(v=>`<button class="btn-pilihan" data-hanzi="${safeEsc(v.hanzi)}"
+              onclick="AllIn._pilihAudio('${safeEsc(v.hanzi)}',this)">
               🔊 <span style="font-size:18px;font-weight:900">${v.hanzi}</span>
             </button>`).join("")}
           </div>
           <div class="hasil-box" id="hasil-ai"></div>
-          <div class="btn-row" style="justify-content:center"><button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button></div>
+          <div class="btn-row" style="justify-content:center">
+            <button class="btn btn-hijau" id="btn-submit-audio" onclick="AllIn._submitPilihanAudio('${safeEsc(item.hanzi)}')" disabled
+              style="opacity:0.4">✅ Submit</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
         </div>`;
     }
 
@@ -1334,14 +1338,23 @@ var AllIn = {
   },
 
   // ── JAWAB PILIHAN ─────────────────────────────────────────────
-  _jawabPilihanAudio(hanziDipilih, hanziBenar, hanziDisplay) {
-    // Play audio pilihan yang diklik dulu
-    TTS.mandarin(hanziDipilih);
+  _pilihAudio(hanzi, btnEl) {
+    // Play audio dan highlight pilihan, aktifkan submit
+    TTS.mandarin(hanzi);
+    el("pilihan-cont")?.querySelectorAll(".btn-pilihan").forEach(b => b.classList.remove("dipilih"));
+    btnEl.classList.add("dipilih");
+    this._pilihanAudioDipilih = hanzi;
+    const btnSubmit = el("btn-submit-audio");
+    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.style.opacity = "1"; }
+  },
+
+  _submitPilihanAudio(hanziBenar) {
+    const hanziDipilih = this._pilihanAudioDipilih;
+    if (!hanziDipilih) return;
     const benar = hanziDipilih === hanziBenar;
-    // Tandai pilihan
     el("pilihan-cont")?.querySelectorAll(".btn-pilihan").forEach(b => {
       b.disabled = true;
-      const h = b.querySelector("span")?.innerText || b.innerText.replace("🔊","").trim();
+      const h = b.dataset.hanzi;
       if (h === hanziBenar) b.classList.add("pilihan-benar");
       else if (h === hanziDipilih && !benar) b.classList.add("pilihan-salah");
     });
@@ -1354,6 +1367,8 @@ var AllIn = {
         : `❌ Salah. Jawaban: <b>${item.hanzi}</b>${py} = ${item.arti}`;
       hEl.className = "hasil-box " + (benar ? "benar" : "salah");
     }
+    const btnSubmit = el("btn-submit-audio");
+    if (btnSubmit) btnSubmit.disabled = true;
     this._prosesJawab(benar, item);
   },
 
