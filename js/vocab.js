@@ -674,14 +674,14 @@ var AllIn = {
 
   // Semua step yang tersedia
   ALL_STEPS: [
-    { id:"audio-arti",      label:"Audio → Arti (Pilihan)",  icon:"🔊", tipe:"pilihan",       star:true },
-    { id:"hanzi-indo",      label:"Hanzi → Arti (Pilihan)",  icon:"🈯", tipe:"pilihan",       star:false },
-    { id:"hanzi-arti-suara",label:"Hanzi → Arti (Suara)",    icon:"🗣️", tipe:"speaking-arti", star:false },
-    { id:"audio-arti-suara",label:"Audio → Arti (Suara)",    icon:"🎤", tipe:"speaking-arti", star:false },
-    { id:"audio-hanzi",     label:"Audio → Hanzi",           icon:"🎧", tipe:"ketik-hanzi",   star:true },
-    { id:"hanzi-pinyin",    label:"Hanzi → Pinyin",          icon:"🔤", tipe:"ketik-pinyin",  star:false },
-    { id:"indo-pinyin",     label:"Arti → Pinyin",           icon:"🔠", tipe:"ketik-pinyin",  star:false },
-    { id:"arti-hanzi",      label:"Arti → Hanzi",            icon:"✍️", tipe:"ketik-hanzi",   star:true },
+    { id:"audio-arti",       label:"Audio → Arti (Pilihan)", icon:"🔊", tipe:"pilihan",       star:true },
+    { id:"hanzi-indo",       label:"Hanzi → Arti (Pilihan)", icon:"🈯", tipe:"pilihan",       star:false },
+    { id:"hanzi-arti-suara", label:"Hanzi → Arti (Suara)",   icon:"🗣️", tipe:"speaking-arti", star:false },
+    { id:"audio-hanzi-suara",label:"Audio → Hanzi (Suara)",  icon:"🎤", tipe:"speaking-hanzi",star:true },
+    { id:"audio-hanzi",      label:"Audio → Hanzi",          icon:"🎧", tipe:"ketik-hanzi",   star:false },
+    { id:"hanzi-pinyin",     label:"Hanzi → Pinyin",         icon:"🔤", tipe:"ketik-pinyin",  star:false },
+    { id:"indo-pinyin",      label:"Arti → Pinyin",          icon:"🔠", tipe:"ketik-pinyin",  star:false },
+    { id:"arti-hanzi",       label:"Arti → Hanzi",           icon:"✍️", tipe:"ketik-hanzi",   star:true },
   ],
 
   // Step default yang aktif (bisa diubah user di opsi)
@@ -887,7 +887,7 @@ var AllIn = {
   _deskStep(id) {
     const m = {
       "audio-arti":       "Dengarkan audio → pilih arti yang benar (4 pilihan).",
-      "audio-arti-suara": "Dengarkan audio → ucapkan artinya dengan suara.",
+      "audio-hanzi-suara": "Dengarkan audio → ucapkan kembali dalam Mandarin (shadowing).",
       "hanzi-indo":       "Lihat karakter Hanzi → pilih artinya (4 pilihan).",
       "audio-hanzi":      "Dengarkan audio → ketik karakter Hanzi-nya.",
       "hanzi-pinyin":     "Lihat Hanzi → ketik Pinyin-nya.",
@@ -959,7 +959,7 @@ var AllIn = {
     this._pasangEventAllIn(step, item);
 
     // Auto-play audio
-    if (["audio-arti","audio-hanzi","audio-arti-suara"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1006,7 +1006,7 @@ var AllIn = {
     el("konten-utama").innerHTML = html;
     this._pasangEventAllIn(step, item, true);
 
-    if (["audio-arti","audio-hanzi","audio-arti-suara"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1137,21 +1137,35 @@ var AllIn = {
         </div>`;
     }
 
-    if (id === "audio-arti-suara" || id === "hanzi-arti-suara") {
-      const soalHtml = id === "audio-arti-suara"
-        ? `<div class="audio-btn-wrap">
-             <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
-           </div>
-           <div class="soal-hint">Dengarkan audio lalu ucapkan artinya:</div>`
-        : `<div class="soal-hanzi">${item.hanzi}</div>
-           <div class="soal-hint">Lihat Hanzi lalu ucapkan artinya:</div>`;
+    if (id === "hanzi-arti-suara") {
       return `
         <div class="soal-wrap" style="text-align:center">
-          <div class="label-mode">${id === "audio-arti-suara" ? "🎤 Audio → Arti (Suara)" : "🗣️ Hanzi → Arti (Suara)"}</div>
-          ${soalHtml}
+          <div class="label-mode">🗣️ Hanzi → Arti (Suara)</div>
+          <div class="soal-hanzi">${item.hanzi}</div>
+          <div class="soal-hint">Lihat Hanzi lalu ucapkan artinya:</div>
           <div id="speaking-status" style="margin:12px 0;font-size:14px;color:var(--c-sub)">Tekan rekam untuk mulai</div>
           <div style="display:flex;gap:10px;justify-content:center;margin:10px 0">
-            <button class="btn btn-hijau" id="btn-rekam" onclick="AllIn._mulaiRekam()">🎙️ Rekam Jawaban</button>
+            <button class="btn btn-hijau" id="btn-rekam" onclick="AllIn._mulaiRekam('arti')">🎙️ Rekam Jawaban</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div id="btn-lanjut-speaking" style="display:none;margin-top:8px">
+            <button class="btn btn-biru" onclick="AllIn._lanjutDariSpeaking()">▶ Lanjut</button>
+          </div>
+        </div>`;
+    }
+
+    if (id === "audio-hanzi-suara") {
+      return `
+        <div class="soal-wrap" style="text-align:center">
+          <div class="label-mode">🎤 Audio → Hanzi (Suara / Shadowing)</div>
+          <div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
+          </div>
+          <div class="soal-hint">Dengarkan audio lalu ucapkan kembali dalam bahasa Mandarin:</div>
+          <div id="speaking-status" style="margin:12px 0;font-size:14px;color:var(--c-sub)">Tekan rekam untuk mulai</div>
+          <div style="display:flex;gap:10px;justify-content:center;margin:10px 0">
+            <button class="btn btn-hijau" id="btn-rekam" onclick="AllIn._mulaiRekam('hanzi')">🎙️ Rekam & Shadowing</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
           <div class="hasil-box" id="hasil-ai"></div>
@@ -1167,7 +1181,7 @@ var AllIn = {
   // ── PASANG EVENT ─────────────────────────────────────────────
   _pasangEventAllIn(step, item, isExtra) {
     const id = step.id;
-    if (id === "audio-arti-suara" || id === "hanzi-arti-suara") {
+    if (id === "audio-hanzi-suara" || id === "hanzi-arti-suara") {
       // Speaking step — tidak perlu pasang input event
       return;
     }
@@ -1251,23 +1265,25 @@ var AllIn = {
   },
 
   // ── SPEAKING (audio/hanzi → arti suara) ──────────────────────
-  _mulaiRekam() {
+  _mulaiRekam(mode) {
+    // mode: 'arti' = jawab arti (bahasa Indonesia), 'hanzi' = shadowing (bahasa Mandarin)
+    this._speakingMode = mode || 'arti';
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       el("speaking-status").textContent = "❌ Browser tidak mendukung speech recognition. Gunakan Chrome.";
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     this._sr = new SR();
-    this._sr.lang = "id-ID";
+    this._sr.lang = mode === 'hanzi' ? "zh-CN" : "id-ID";
     this._sr.interimResults = false;
     this._sr.maxAlternatives = 5;
 
-    el("speaking-status").textContent = "🎙️ Sedang mendengarkan...";
+    el("speaking-status").textContent = mode === 'hanzi' ? "🎙️ Ucapkan dalam Mandarin..." : "🎙️ Sedang mendengarkan...";
     const btnRekam = el("btn-rekam");
     if (btnRekam) { btnRekam.disabled = true; btnRekam.textContent = "⏳ Rekam..."; }
 
     this._sr.onresult = (e) => {
-      const transkrip = Array.from(e.results[0]).map(r => r.transcript.toLowerCase().trim());
+      const transkrip = Array.from(e.results[0]).map(r => r.transcript.trim());
       this._cekJawabanSpeaking(transkrip);
     };
     this._sr.onerror = (e) => {
@@ -1282,20 +1298,34 @@ var AllIn = {
 
   _cekJawabanSpeaking(transkripArr) {
     const item = this._currentItem();
-    const benar = transkripArr.some(t => this._cocokArti(t, item.arti));
-    const hEl = el("hasil-ai");
+    const mode = this._speakingMode || 'arti';
+    let benar;
+    let pesanBenar, pesanSalah;
+
+    if (mode === 'hanzi') {
+      // Shadowing: cocokkan dengan hanzi atau pinyin
+      benar = transkripArr.some(t => {
+        const t2 = t.toLowerCase().replace(/\s/g,'');
+        const hanzi = (item.hanzi||'').toLowerCase();
+        const pinyin = (item.pinyin||'').toLowerCase().replace(/\s/g,'').replace(/[1-5]/g,'');
+        return t2.includes(hanzi) || hanzi.includes(t2) || t2.includes(pinyin) || pinyin.includes(t2);
+      });
+      pesanBenar = `✅ Benar! <b>${item.hanzi}</b> (${item.pinyin})`;
+      pesanSalah = `❌ Didengar: "${transkripArr[0]}" — Jawaban: <b>${item.hanzi}</b> (${item.pinyin})`;
+    } else {
+      benar = transkripArr.some(t => this._cocokArti(t, item.arti));
+      pesanBenar = `✅ Benar! Arti: <b>${item.arti}</b>`;
+      pesanSalah = `❌ Didengar: "${transkripArr[0]}" — Jawaban: <b>${item.arti}</b>`;
+    }
+
     el("speaking-status").textContent = `Didengar: "${transkripArr[0]}"`;
+    const hEl = el("hasil-ai");
     if (hEl) {
-      hEl.innerHTML = benar
-        ? `✅ Benar! Arti: <b>${item.arti}</b>`
-        : `❌ Kurang tepat. Arti yang diterima: "${transkripArr[0]}" — Jawaban: <b>${item.arti}</b>`;
+      hEl.innerHTML = benar ? pesanBenar : pesanSalah;
       hEl.className = "hasil-box " + (benar ? "benar" : "salah");
     }
-    // Tampil tombol lanjut, simpan hasil
     const btnL = el("btn-lanjut-speaking");
     if (btnL) btnL.style.display = "block";
-    this._speakingBenar = benar;
-    this._speakingItem = item;
     this._prosesJawab(benar, item);
   },
 
