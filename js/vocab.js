@@ -711,11 +711,9 @@ var AllIn = {
     const n = this.soalList.length;
     const stepChecks = this.ALL_STEPS.map(s => {
       const aktif = this.activeStepIds.includes(s.id);
-      const starBadge = s.star ? `<span style="color:#f59e0b;font-size:13px" title="Rekomendasi">⭐</span>` : `<span style="display:inline-block;width:16px"></span>`;
       return `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:14px">
         <input type="checkbox" value="${s.id}" ${aktif?'checked':''} onchange="AllIn._toggleStep('${s.id}',this.checked)"
           style="width:18px;height:18px;cursor:pointer;flex-shrink:0">
-        ${starBadge}
         <span>${s.icon} ${s.label}</span>
       </label>`;
     }).join("");
