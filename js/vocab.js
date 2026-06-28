@@ -676,6 +676,7 @@ var AllIn = {
   ALL_STEPS: [
     { id:"audio-arti",       label:"Audio → Arti (Pilihan)", icon:"🔊", tipe:"pilihan",       star:true },
     { id:"hanzi-indo",       label:"Hanzi → Arti (Pilihan)", icon:"🈯", tipe:"pilihan",       star:false },
+    { id:"audio-hanzi-arti", label:"Audio + Hanzi → Arti (Pilihan)", icon:"🔊🈯", tipe:"pilihan", star:false },
     { id:"hanzi-arti-suara", label:"Hanzi → Arti (Suara)",   icon:"🗣️", tipe:"speaking-arti", star:false },
     { id:"arti-audio",        label:"Arti → Audio (Pilihan)", icon:"🔉", tipe:"pilihan-audio",  star:false },
     { id:"audio-hanzi-suara",label:"Audio → Hanzi (Suara)",  icon:"🎤", tipe:"speaking-hanzi",star:true },
@@ -982,6 +983,7 @@ var AllIn = {
       "hanzi-pinyin":     "Lihat Hanzi → ketik Pinyin-nya.",
       "indo-pinyin":      "Lihat arti Indonesia → ketik Pinyin-nya.",
       "arti-hanzi":       "Lihat arti Indonesia → ketik karakter Hanzi-nya.",
+      "audio-hanzi-arti": "Dengarkan audio + lihat Hanzi → pilih arti yang benar (4 pilihan).",
       "hanzi-arti-suara": "Lihat Hanzi → ucapkan artinya dengan suara.",
     };
     return m[id] || "";
@@ -1048,7 +1050,7 @@ var AllIn = {
     this._pasangEventAllIn(step, item);
 
     // Auto-play audio
-    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin","audio-hanzi-arti"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1095,7 +1097,7 @@ var AllIn = {
     el("konten-utama").innerHTML = html;
     this._pasangEventAllIn(step, item, true);
 
-    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin"].includes(step.id)) {
+    if (["audio-arti","audio-hanzi","audio-hanzi-suara","audio-pinyin","audio-hanzi-arti"].includes(step.id)) {
       setTimeout(() => TTS.mandarin(item.hanzi), 350);
     }
   },
@@ -1269,6 +1271,26 @@ var AllIn = {
             <button class="btn btn-hijau" onclick="AllIn._jawabKetikHanzi()">✅ Submit</button>
             <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
           </div>
+        </div>`;
+    }
+
+    if (id === "audio-hanzi-arti") {
+      const pilihanAHA = acak(pool.length >= 3 ? pool : this.soalList.filter(v=>v.hanzi!==item.hanzi)).slice(0,3);
+      const kandidatAHA = acak([item, ...pilihanAHA]);
+      return `
+        <div class="soal-wrap" style="text-align:center">
+          <div class="label-mode">🔊🈯 Audio + Hanzi → Arti</div>
+          <div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊 Putar Audio</button>
+          </div>
+          <div class="soal-hanzi">${item.hanzi}</div>
+          <div class="soal-hint">Pilih arti yang tepat:</div>
+          <div class="pilihan-grid">
+            ${kandidatAHA.map(v=>`<button class="btn-pilihan"
+              onclick="AllIn._jawabPilihan('${safeEsc(v.arti)}','${safeEsc(item.arti)}')">${v.arti}</button>`).join("")}
+          </div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row" style="justify-content:center"><button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button></div>
         </div>`;
     }
 
