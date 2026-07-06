@@ -479,6 +479,7 @@ var InterviewCall = {
   _cfg: {
     tampilAI: new Set(["hanzi", "pinyin"]),  // hanzi | pinyin | indo — teks yang ditampilkan di bawah gelembung AI
     totalTanya: 5,
+    koreksiRounds: 1,      // 1 = langsung lanjut, 2/3 = tetap di pertanyaan sama sampai N kali jawab (kecuali sudah benar)
   },
 
   _state: {
@@ -487,6 +488,7 @@ var InterviewCall = {
     history: [],          // {role:'user'|'model', text}
     topikPool: [],
     jumlahTanya: 0,
+    putaran: 0,            // percobaan ke-berapa untuk pertanyaan yang sedang berjalan
     sedangProses: false,
   },
 
@@ -518,6 +520,16 @@ var InterviewCall = {
           <input type="range" min="3" max="12" value="${c.totalTanya}" oninput="InterviewCall._setTotal(this.value)" style="width:100%;accent-color:#1565c0">
         </div>
 
+        <div class="sv-section" style="padding:10px;background:#f3e5f5;border-radius:8px;border-left:3px solid #9c27b0">
+          <div style="font-size:13px;color:#6a1b9a;font-weight:600;margin-bottom:8px">🔁 Sebelum Lanjut ke Pertanyaan Berikutnya</div>
+          <div class="sv-chips" id="ivc-koreksi-chips">
+            <button class="sv-chip ${c.koreksiRounds === 1 ? "aktif" : ""}" onclick="InterviewCall._setKoreksi(1)">➡️ Langsung</button>
+            <button class="sv-chip ${c.koreksiRounds === 2 ? "aktif" : ""}" onclick="InterviewCall._setKoreksi(2)">🔁 2x Jawab</button>
+            <button class="sv-chip ${c.koreksiRounds === 3 ? "aktif" : ""}" onclick="InterviewCall._setKoreksi(3)">🔁 3x Jawab</button>
+          </div>
+          <div style="font-size:11px;color:#78909c;margin-top:6px">Jika dipilih 2x/3x: AI fokus mengoreksi & memintamu mencoba lagi pada pertanyaan yang sama selama jawabanmu belum tepat, baru lanjut ke pertanyaan baru setelah mencoba sejumlah itu — kecuali jawabanmu sudah benar, maka langsung lanjut.</div>
+        </div>
+
         <div class="sv-section" style="padding:10px;background:#fff8e1;border-radius:8px;border-left:3px solid #ffa000">
           <div style="font-size:13px;color:#5d4037;font-weight:600;margin-bottom:6px">🔑 Gemini API Key</div>
           <div style="display:flex;gap:6px;align-items:center">
@@ -544,6 +556,11 @@ var InterviewCall = {
     this._cfg.totalTanya = parseInt(v);
     const lbl = el("ivc-total-label"); if (lbl) lbl.textContent = v;
   },
+  _setKoreksi(v) {
+    this._cfg.koreksiRounds = v;
+    const wrap = el("ivc-koreksi-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", [1,2,3][i] === v));
+  },
 
   async mulai() {
     if (!InterviewAI.getApiKey()) { tampilToast("⚠️ Masukkan Gemini API key dulu!"); return; }
@@ -557,7 +574,7 @@ var InterviewCall = {
 
     const s = this._state;
     s.aktif = true; s.berakhir = false; s.history = [];
-    s.topikPool = data; s.jumlahTanya = 0; s.sedangProses = false;
+    s.topikPool = data; s.jumlahTanya = 0; s.putaran = 0; s.sedangProses = false;
 
     this._renderCallUI();
     await this._giliranAI(true);
@@ -565,14 +582,23 @@ var InterviewCall = {
 
   _systemPrompt() {
     const topik = InterviewAI.buildTopikContext(this._state.topikPool, 10);
+    const rounds = this._cfg.koreksiRounds;
+    const aturanLanjut = rounds > 1
+      ? `- Setiap giliran, kamu akan diberi tahu apakah kamu WAJIB TETAP di pertanyaan yang sama atau BOLEH PINDAH ke pertanyaan baru — ikuti instruksi itu dengan patuh.
+- Saat diberi tahu WAJIB TETAP: JANGAN mengajukan pertanyaan baru. Fokus penuh mengoreksi/menjelaskan kekurangan jawaban kandidat, lalu minta kandidat mencoba menjawab ULANG pertanyaan yang sama (boleh beri clue tambahan).
+- Kecualinya: jika jawaban kandidat menurutmu SUDAH benar/tepat secara memadai walau instruksi bilang WAJIB TETAP, kamu tetap BOLEH langsung pindah ke pertanyaan baru — set "cocok": true.
+- Saat diberi tahu BOLEH PINDAH: beri koreksi singkat atas jawaban terakhir, lalu ajukan pertanyaan baru.`
+      : `- Setiap giliran berikan koreksi singkat atas jawaban kandidat sebelumnya, lalu langsung lanjut ke pertanyaan baru.`;
     return `Kamu adalah seorang pewawancara (interviewer) HR yang sedang menelepon kandidat untuk latihan wawancara kerja berbahasa Mandarin.
 Gunakan tema/gaya pertanyaan berikut sebagai referensi (boleh dimodifikasi agar terasa alami dan mengalir sebagai percakapan telepon):
 ${topik}
 
 Aturan:
-- Ajukan HANYA SATU pertanyaan per giliran.
-- Jika ini bukan giliran pertama, berikan dulu koreksi/masukan singkat (1-2 kalimat, bahasa Indonesia) atas jawaban kandidat sebelumnya, baru lanjut ke pertanyaan berikutnya.
-- Total wawancara sekitar ${this._cfg.totalTanya} pertanyaan. Setelah itu akhiri panggilan dengan ucapan penutup ramah dan set "akhiri": true.
+- Ajukan HANYA SATU pertanyaan per giliran (kecuali sedang diminta tetap di pertanyaan yang sama, lihat di bawah).
+- Jika ini bukan giliran pertama, berikan dulu koreksi/masukan singkat (1-2 kalimat, bahasa Indonesia) atas jawaban kandidat sebelumnya.
+${aturanLanjut}
+- Isi selalu field "cocok": true jika jawaban kandidat yang barusan dinilai SUDAH benar/tepat secara memadai (grammar & makna sesuai), false jika masih ada kekurangan berarti. Saat giliran pertama, set "cocok": false.
+- Total wawancara sekitar ${this._cfg.totalTanya} pertanyaan (dihitung dari pertanyaan baru, bukan pengulangan). Setelah tercapai, akhiri panggilan dengan ucapan penutup ramah dan set "akhiri": true.
 - Nada bicara sopan, natural, seperti telepon interview sungguhan.
 
 Balas HANYA dengan JSON valid (tanpa markdown/komentar):
@@ -581,25 +607,40 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
   "pinyin": "pinyin bertanda nada",
   "indonesia": "terjemahan bahasa Indonesia",
   "koreksi": "koreksi singkat atas jawaban user sebelumnya, atau string kosong jika giliran pertama",
+  "cocok": false,
   "akhiri": false
 }`;
   },
 
   async _giliranAI(pertama) {
     const s = this._state;
+    const cfg = this._cfg;
     s.sedangProses = true;
     this._tampilStatus("📞 AI sedang bicara...");
     try {
       const messages = [{ role: "user", content: this._systemPrompt() }];
       for (const h of s.history) messages.push({ role: h.role === "user" ? "user" : "assistant", content: h.text });
-      if (!pertama) messages.push({ role: "user", content: "(lanjutkan wawancara, berikan koreksi singkat lalu pertanyaan berikutnya)" });
+
+      let attemptNumber = 0, wajibPindah = true;
+      if (!pertama) {
+        attemptNumber = s.putaran + 1;
+        wajibPindah = attemptNumber >= cfg.koreksiRounds;
+        const instruksi = wajibPindah
+          ? `(Beri koreksi singkat atas jawaban kandidat barusan, lalu kamu BOLEH PINDAH ke pertanyaan baru.)`
+          : `(Ini percobaan ke-${attemptNumber} dari ${cfg.koreksiRounds} untuk pertanyaan yang sama. Kamu WAJIB TETAP di pertanyaan ini — jangan ajukan pertanyaan baru dulu, fokus koreksi & minta kandidat mencoba lagi. KECUALI jawabannya sudah benar/tepat, maka boleh set "cocok": true dan pindah ke pertanyaan baru.)`;
+        messages.push({ role: "user", content: instruksi });
+      }
 
       const raw = await InterviewAI.call(messages, 500);
       const parsed = InterviewAI.parseJSON(raw);
       s.history.push({ role: "model", text: JSON.stringify(parsed) });
-      s.jumlahTanya++;
+
+      const pindahTopik = pertama || wajibPindah || parsed.cocok === true;
+      if (pindahTopik) { s.jumlahTanya++; s.putaran = 0; }
+      else { s.putaran = attemptNumber; }
+
       this._tampilGiliranAI(parsed);
-      if (parsed.akhiri || s.jumlahTanya > this._cfg.totalTanya) {
+      if (parsed.akhiri || s.jumlahTanya > cfg.totalTanya) {
         s.berakhir = true;
       }
     } catch (e) {
@@ -615,6 +656,14 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
         <div id="ivc-status" style="text-align:center;color:#546e7a;font-size:13px;margin-bottom:8px">Menyambungkan...</div>
         <div id="ivc-transcript" class="sv-chat-area" style="max-height:280px"></div>
         <div id="ivc-input-area"></div>
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:#e3f2fd;border-radius:8px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600;margin-bottom:4px">❓ Tanya AI (di luar wawancara, mis. arti sebuah hanzi)</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="ivc-tanya-input" placeholder="Misal: apa arti 面试?" style="flex:1;min-width:0;padding:7px 9px;border:1px solid #90caf9;border-radius:6px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')InterviewCall._kirimTanya()">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="InterviewCall._kirimTanya()">Tanya</button>
+          </div>
+          <div id="ivc-tanya-hasil" style="font-size:12px;color:#37474f;margin-top:6px"></div>
+        </div>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn btn-merah" onclick="InterviewCall._tutupTelepon()">📵 Tutup Telepon</button>
         </div>
@@ -698,6 +747,30 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
     this._tampilSelesai();
   },
 
+  async _kirimTanya() {
+    const inp = el("ivc-tanya-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    const hasilEl = el("ivc-tanya-hasil");
+    if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+    if (inp) inp.disabled = true;
+    try {
+      const messages = [{
+        role: "user",
+        content: `Kamu adalah asisten bahasa Mandarin yang membantu siswa yang sedang latihan wawancara kerja lewat telepon simulasi.
+Siswa bertanya hal DI LUAR pertanyaan wawancara yang sedang berjalan — misalnya arti sebuah hanzi/kata, cara baca (pinyin), atau tata bahasa. Ini BUKAN jawaban untuk pertanyaan wawancara, jadi jangan anggap sebagai jawaban wawancara.
+Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relevan.
+
+Pertanyaan siswa: "${teks}"`
+      }];
+      const raw = await InterviewAI.call(messages, 300);
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2(raw.trim())}</div>`;
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+    }
+    if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
+  },
+
   _tampilSelesai() {
     TTS.berhenti(); if (window.STT) STT.berhenti();
     el("konten-utama").innerHTML = `
@@ -727,9 +800,10 @@ var InterviewChat = {
     tampilAI: new Set(["hanzi", "pinyin", "indo"]),  // apa yg ditampilkan dari pesan AI
     aiSuara: true,          // AI kirim pesan pakai suara (TTS) juga
     caraJawab: "ketik",     // "ketik" | "suara"
+    koreksiRounds: 1,       // 1 = langsung lanjut, 2/3 = tetap di topik sama sampai N kali jawab (kecuali sudah benar)
   },
 
-  _state: { history: [], sedangProses: false, topikPool: [] },
+  _state: { history: [], sedangProses: false, topikPool: [], putaran: 0 },
 
   renderMenu() {
     const c = this._cfg;
@@ -770,6 +844,16 @@ var InterviewChat = {
           </div>
         </div>
 
+        <div class="sv-section" style="padding:10px;background:#f3e5f5;border-radius:8px;border-left:3px solid #9c27b0">
+          <div style="font-size:13px;color:#6a1b9a;font-weight:600;margin-bottom:8px">🔁 Sebelum Lanjut ke Topik/Pertanyaan Berikutnya</div>
+          <div class="sv-chips" id="ivh-koreksi-chips">
+            <button class="sv-chip ${c.koreksiRounds === 1 ? "aktif" : ""}" onclick="InterviewChat._setKoreksi(1)">➡️ Langsung</button>
+            <button class="sv-chip ${c.koreksiRounds === 2 ? "aktif" : ""}" onclick="InterviewChat._setKoreksi(2)">🔁 2x Jawab</button>
+            <button class="sv-chip ${c.koreksiRounds === 3 ? "aktif" : ""}" onclick="InterviewChat._setKoreksi(3)">🔁 3x Jawab</button>
+          </div>
+          <div style="font-size:11px;color:#78909c;margin-top:6px">Jika dipilih 2x/3x: AI fokus mengoreksi & memintamu mencoba lagi pada topik yang sama selama jawabanmu belum tepat, baru lanjut ke topik baru setelah mencoba sejumlah itu — kecuali jawabanmu sudah benar, maka langsung lanjut.</div>
+        </div>
+
         <div class="sv-section" style="padding:10px;background:#fff8e1;border-radius:8px;border-left:3px solid #ffa000">
           <div style="font-size:13px;color:#5d4037;font-weight:600;margin-bottom:6px">🔑 Gemini API Key</div>
           <input type="password" id="ivh-api-key-input" placeholder="Masukkan Gemini API key..." value="${InterviewAI.getApiKey()}"
@@ -801,6 +885,11 @@ var InterviewChat = {
     if (a) a.classList.toggle("aktif", v === "ketik");
     if (b) b.classList.toggle("aktif", v === "suara");
   },
+  _setKoreksi(v) {
+    this._cfg.koreksiRounds = v;
+    const wrap = el("ivh-koreksi-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", [1,2,3][i] === v));
+  },
 
   async mulai() {
     if (!InterviewAI.getApiKey()) { tampilToast("⚠️ Masukkan Gemini API key dulu!"); return; }
@@ -813,19 +902,29 @@ var InterviewChat = {
     if (!data.length) { tampilToast("⚠️ Data sheet 'interview' kosong."); this.kembaliMenu(); return; }
     this._state.topikPool = data;
     this._state.history = [];
+    this._state.putaran = 0;
     this._renderChatUI();
     await this._giliranAI(true);
   },
 
   _systemPrompt() {
     const topik = InterviewAI.buildTopikContext(this._state.topikPool, 10);
+    const rounds = this._cfg.koreksiRounds;
+    const aturanLanjut = rounds > 1
+      ? `- Setiap giliran, kamu akan diberi tahu apakah kamu WAJIB TETAP di topik/pertanyaan yang sama atau BOLEH PINDAH ke topik baru — ikuti instruksi itu dengan patuh.
+- Saat diberi tahu WAJIB TETAP: JANGAN memberi topik/pertanyaan baru. Fokus penuh mengoreksi/menjelaskan kekurangan jawaban siswa, lalu minta siswa mencoba menjawab ULANG hal yang sama (boleh beri clue tambahan).
+- Kecualinya: jika jawaban siswa menurutmu SUDAH benar/tepat secara memadai walau instruksi bilang WAJIB TETAP, kamu tetap BOLEH langsung lanjut ke topik baru — set "cocok": true.
+- Saat diberi tahu BOLEH PINDAH: beri koreksi singkat atas jawaban terakhir, lalu lanjutkan obrolan dengan topik/pertanyaan baru.`
+      : `- Jika bukan giliran pertama, berikan koreksi singkat & jelas atas jawaban siswa sebelumnya, lalu langsung lanjutkan obrolan dengan pertanyaan/topik baru.`;
     return `Kamu adalah partner latihan interview kerja berbahasa Mandarin yang ramah, mengobrol santai lewat chat dengan siswa.
 Gunakan tema pertanyaan berikut sebagai inspirasi topik obrolan (boleh dikembangkan bebas, tidak harus persis sama):
 ${topik}
 
 Aturan:
 - Kirim SATU pesan per giliran: bisa berupa pertanyaan lanjutan, komentar, atau koreksi.
-- Jika bukan giliran pertama, berikan koreksi singkat & jelas (bahasa Indonesia) terhadap jawaban siswa sebelumnya (grammar/pilihan kata/kewajaran kalimat), lalu lanjutkan obrolan dengan pertanyaan/topik baru.
+- Jika bukan giliran pertama, berikan koreksi singkat & jelas (bahasa Indonesia) terhadap jawaban siswa sebelumnya (grammar/pilihan kata/kewajaran kalimat).
+${aturanLanjut}
+- Isi selalu field "cocok": true jika jawaban siswa yang barusan dinilai SUDAH benar/tepat secara memadai, false jika masih ada kekurangan berarti. Saat giliran pertama, set "cocok": false.
 - Nada natural seperti chat sehari-hari, tidak kaku.
 
 Balas HANYA dengan JSON valid (tanpa markdown/komentar):
@@ -833,7 +932,8 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
   "hanzi": "isi pesan dalam Hanzi",
   "pinyin": "pinyin bertanda nada",
   "indonesia": "terjemahan bahasa Indonesia",
-  "koreksi": "koreksi singkat, atau string kosong jika giliran pertama"
+  "koreksi": "koreksi singkat, atau string kosong jika giliran pertama",
+  "cocok": false
 }`;
   },
 
@@ -843,6 +943,14 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
         <div class="label-mode">💬 Chat Interview AI</div>
         <div id="ivh-chat-area" class="sv-chat-area" style="max-height:320px"></div>
         <div id="ivh-input-area"></div>
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:#e3f2fd;border-radius:8px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600;margin-bottom:4px">❓ Tanya AI (di luar obrolan, mis. arti sebuah hanzi)</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="ivh-tanya-input" placeholder="Misal: apa arti 面试?" style="flex:1;min-width:0;padding:7px 9px;border:1px solid #90caf9;border-radius:6px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')InterviewChat._kirimTanya()">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="InterviewChat._kirimTanya()">Tanya</button>
+          </div>
+          <div id="ivh-tanya-hasil" style="font-size:12px;color:#37474f;margin-top:6px"></div>
+        </div>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn btn-abu" onclick="InterviewChat.kembaliMenu()">← Selesai & Keluar</button>
         </div>
@@ -851,18 +959,32 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
 
   async _giliranAI(pertama) {
     const s = this._state;
+    const cfg = this._cfg;
     s.sedangProses = true;
     this._appendChat("ai", "⏳ Sedang mengetik...", "sv-chat-ai-loading");
     try {
       const messages = [{ role: "user", content: this._systemPrompt() }];
       for (const h of s.history) messages.push({ role: h.role === "user" ? "user" : "assistant", content: h.text });
-      if (!pertama) messages.push({ role: "user", content: "(lanjutkan obrolan, beri koreksi singkat lalu topik/pertanyaan berikutnya)" });
+
+      let attemptNumber = 0, wajibPindah = true;
+      if (!pertama) {
+        attemptNumber = s.putaran + 1;
+        wajibPindah = attemptNumber >= cfg.koreksiRounds;
+        const instruksi = wajibPindah
+          ? `(Beri koreksi singkat atas jawaban barusan, lalu kamu BOLEH PINDAH ke topik/pertanyaan baru.)`
+          : `(Ini percobaan ke-${attemptNumber} dari ${cfg.koreksiRounds} untuk hal yang sama. Kamu WAJIB TETAP di topik ini — jangan beri topik baru dulu, fokus koreksi & minta siswa mencoba lagi. KECUALI jawabannya sudah benar/tepat, maka boleh set "cocok": true dan lanjut ke topik baru.)`;
+        messages.push({ role: "user", content: instruksi });
+      }
 
       const raw = await InterviewAI.call(messages, 500);
       const parsed = InterviewAI.parseJSON(raw);
       s.history.push({ role: "model", text: JSON.stringify(parsed) });
+
+      const pindahTopik = pertama || wajibPindah || parsed.cocok === true;
+      s.putaran = pindahTopik ? 0 : attemptNumber;
+
       this._updateLastAI(parsed);
-      if (this._cfg.aiSuara) TTS.mandarin(parsed.hanzi);
+      if (cfg.aiSuara) TTS.mandarin(parsed.hanzi);
     } catch (e) {
       this._updateLastAI({ hanzi: "", pinyin: "", indonesia: "", koreksi: "", _error: e.message });
     }
@@ -950,5 +1072,29 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
   kembaliMenu() {
     TTS.berhenti(); if (window.STT) STT.berhenti();
     el("konten-utama").innerHTML = InterviewHub.renderMenu();
+  },
+
+  async _kirimTanya() {
+    const inp = el("ivh-tanya-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    const hasilEl = el("ivh-tanya-hasil");
+    if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+    if (inp) inp.disabled = true;
+    try {
+      const messages = [{
+        role: "user",
+        content: `Kamu adalah asisten bahasa Mandarin yang membantu siswa yang sedang latihan chat interview kerja berbahasa Mandarin.
+Siswa bertanya hal DI LUAR obrolan interview yang sedang berjalan — misalnya arti sebuah hanzi/kata, cara baca (pinyin), atau tata bahasa. Ini BUKAN jawaban untuk pertanyaan dalam chat, jadi jangan anggap sebagai balasan chat.
+Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relevan.
+
+Pertanyaan siswa: "${teks}"`
+      }];
+      const raw = await InterviewAI.call(messages, 300);
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2(raw.trim())}</div>`;
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+    }
+    if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
   },
 };
