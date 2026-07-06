@@ -87,6 +87,13 @@ var InterviewData = {
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>");
   },
+  // Sama seperti esc2, tapi juga mengubah format markdown sederhana dari AI (**bold**, *italic*, `code`) jadi tag HTML asli
+  esc2md(s) {
+    return InterviewData.esc2(s)
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/\*(.+?)\*/g, "<i>$1</i>")
+      .replace(/`(.+?)`/g, "<code style='background:#f0f0f0;padding:1px 4px;border-radius:3px;font-size:12px'>$1</code>");
+  },
 };
 
 // ================================================================
@@ -679,7 +686,7 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
       const div = document.createElement("div");
       div.className = "sv-chat-bubble sv-chat-ai";
       let info = "";
-      if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${InterviewData.esc2(parsed.koreksi)}</div>`;
+      if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${InterviewData.esc2md(parsed.koreksi)}</div>`;
       if (c.has("hanzi")) info += `<div>${parsed.hanzi}</div>`;
       if (c.has("pinyin")) info += `<div style="font-size:12px;color:#0277bd">${parsed.pinyin || ""}</div>`;
       if (c.has("indo")) info += `<div style="font-size:12px;color:#546e7a">${parsed.indonesia || ""}</div>`;
@@ -764,7 +771,7 @@ Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relev
 Pertanyaan siswa: "${teks}"`
       }];
       const raw = await InterviewAI.call(messages, 300);
-      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2(raw.trim())}</div>`;
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2md(raw.trim())}</div>`;
     } catch (e) {
       if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
     }
@@ -996,7 +1003,7 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
     if (parsed._error) return `<span style="color:#c62828">❌ ${InterviewData.esc2(parsed._error)}</span>`;
     const c = this._cfg.tampilAI;
     let info = "";
-    if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${InterviewData.esc2(parsed.koreksi)}</div>`;
+    if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${InterviewData.esc2md(parsed.koreksi)}</div>`;
     if (c.has("hanzi")) info += `<div>${parsed.hanzi} <button class="btn-audio-kecil" onclick="TTS.mandarin('${InterviewData.esc(parsed.hanzi)}')">🔊</button></div>`;
     if (c.has("pinyin")) info += `<div style="font-size:12px;color:#0277bd">${parsed.pinyin || ""}</div>`;
     if (c.has("indo")) info += `<div style="font-size:12px;color:#546e7a">${parsed.indonesia || ""}</div>`;
@@ -1091,7 +1098,7 @@ Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relev
 Pertanyaan siswa: "${teks}"`
       }];
       const raw = await InterviewAI.call(messages, 300);
-      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2(raw.trim())}</div>`;
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${InterviewData.esc2(teks)}</b></div><div>💡 ${InterviewData.esc2md(raw.trim())}</div>`;
     } catch (e) {
       if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
     }
