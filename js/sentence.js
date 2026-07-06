@@ -23,6 +23,7 @@ var Sentence = {
       { id:"speaking",    icon:"🎤", label:"Speaking Sentence",  desc:"Baca kalimat dengan suara" },
       { id:"struktur",    icon:"📐", label:"Lihat Struktur",     desc:"Pola & penjelasan kalimat" },
       { id:"vocab-ai",   icon:"🤖", label:"Generate AI",         desc:"AI buat soal dari vocab HSK kamu" },
+      { id:"interview",  icon:"💼", label:"Latihan Interview",   desc:"Tanya-jawab + telepon/chat AI dari sheet interview" },
     ];
     return `
       <div style="padding-bottom:12px">
@@ -47,6 +48,7 @@ var Sentence = {
   // ── MULAI ─────────────────────────────────────────────────────
   mulai(mode) {
     if (mode === "vocab-ai") { el("konten-utama").innerHTML = SentenceVocab.renderMenu(); return; }
+    if (mode === "interview") { el("konten-utama").innerHTML = InterviewHub.renderMenu(); return; }
     const cfg = SetSoal.get("sentence");
     const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
     if (modeRetry) {
