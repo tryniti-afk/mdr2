@@ -24,6 +24,7 @@ var Vocab = {
       { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
       { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking()" },
       { id:"all-in",       icon:"🔥", label:"All In",              desc:"Review + 6 tipe soal sekaligus!",fn:"mulaiAllIn()" },
+      { id:"ai-latihan",   icon:"🤖", label:"Latihan AI",          desc:"Chat/telepon AI, bahas 5 kata sekaligus", fn:"bukaLatihanAI()" },
     ];
     return `
       <div style="padding-bottom:12px">
@@ -39,6 +40,11 @@ var Vocab = {
         </div>
       </div>
     `;
+  },
+
+  // ── LATIHAN VOCAB DENGAN AI (chat / telepon) ─────────────────
+  bukaLatihanAI() {
+    el("konten-utama").innerHTML = VocabAIHub.renderMenu();
   },
 
   _pasangEventMenu() {
