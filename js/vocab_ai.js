@@ -27,7 +27,8 @@ var VocabAIHub = {
     const cards = [
       { obj: "VocabAIChat", icon: "💬", label: "Chat AI",   desc: "Ngobrol teks/suara, dilatih 5 kata sekaligus" },
       { obj: "VocabAICall", icon: "📞", label: "Telepon AI", desc: "Simulasi telepon, dengar & jawab langsung" },
-      { obj: "VocabAIFreeCall", icon: "🗣️", label: "Telepon Bebas (HSK)", desc: "Obrol bebas, kosakata dibatasi level HSK pilihanmu" },
+      { obj: "VocabAIFreeCall", icon: "🗣️", label: "Telepon Bebas (HSK)", desc: "Obrol bebas via suara, kosakata dibatasi level HSK pilihanmu" },
+      { obj: "VocabAIFreeChat", icon: "🗨️", label: "Chat Bebas (HSK)", desc: "Obrol bebas teks/suara, kosakata dibatasi level HSK pilihanmu" },
     ];
     return `
       <div class="sv-menu-wrap">
@@ -1410,6 +1411,326 @@ Pertanyaan siswa: "${teks}"`
           <button class="btn btn-biru" onclick="VocabAIFreeCall.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
+  },
+
+  kembaliMenu() {
+    TTS.berhenti(); if (window.STT) STT.berhenti();
+    el("konten-utama").innerHTML = VocabAIHub.renderMenu();
+  },
+};
+
+// ================================================================
+//  6) VOCABAIFREECHAT — UI "Chat Bebas (HSK)"
+//     Sama seperti Telepon Bebas (pakai VocabAIFreeFlow yang sama),
+//     tapi tampilan chat teks + bisa pilih jawab via ketik ATAU suara.
+// ================================================================
+var VocabAIFreeChat = {
+  _cfg: {
+    tampilAI: new Set(["hanzi", "pinyin", "indo"]),
+    hskSet: new Set(["hsk1-2"]),
+    pakaiTopik: false,
+    topikTeks: "",
+    modeKetat: false,
+    aiSuara: true,           // pesan AI dibacakan suara juga?
+    caraJawab: "ketik",      // "ketik" | "suara" — cara SISWA menjawab
+  },
+
+  renderMenu() {
+    const c = this._cfg;
+    const chipTampil = (key, label) => `
+      <button class="sv-chip ${c.tampilAI.has(key) ? "aktif" : ""}" onclick="VocabAIFreeChat._toggleTampil('${key}')">${label}</button>`;
+    const chipHSK = (s) => `
+      <button class="sv-chip ${c.hskSet.has(s.id) ? "aktif" : ""}" onclick="VocabAIFreeChat._toggleHSK('${s.id}')">${s.label}</button>`;
+    return `
+      <div class="sv-menu-wrap">
+        <div class="sv-header">
+          <div class="sv-icon">🗨️</div>
+          <div>
+            <div class="sv-title">Chat Bebas (HSK)</div>
+            <div class="sv-subtitle">Ngobrol bebas teks/suara — AI hanya pakai kosakata level HSK yang kamu pilih</div>
+          </div>
+        </div>
+
+        <div class="sv-section">
+          <div class="sv-label">📚 Sumber Kosakata (boleh pilih lebih dari satu):</div>
+          <div class="sv-chips" id="vfh-hsk-chips">
+            ${SHEET_VOCAB.map(chipHSK).join("")}
+          </div>
+        </div>
+
+        <div class="sv-section">
+          <div class="sv-label">👁️ Info pesan AI yang ditampilkan:</div>
+          <div class="sv-chips" id="vfh-chips">
+            ${chipTampil("hanzi", "🈯 Hanzi")}
+            ${chipTampil("pinyin", "🔤 Pinyin")}
+            ${chipTampil("indo", "🇮🇩 Terjemahan")}
+          </div>
+        </div>
+
+        <div class="sv-section">
+          <div class="sv-label">🔊 Pesan AI pakai suara juga?</div>
+          <div class="sv-chips">
+            <button class="sv-chip ${c.aiSuara ? "aktif" : ""}" id="vfh-suara-ya" onclick="VocabAIFreeChat._setSuara(true)">🔊 Ya</button>
+            <button class="sv-chip ${!c.aiSuara ? "aktif" : ""}" id="vfh-suara-tidak" onclick="VocabAIFreeChat._setSuara(false)">🚫 Teks saja</button>
+          </div>
+        </div>
+
+        <div class="sv-section">
+          <div class="sv-label">✏️ Cara Kamu Menjawab:</div>
+          <div class="sv-chips">
+            <button class="sv-chip ${c.caraJawab === "ketik" ? "aktif" : ""}" id="vfh-jawab-ketik" onclick="VocabAIFreeChat._setJawab('ketik')">⌨️ Ketik</button>
+            <button class="sv-chip ${c.caraJawab === "suara" ? "aktif" : ""}" id="vfh-jawab-suara" onclick="VocabAIFreeChat._setJawab('suara')">🎤 Suara</button>
+          </div>
+        </div>
+
+        <div class="sv-section" style="padding:10px;background:#f3e5f5;border-radius:8px;border-left:3px solid #9c27b0">
+          <div style="font-size:13px;color:#6a1b9a;font-weight:600;margin-bottom:8px">💡 Topik Percakapan (opsional)</div>
+          <div class="sv-chips" id="vfh-topik-chips">
+            <button class="sv-chip ${!c.pakaiTopik ? "aktif" : ""}" onclick="VocabAIFreeChat._setPakaiTopik(false)">🎲 Bebas (tanpa topik)</button>
+            <button class="sv-chip ${c.pakaiTopik ? "aktif" : ""}" onclick="VocabAIFreeChat._setPakaiTopik(true)">✍️ Tentukan Topik</button>
+          </div>
+          <div id="vfh-topik-input-wrap" style="margin-top:8px;display:${c.pakaiTopik ? "block" : "none"}">
+            <input type="text" id="vfh-topik-input" placeholder="Misal: liburan, keluarga, hobi..." value="${VocabAIData.esc2(c.topikTeks)}"
+              style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #ce93d8;border-radius:6px;font-size:13px;outline:none"
+              oninput="VocabAIFreeChat._setTopikTeks(this.value)">
+          </div>
+        </div>
+
+        <div class="sv-section" style="padding:10px;background:#e8f5e9;border-radius:8px;border-left:3px solid #43a047">
+          <div style="font-size:13px;color:#2e7d32;font-weight:600;margin-bottom:8px">🔒 Kepatuhan Kosakata</div>
+          <div class="sv-chips" id="vfh-ketat-chips">
+            <button class="sv-chip ${!c.modeKetat ? "aktif" : ""}" onclick="VocabAIFreeChat._setModeKetat(false)">🔓 Longgar (instruksi saja)</button>
+            <button class="sv-chip ${c.modeKetat ? "aktif" : ""}" onclick="VocabAIFreeChat._setModeKetat(true)">🔒 Ketat (divalidasi ulang)</button>
+          </div>
+          <div style="font-size:11px;color:#558b2f;margin-top:6px" id="vfh-ketat-desc">
+            ${c.modeKetat
+              ? "AI dicek tiap giliran: kalau ada karakter di luar daftar kosakata, otomatis diminta menulis ulang (maks 2x) sampai patuh."
+              : "AI hanya diberi instruksi untuk patuh pada daftar kosakata — cepat & hemat kuota, tapi TIDAK 100% dijamin selalu patuh."}
+          </div>
+        </div>
+
+        <div class="sv-section" style="padding:10px;background:#fff8e1;border-radius:8px;border-left:3px solid #ffa000">
+          <div style="font-size:13px;color:#5d4037;font-weight:600;margin-bottom:6px">🔑 Gemini API Key</div>
+          <input type="password" id="vfh-api-key-input" placeholder="Masukkan Gemini API key..." value="${SentenceVocab._getApiKey()}"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #ffa000;border-radius:6px;font-size:13px;outline:none"
+            oninput="SentenceVocab._setApiKey(this.value)">
+          <div style="font-size:11px;color:#888;margin-top:5px">Key sama dipakai di semua fitur AI (tersimpan di browser saja).</div>
+        </div>
+
+        <button class="btn btn-hijau" style="width:100%;margin-top:8px;font-size:15px;padding:12px" onclick="VocabAIFreeChat.mulai()">🚀 Mulai Chat Bebas</button>
+        <button class="btn btn-abu" style="width:100%;margin-top:8px" onclick="VocabAIFreeChat.kembaliMenu()">← Kembali</button>
+      </div>`;
+  },
+
+  _toggleTampil(key) {
+    const s = this._cfg.tampilAI;
+    if (s.has(key)) { if (s.size === 1) { tampilToast("Pilih minimal 1!"); return; } s.delete(key); }
+    else s.add(key);
+    const wrap = el("vfh-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", s.has(["hanzi", "pinyin", "indo"][i])));
+  },
+  _toggleHSK(id) {
+    const s = this._cfg.hskSet;
+    if (s.has(id)) { if (s.size === 1) { tampilToast("Pilih minimal 1 sumber kosakata!"); return; } s.delete(id); }
+    else s.add(id);
+    const wrap = el("vfh-hsk-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", s.has(SHEET_VOCAB[i].id)));
+  },
+  _setSuara(v) {
+    this._cfg.aiSuara = v;
+    const ya = el("vfh-suara-ya"), tidak = el("vfh-suara-tidak");
+    if (ya) ya.classList.toggle("aktif", v);
+    if (tidak) tidak.classList.toggle("aktif", !v);
+  },
+  _setJawab(v) {
+    this._cfg.caraJawab = v;
+    const a = el("vfh-jawab-ketik"), b = el("vfh-jawab-suara");
+    if (a) a.classList.toggle("aktif", v === "ketik");
+    if (b) b.classList.toggle("aktif", v === "suara");
+  },
+  _setPakaiTopik(v) {
+    this._cfg.pakaiTopik = v;
+    const wrap = el("vfh-topik-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", (i === 1) === v));
+    const inWrap = el("vfh-topik-input-wrap");
+    if (inWrap) inWrap.style.display = v ? "block" : "none";
+  },
+  _setTopikTeks(v) { this._cfg.topikTeks = v; },
+  _setModeKetat(v) {
+    this._cfg.modeKetat = v;
+    const wrap = el("vfh-ketat-chips");
+    if (wrap) wrap.querySelectorAll(".sv-chip").forEach((btn, i) => btn.classList.toggle("aktif", (i === 1) === v));
+    setHTML("vfh-ketat-desc", v
+      ? "AI dicek tiap giliran: kalau ada karakter di luar daftar kosakata, otomatis diminta menulis ulang (maks 2x) sampai patuh."
+      : "AI hanya diberi instruksi untuk patuh pada daftar kosakata — cepat & hemat kuota, tapi TIDAK 100% dijamin selalu patuh.");
+  },
+
+  async mulai() {
+    if (!SentenceVocab._getApiKey()) { tampilToast("⚠️ Masukkan Gemini API key dulu!"); return; }
+    if (!this._cfg.hskSet.size) { tampilToast("⚠️ Pilih minimal 1 sumber kosakata HSK!"); return; }
+    el("konten-utama").innerHTML = `
+      <div style="text-align:center;padding:60px 20px">
+        <div class="sv-spinner"></div>
+        <div style="margin-top:16px;color:#546e7a;font-size:14px">📚 Mengambil kosakata ${[...this._cfg.hskSet].join(", ")}...</div>
+      </div>`;
+    const words = await VocabAIData.ambilKataDariHSK([...this._cfg.hskSet]);
+    if (!words.length) { tampilToast("⚠️ Gagal mengambil data kosakata untuk sumber yang dipilih."); this.kembaliMenu(); return; }
+    const topik = this._cfg.pakaiTopik ? this._cfg.topikTeks.trim() : "";
+    VocabAIFreeFlow.reset(words, topik, this._cfg.modeKetat);
+    this._renderChatUI(words.length);
+    await this._giliran(() => VocabAIFreeFlow.mulai());
+  },
+
+  _renderChatUI(jumlahKata) {
+    const topik = VocabAIFreeFlow.topik;
+    const ketatBadge = VocabAIFreeFlow.modeKetat
+      ? `<span style="color:#2e7d32;font-weight:600">🔒 Ketat</span>`
+      : `<span style="color:#e65100;font-weight:600">🔓 Longgar</span>`;
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🗨️ Chat Bebas (HSK)</div>
+        <div style="text-align:center;color:#546e7a;font-size:12px;margin-bottom:6px">
+          📚 ${jumlahKata} kata dari ${[...this._cfg.hskSet].join(", ")} · ${ketatBadge}${topik ? ` · 💡 Topik: ${VocabAIData.esc2(topik)}` : " · 🎲 Bebas"}
+        </div>
+        <div id="vfh-chat-area" class="sv-chat-area" style="max-height:340px"></div>
+        <div id="vfh-input-area"></div>
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:#e3f2fd;border-radius:8px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600;margin-bottom:4px">❓ Tanya AI (di luar obrolan, mis. arti sebuah hanzi)</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="vfh-tanya-input" placeholder="Misal: apa arti 认真?" style="flex:1;min-width:0;padding:7px 9px;border:1px solid #90caf9;border-radius:6px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')VocabAIFreeChat._kirimTanya()">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="VocabAIFreeChat._kirimTanya()">Tanya</button>
+          </div>
+          <div id="vfh-tanya-hasil" style="font-size:12px;color:#37474f;margin-top:6px"></div>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-abu" onclick="VocabAIFreeChat.kembaliMenu()">← Selesai & Keluar</button>
+        </div>
+      </div>`;
+  },
+
+  async _giliran(fn) {
+    VocabAIFreeFlow.sedangProses = true;
+    this._appendChat("ai", "⏳ Sedang mengetik...", "sv-chat-ai-loading");
+    try {
+      const parsed = await fn();
+      this._updateLastAI(parsed);
+      if (this._cfg.aiSuara && parsed.hanzi) TTS.mandarin(parsed.hanzi);
+      if (parsed.selesai) {
+        setHTML("vfh-input-area", "");
+        if (typeof App !== "undefined" && App.catatSesiSelesai) App.catatSesiSelesai("vocab", 1, 1);
+        return;
+      }
+      VocabAIFreeFlow.sedangProses = false;
+      this._renderInputArea();
+      return;
+    } catch (e) {
+      this._updateLastAI({ hanzi: "", pinyin: "", indonesia: "", koreksi: "", _error: e.message });
+    }
+    VocabAIFreeFlow.sedangProses = false;
+    this._renderInputArea();
+  },
+
+  _bubbleAIHtml(parsed) {
+    if (parsed._error) return `<span style="color:#c62828">❌ ${VocabAIData.esc2(parsed._error)}</span>`;
+    const c = this._cfg.tampilAI;
+    let info = "";
+    if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${VocabAIData.esc2md(parsed.koreksi)}</div>`;
+    if (c.has("hanzi") && parsed.hanzi) info += `<div>${parsed.hanzi} <button class="btn-audio-kecil" onclick="TTS.mandarin('${VocabAIData.esc(parsed.hanzi)}')">🔊</button></div>`;
+    if (c.has("pinyin") && parsed.pinyin) info += `<div style="font-size:12px;color:#0277bd">${parsed.pinyin}</div>`;
+    if (c.has("indo")) info += `<div style="font-size:13px;color:#37474f;margin-top:2px">${VocabAIData.esc2md(parsed.indonesia || "")}</div>`;
+    if (VocabAIFreeFlow.modeKetat && parsed._pelanggaranSisa && parsed._pelanggaranSisa.length) {
+      info += `<div style="font-size:11px;color:#c62828;margin-top:2px">⚠️ Masih ada di luar daftar meski sudah divalidasi 2x: ${parsed._pelanggaranSisa.join("、")}</div>`;
+    }
+    return `<span class="sv-chat-label">🤖 Partner:</span> ${info}`;
+  },
+
+  _appendChat(role, teks, extraClass = "") {
+    const area = el("vfh-chat-area");
+    if (!area) return;
+    const div = document.createElement("div");
+    div.className = `sv-chat-bubble sv-chat-${role} ${extraClass}`;
+    div.innerHTML = role === "ai"
+      ? `<span class="sv-chat-label">🤖 Partner:</span> ${teks}`
+      : `<span class="sv-chat-label">👤 Kamu:</span> ${VocabAIData.esc2(teks)}`;
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+  },
+
+  _updateLastAI(parsed) {
+    const area = el("vfh-chat-area");
+    if (!area) return;
+    const loading = area.querySelector(".sv-chat-ai-loading");
+    const html = this._bubbleAIHtml(parsed);
+    if (loading) { loading.className = "sv-chat-bubble sv-chat-ai"; loading.innerHTML = html; }
+    else this._appendChat("ai", html);
+    area.scrollTop = area.scrollHeight;
+  },
+
+  _renderInputArea() {
+    if (this._cfg.caraJawab === "ketik") {
+      setHTML("vfh-input-area", `
+        <div class="sv-tanya-input-wrap" style="margin-top:8px">
+          <input type="text" id="vfh-input" placeholder="Ketik balasanmu..." onkeydown="if(event.key==='Enter')VocabAIFreeChat._jawabTeks()">
+          <button onclick="VocabAIFreeChat._jawabTeks()">Kirim</button>
+        </div>`);
+      setTimeout(() => { const i = el("vfh-input"); if (i) i.focus(); }, 100);
+    } else {
+      const label = VocabAIFreeFlow.bahasaJawabanBerikutnya === "id" ? "🎤 Bicara (Indonesia)" : "🎤 Bicara (Mandarin)";
+      setHTML("vfh-input-area", `
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn btn-merah" id="vfh-btn-mic" onclick="VocabAIFreeChat._jawabSuara()">${label}</button>
+        </div>`);
+    }
+  },
+
+  async _jawabTeks() {
+    if (VocabAIFreeFlow.sedangProses) return;
+    const inp = el("vfh-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    inp.value = "";
+    this._appendChat("user", teks);
+    setHTML("vfh-input-area", "");
+    await this._giliran(() => VocabAIFreeFlow.kirimJawaban(teks));
+  },
+
+  _jawabSuara() {
+    if (VocabAIFreeFlow.sedangProses) return;
+    const btnMic = el("vfh-btn-mic");
+    if (btnMic) { btnMic.disabled = true; btnMic.innerText = "🎙️ Mendengarkan..."; }
+    STT.mulai(VocabAIFreeFlow.bahasaSTT(),
+      async (hasil) => {
+        this._appendChat("user", hasil);
+        setHTML("vfh-input-area", "");
+        await this._giliran(() => VocabAIFreeFlow.kirimJawaban(hasil));
+      },
+      err => { tampilToast("❌ Error mic: " + err); if (btnMic) { btnMic.disabled = false; btnMic.innerText = "🎤 Bicara"; } },
+      dapat => { if (!dapat) { tampilToast("⚠️ Tidak terdeteksi."); if (btnMic) { btnMic.disabled = false; btnMic.innerText = "🎤 Bicara"; } } }
+    );
+  },
+
+  async _kirimTanya() {
+    const inp = el("vfh-tanya-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    const hasilEl = el("vfh-tanya-hasil");
+    if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+    if (inp) inp.disabled = true;
+    try {
+      const messages = [{
+        role: "user",
+        content: `Kamu adalah asisten bahasa Mandarin yang membantu siswa yang sedang latihan ngobrol bebas lewat chat dengan AI.
+Siswa bertanya hal DI LUAR obrolan yang sedang berjalan — misalnya arti sebuah hanzi/kata, cara baca (pinyin), atau tata bahasa. Ini BUKAN jawaban untuk obrolan, jadi jangan anggap sebagai jawaban.
+Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relevan.
+
+Pertanyaan siswa: "${teks}"`
+      }];
+      const raw = await SentenceVocab._callAI(messages, 300);
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${VocabAIData.esc2(teks)}</b></div><div>💡 ${VocabAIData.esc2md(raw.trim())}</div>`;
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+    }
+    if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
   },
 
   kembaliMenu() {
