@@ -97,6 +97,7 @@ var VocabAIFlow = {
   putaran: 0,
   koreksiRounds: 1,      // 1 = langsung lanjut, 2/3 = ulang tes sampai benar
   sedangProses: false,
+  bahasaJawabanBerikutnya: "zh",  // "zh" | "id" — bahasa yang diharapkan untuk giliran jawaban siswa selanjutnya
 
   reset(words, koreksiRounds) {
     this.words = words;
@@ -106,6 +107,12 @@ var VocabAIFlow = {
     this.putaran = 0;
     this.koreksiRounds = koreksiRounds || 1;
     this.sedangProses = false;
+    this.bahasaJawabanBerikutnya = "zh";
+  },
+
+  // Kode bahasa STT ("zh-CN"/"id-ID") sesuai bahasa jawaban yang diharapkan giliran ini
+  bahasaSTT() {
+    return this.bahasaJawabanBerikutnya === "id" ? "id-ID" : "zh-CN";
   },
 
   kataSaatIni() { return this.words[this.wordIdx]; },
@@ -129,6 +136,7 @@ Aturan umum:
 - Field "koreksi" berisi feedback singkat atas jawaban siswa sebelumnya (kosong jika belum ada jawaban untuk dinilai).
 - Field "cocok": true jika jawaban/kalimat siswa yang baru dinilai sudah benar & memadai, false jika masih kurang tepat.
 - Field "selesai": true HANYA jika sesi latihan benar-benar sudah berakhir (setelah tantangan kalimat gabungan terakhir).
+- Field "bahasaJawaban": bahasa yang HARUS dipakai siswa untuk menjawab giliran ini. Isi "zh" jika kamu meminta siswa mengucapkan/menulis sesuatu dalam Bahasa Mandarin (misalnya bikin kalimat, mengulang kalimat, dsb). Isi "id" jika kamu meminta siswa menjawab dalam Bahasa Indonesia (misalnya menyebutkan arti/terjemahan suatu kata, menjawab pertanyaan tes yang minta artinya). Wajib diisi setiap giliran sesuai bahasa yang kamu minta di pertanyaan/instruksimu.
 
 Balas HANYA dengan JSON valid (tanpa markdown/komentar):
 {
@@ -137,7 +145,8 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
   "indonesia": "narasi lengkap pesanmu",
   "koreksi": "feedback singkat, atau string kosong",
   "cocok": false,
-  "selesai": false
+  "selesai": false,
+  "bahasaJawaban": "zh"
 }`;
   },
 
@@ -157,6 +166,7 @@ Balas HANYA dengan JSON valid (tanpa markdown/komentar):
       if (!parsed) throw new Error("Gagal memproses balasan AI. Coba lagi.");
     }
     this.history.push({ role: "model", text: JSON.stringify(parsed) });
+    this.bahasaJawabanBerikutnya = parsed.bahasaJawaban === "id" ? "id" : "zh";
     return parsed;
   },
 
@@ -206,7 +216,7 @@ Ini percobaan ke-${attempt} dari ${this.koreksiRounds}. Jika jawaban SUDAH benar
       const daftar = this.words.map(x => `${x.hanzi}(${x.arti})`).join("、");
       instruksi = `Nilai jawaban tes siswa untuk kata "${w.hanzi}": "${teks}"
 Beri feedback singkat di "koreksi" & set "cocok" sesuai benar-tidaknya.
-Karena ini kata TERAKHIR dari 5 kata (${daftar}), lanjutkan pesan yang sama dengan mengajak siswa membuat SATU kalimat yang memuat SEMUA 5 kata tersebut sekaligus sebagai tantangan penutup sesi. Jelaskan tantangan ini dengan jelas & memotivasi di field "indonesia". Set "selesai": false (belum selesai, masih menunggu kalimat gabungan siswa).`;
+Karena ini kata TERAKHIR dari ${this.words.length} kata (${daftar}), lanjutkan pesan yang sama dengan memberi tahu siswa bahwa sebelum tantangan kalimat gabungan nanti, akan ada mini-game seru mencocokkan Hanzi-Pinyin lalu Hanzi-Arti untuk me-review semua kata tadi. Jelaskan singkat & memotivasi di field "indonesia" bahwa mini-game akan segera dimulai. Set "selesai": false.`;
     } else {
       const next = this.words[this.wordIdx + 1];
       instruksi = `Nilai jawaban tes siswa untuk kata "${w.hanzi}": "${teks}"
@@ -218,7 +228,7 @@ Setelah itu, LANJUTKAN pesan yang sama dengan memperkenalkan kata BERIKUTNYA sec
     if (!wajibPindah) {
       this.putaran = attempt;
     } else if (isLast) {
-      this.subPhase = "final";
+      this.subPhase = "matching";
       this.putaran = 0;
     } else {
       this.wordIdx++;
@@ -226,6 +236,15 @@ Setelah itu, LANJUTKAN pesan yang sama dengan memperkenalkan kata BERIKUTNYA sec
       this.putaran = 0;
     }
     return parsed;
+  },
+
+  // ── Dipanggil setelah mini-game matching (Hanzi-Pinyin & Hanzi-Arti) selesai ──
+  async mulaiTantanganAkhir() {
+    const daftar = this.words.map(w => `${w.hanzi}(${w.arti})`).join("、");
+    const instruksi = `Siswa baru saja menyelesaikan mini-game mencocokkan Hanzi-Pinyin dan Hanzi-Arti untuk me-review ${this.words.length} kata (${daftar}).
+Sekarang ajak siswa membuat SATU kalimat yang memuat SEMUA ${this.words.length} kata tersebut sekaligus sebagai tantangan penutup sesi. Jelaskan tantangan ini dengan jelas & memotivasi di field "indonesia". Set "koreksi": "" dan "cocok": false karena belum ada jawaban siswa untuk dinilai kali ini. Set "selesai": false (masih menunggu kalimat gabungan siswa).`;
+    this.subPhase = "final";
+    return this._call(instruksi);
   },
 
   async _prosesFinal(teks) {
@@ -366,6 +385,14 @@ var VocabAIChat = {
         <div id="vac-progres" style="text-align:center;color:#546e7a;font-size:12px;margin-bottom:6px"></div>
         <div id="vac-chat-area" class="sv-chat-area" style="max-height:340px"></div>
         <div id="vac-input-area"></div>
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:#e3f2fd;border-radius:8px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600;margin-bottom:4px">❓ Tanya AI (di luar latihan, mis. arti sebuah hanzi)</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="vac-tanya-input" placeholder="Misal: apa arti 认真?" style="flex:1;min-width:0;padding:7px 9px;border:1px solid #90caf9;border-radius:6px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')VocabAIChat._kirimTanya()">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="VocabAIChat._kirimTanya()">Tanya</button>
+          </div>
+          <div id="vac-tanya-hasil" style="font-size:12px;color:#37474f;margin-top:6px"></div>
+        </div>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn btn-abu" onclick="VocabAIChat.kembaliMenu()">← Selesai & Keluar</button>
         </div>
@@ -373,11 +400,40 @@ var VocabAIChat = {
     this._updateProgres();
   },
 
+  async _kirimTanya() {
+    const inp = el("vac-tanya-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    const hasilEl = el("vac-tanya-hasil");
+    if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+    if (inp) inp.disabled = true;
+    try {
+      const daftarKata = VocabAIFlow.words.length
+        ? VocabAIFlow.words.map(w => `${w.hanzi}(${w.pinyin || "?"}=${w.arti})`).join("、")
+        : "";
+      const messages = [{
+        role: "user",
+        content: `Kamu adalah asisten bahasa Mandarin yang membantu siswa yang sedang latihan vocabulary lewat chat dengan AI.
+Siswa bertanya hal DI LUAR latihan yang sedang berjalan — misalnya arti sebuah hanzi/kata, cara baca (pinyin), atau tata bahasa. Ini BUKAN jawaban untuk latihan, jadi jangan anggap sebagai jawaban latihan.
+${daftarKata ? `Konteks: siswa sedang berlatih kata-kata berikut: ${daftarKata}.` : ""}
+Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relevan.
+
+Pertanyaan siswa: "${teks}"`
+      }];
+      const raw = await SentenceVocab._callAI(messages, 300);
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${VocabAIData.esc2(teks)}</b></div><div>💡 ${VocabAIData.esc2md(raw.trim())}</div>`;
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+    }
+    if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
+  },
+
   _updateProgres() {
     const p = VocabAIFlow.progres();
     const w = VocabAIFlow.kataSaatIni();
     let teks;
-    if (p.fase === "final" || p.fase === "selesai") teks = `🏁 Tantangan akhir: kalimat gabungan 5 kata`;
+    if (p.fase === "matching") teks = `🧩 Mini-game: cocokkan semua kata dulu`;
+    else if (p.fase === "final" || p.fase === "selesai") teks = `🏁 Tantangan akhir: kalimat gabungan ${VocabAIFlow.words.length} kata`;
     else teks = `Kata ${p.idx + 1} / ${p.total}: ${w ? w.hanzi + (w.pinyin ? " (" + w.pinyin + ")" : "") : ""}`;
     setTeks("vac-progres", teks);
   },
@@ -395,6 +451,15 @@ var VocabAIChat = {
         if (typeof App !== "undefined" && App.catatSesiSelesai) App.catatSesiSelesai("vocab", 1, 1);
         return;
       }
+      VocabAIFlow.sedangProses = false;
+      if (VocabAIFlow.subPhase === "matching") {
+        VocabAIMatch.mulai("vac-input-area", VocabAIFlow.words, () => {
+          this._giliran(() => VocabAIFlow.mulaiTantanganAkhir());
+        });
+        return;
+      }
+      this._renderInputArea();
+      return;
     } catch (e) {
       this._updateLastAI({ hanzi: "", pinyin: "", indonesia: "", koreksi: "", _error: e.message });
     }
@@ -444,9 +509,10 @@ var VocabAIChat = {
         </div>`);
       setTimeout(() => { const i = el("vac-input"); if (i) i.focus(); }, 100);
     } else {
+      const label = VocabAIFlow.bahasaJawabanBerikutnya === "id" ? "🎤 Bicara (Indonesia)" : "🎤 Bicara (Mandarin)";
       setHTML("vac-input-area", `
         <div class="btn-row" style="margin-top:8px">
-          <button class="btn btn-merah" id="vac-btn-mic" onclick="VocabAIChat._jawabSuara()">🎤 Bicara</button>
+          <button class="btn btn-merah" id="vac-btn-mic" onclick="VocabAIChat._jawabSuara()">${label}</button>
         </div>`);
     }
   },
@@ -466,7 +532,7 @@ var VocabAIChat = {
     if (VocabAIFlow.sedangProses) return;
     const btnMic = el("vac-btn-mic");
     if (btnMic) { btnMic.disabled = true; btnMic.innerText = "🎙️ Mendengarkan..."; }
-    STT.mulai("zh-CN",
+    STT.mulai(VocabAIFlow.bahasaSTT(),
       async (hasil) => {
         this._appendChat("user", hasil);
         setHTML("vac-input-area", "");
@@ -582,6 +648,14 @@ var VocabAICall = {
         <div id="vap-status" style="text-align:center;color:#546e7a;font-size:13px;margin-bottom:8px">Menyambungkan...</div>
         <div id="vap-transcript" class="sv-chat-area" style="max-height:280px"></div>
         <div id="vap-input-area"></div>
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:#e3f2fd;border-radius:8px">
+          <div style="font-size:12px;color:#0d47a1;font-weight:600;margin-bottom:4px">❓ Tanya AI (di luar panggilan, mis. arti sebuah hanzi)</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="vap-tanya-input" placeholder="Misal: apa arti 认真?" style="flex:1;min-width:0;padding:7px 9px;border:1px solid #90caf9;border-radius:6px;font-size:13px;outline:none" onkeydown="if(event.key==='Enter')VocabAICall._kirimTanya()">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="VocabAICall._kirimTanya()">Tanya</button>
+          </div>
+          <div id="vap-tanya-hasil" style="font-size:12px;color:#37474f;margin-top:6px"></div>
+        </div>
         <div class="btn-row" style="margin-top:10px">
           <button class="btn btn-merah" onclick="VocabAICall._tutupTelepon()">📵 Tutup Telepon</button>
         </div>
@@ -589,11 +663,40 @@ var VocabAICall = {
     this._updateProgres();
   },
 
+  async _kirimTanya() {
+    const inp = el("vap-tanya-input");
+    const teks = inp ? inp.value.trim() : "";
+    if (!teks) return;
+    const hasilEl = el("vap-tanya-hasil");
+    if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+    if (inp) inp.disabled = true;
+    try {
+      const daftarKata = VocabAIFlow.words.length
+        ? VocabAIFlow.words.map(w => `${w.hanzi}(${w.pinyin || "?"}=${w.arti})`).join("、")
+        : "";
+      const messages = [{
+        role: "user",
+        content: `Kamu adalah asisten bahasa Mandarin yang membantu siswa yang sedang latihan vocabulary lewat simulasi telepon dengan AI.
+Siswa bertanya hal DI LUAR panggilan yang sedang berjalan — misalnya arti sebuah hanzi/kata, cara baca (pinyin), atau tata bahasa. Ini BUKAN jawaban untuk panggilan, jadi jangan anggap sebagai jawaban latihan.
+${daftarKata ? `Konteks: siswa sedang berlatih kata-kata berikut: ${daftarKata}.` : ""}
+Jawab singkat, jelas, dalam Bahasa Indonesia. Sertakan Hanzi & pinyin jika relevan.
+
+Pertanyaan siswa: "${teks}"`
+      }];
+      const raw = await SentenceVocab._callAI(messages, 300);
+      if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${VocabAIData.esc2(teks)}</b></div><div>💡 ${VocabAIData.esc2md(raw.trim())}</div>`;
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+    }
+    if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
+  },
+
   _updateProgres() {
     const p = VocabAIFlow.progres();
     const w = VocabAIFlow.kataSaatIni();
     let teks;
-    if (p.fase === "final" || p.fase === "selesai") teks = `🏁 Tantangan akhir: kalimat gabungan 5 kata`;
+    if (p.fase === "matching") teks = `🧩 Mini-game: cocokkan semua kata dulu`;
+    else if (p.fase === "final" || p.fase === "selesai") teks = `🏁 Tantangan akhir: kalimat gabungan ${VocabAIFlow.words.length} kata`;
     else teks = `Kata ${p.idx + 1} / ${p.total}: ${w ? w.hanzi + (w.pinyin ? " (" + w.pinyin + ")" : "") : ""}`;
     setTeks("vap-progres", teks);
   },
@@ -637,6 +740,13 @@ var VocabAICall = {
         setTimeout(() => this._tampilSelesai(), 800);
         return;
       }
+      if (VocabAIFlow.subPhase === "matching") {
+        this._tampilStatus("🧩 Ayo main mini-game dulu");
+        VocabAIMatch.mulai("vap-input-area", VocabAIFlow.words, () => {
+          this._giliran(() => VocabAIFlow.mulaiTantanganAkhir());
+        });
+        return;
+      }
       this._tampilStatus("🎤 Giliranmu menjawab");
       this._renderInputArea();
     };
@@ -647,11 +757,12 @@ var VocabAICall = {
   },
 
   _renderInputArea() {
+    const label = VocabAIFlow.bahasaJawabanBerikutnya === "id" ? "🎤 Bicara (Indonesia)" : "🎤 Bicara (Mandarin)";
     setHTML("vap-input-area", `
       <textarea id="vap-input" class="input-jawab" rows="2" placeholder="Ketik jawabanmu, atau pakai mic..."></textarea>
       <div class="btn-row" style="margin-top:6px">
         <button class="btn btn-hijau" onclick="VocabAICall._jawabTeks()">✅ Kirim</button>
-        <button class="btn btn-merah" id="vap-btn-mic" onclick="VocabAICall._jawabSuara()">🎤 Bicara</button>
+        <button class="btn btn-merah" id="vap-btn-mic" onclick="VocabAICall._jawabSuara()">${label}</button>
       </div>`);
   },
 
@@ -678,7 +789,7 @@ var VocabAICall = {
     const btnMic = el("vap-btn-mic");
     if (btnMic) { btnMic.disabled = true; btnMic.innerText = "🎙️ Mendengarkan..."; }
     this._tampilStatus("🎙️ Silakan bicara...");
-    STT.mulai("zh-CN",
+    STT.mulai(VocabAIFlow.bahasaSTT(),
       async (hasil) => {
         this._tambahUserBubble(hasil);
         setHTML("vap-input-area", "");
@@ -714,3 +825,134 @@ var VocabAICall = {
     el("konten-utama").innerHTML = VocabAIHub.renderMenu();
   },
 };
+
+// ================================================================
+//  3) VOCABAIMATCH — Mini-Game "Klik-Sambung" (Hanzi ↔ Pinyin,
+//     lalu Hanzi ↔ Arti) sebelum tantangan kalimat gabungan
+// ================================================================
+var VocabAIMatch = {
+  _containerId: null,
+  _onDone: null,
+  _words: [],
+  _stage: "hp",       // "hp" = Hanzi-Pinyin, "ha" = Hanzi-Arti
+  _left: [],          // urutan tetap: indeks kata di kolom kiri (Hanzi)
+  _right: [],         // urutan acak: indeks kata di kolom kanan
+  _matched: null,     // Set indeks kata yang sudah tersambung benar di stage ini
+  _selL: null,
+  _selR: null,
+  _salahL: null,
+  _salahR: null,
+  _kunci: false,      // kunci klik sementara saat menampilkan feedback salah
+
+  mulai(containerId, words, onDone) {
+    this._containerId = containerId;
+    this._words = words;
+    this._onDone = onDone;
+    this._stage = "hp";
+    this._mulaiStage();
+  },
+
+  _mulaiStage() {
+    this._matched = new Set();
+    this._selL = null; this._selR = null;
+    this._salahL = null; this._salahR = null;
+    this._kunci = false;
+    this._left = this._words.map((w, i) => i);
+    this._right = acak(this._words.map((w, i) => i));
+    this._render();
+  },
+
+  _labelKanan(i) {
+    const w = this._words[i];
+    return this._stage === "hp" ? (w.pinyin || "?") : w.arti;
+  },
+
+  _render() {
+    const judul = this._stage === "hp" ? "🔤 Cocokkan Hanzi ↔ Pinyin" : "🈯 Cocokkan Hanzi ↔ Arti";
+    const btn = (sisi, i) => {
+      const done = this._matched.has(i);
+      const salah = (sisi === "L" && this._salahL === i) || (sisi === "R" && this._salahR === i);
+      const aktif = (sisi === "L" && this._selL === i) || (sisi === "R" && this._selR === i);
+      const kelas = `sv-match-btn ${done ? "sv-match-done" : ""} ${salah ? "sv-match-salah" : ""} ${aktif && !salah ? "sv-match-aktif" : ""}`;
+      const teks = sisi === "L" ? this._words[i].hanzi : this._labelKanan(i);
+      return `<button class="${kelas}" ${done ? "disabled" : ""} onclick="VocabAIMatch._pilih('${sisi}',${i})">${teks}</button>`;
+    };
+    const kiri  = this._left.map(i => btn("L", i)).join("");
+    const kanan = this._right.map(i => btn("R", i)).join("");
+    const html = `
+      <div class="sv-match-wrap">
+        <div class="sv-match-title">${judul}</div>
+        <div class="sv-match-sub">Klik Hanzi, lalu klik pasangannya di kolom kanan.</div>
+        <div class="sv-match-grid">
+          <div class="sv-match-col">${kiri}</div>
+          <div class="sv-match-col">${kanan}</div>
+        </div>
+        <div class="sv-match-progress">${this._matched.size} / ${this._words.length} tersambung ${this._stage === "hp" ? "(tahap 1/2: Pinyin)" : "(tahap 2/2: Arti)"}</div>
+        <button class="btn btn-abu" style="width:100%;margin-top:8px" onclick="VocabAIMatch._lewati()">⏭ Lewati Mini-Game</button>
+      </div>`;
+    setHTML(this._containerId, html);
+  },
+
+  _pilih(sisi, i) {
+    if (this._kunci || this._matched.has(i)) return;
+    if (sisi === "L") this._selL = (this._selL === i) ? null : i;
+    else this._selR = (this._selR === i) ? null : i;
+
+    if (this._selL === null || this._selR === null) { this._render(); return; }
+
+    if (this._selL === this._selR) {
+      // Cocok!
+      this._matched.add(this._selL);
+      this._selL = null; this._selR = null;
+      this._render();
+      if (this._matched.size === this._words.length) {
+        this._kunci = true;
+        setTimeout(() => {
+          if (this._stage === "hp") { this._stage = "ha"; this._mulaiStage(); }
+          else if (this._onDone) this._onDone();
+        }, 600);
+      }
+    } else {
+      // Salah — tampilkan merah sebentar lalu reset
+      this._kunci = true;
+      this._salahL = this._selL; this._salahR = this._selR;
+      this._render();
+      setTimeout(() => {
+        this._selL = null; this._selR = null;
+        this._salahL = null; this._salahR = null;
+        this._kunci = false;
+        this._render();
+      }, 600);
+    }
+  },
+
+  _lewati() {
+    if (this._onDone) this._onDone();
+  },
+};
+
+// ── CSS mini-game (disuntik sekali, dipakai VocabAIMatch) ──────
+(function _injectMatchCSS() {
+  if (document.getElementById("vam-styles")) return;
+  const style = document.createElement("style");
+  style.id = "vam-styles";
+  style.textContent = `
+    .sv-match-wrap { padding:6px 0; }
+    .sv-match-title { font-size:14px; font-weight:700; color:#1565c0; text-align:center; margin-bottom:4px; }
+    .sv-match-sub { font-size:12px; color:#78909c; text-align:center; margin-bottom:10px; }
+    .sv-match-grid { display:flex; gap:10px; }
+    .sv-match-col { flex:1; display:flex; flex-direction:column; gap:8px; }
+    .sv-match-btn {
+      padding:10px 8px; border-radius:8px; font-size:15px; font-weight:600;
+      border:1.5px solid #b0bec5; background:#fff; color:#37474f; cursor:pointer;
+      transition:all .15s; width:100%; text-align:center;
+    }
+    .sv-match-btn:hover:not(:disabled) { border-color:#1565c0; background:#e3f2fd; }
+    .sv-match-btn.sv-match-aktif { border-color:#1565c0; background:#e3f2fd; color:#1565c0; }
+    .sv-match-btn.sv-match-done { border-color:#43a047; background:#e8f5e9; color:#2e7d32; opacity:.75; cursor:default; }
+    .sv-match-btn.sv-match-salah { border-color:#e53935; background:#ffebee; color:#c62828; }
+    .sv-match-btn:disabled { cursor:default; }
+    .sv-match-progress { text-align:center; font-size:12px; color:#546e7a; margin-top:8px; font-weight:600; }
+  `;
+  document.head.appendChild(style);
+})();
