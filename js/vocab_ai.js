@@ -1292,12 +1292,12 @@ var VocabAIFreeCall = {
 
   _tampilGiliranAI(parsed) {
     const c = this._cfg.tampilAI;
+    if (parsed.koreksi) this._tambahCatatanKoreksi(parsed.koreksi);
     const area = el("vfc-transcript");
     if (area) {
       const div = document.createElement("div");
       div.className = "sv-chat-bubble sv-chat-ai";
       let info = "";
-      if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${VocabAIData.esc2md(parsed.koreksi)}</div>`;
       if (c.has("hanzi") && parsed.hanzi) info += `<div>${parsed.hanzi}</div>`;
       if (c.has("pinyin") && parsed.pinyin) info += `<div style="font-size:12px;color:#0277bd">${parsed.pinyin}</div>`;
       if (c.has("indo")) info += `<div style="font-size:12px;color:#546e7a">${VocabAIData.esc2md(parsed.indonesia || "")}</div>`;
@@ -1343,6 +1343,22 @@ var VocabAIFreeCall = {
     div.innerHTML = `<span class="sv-chat-label">👤 Kamu:</span> ${VocabAIData.esc2(teks)}`;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
+    this._lastUserBubbleEl = div;
+  },
+
+  // Tempel catatan/koreksi grammar di bawah bubble ucapan siswa yang barusan dikirim,
+  // supaya jelas catatan ini soal ucapan siswa, bukan bagian dari balasan partner.
+  _tambahCatatanKoreksi(teks) {
+    const target = this._lastUserBubbleEl;
+    if (!target) return;
+    const note = document.createElement("div");
+    note.className = "sv-grammar-note";
+    note.style.cssText = "font-size:11.5px;color:#e65100;background:#fff3e0;border-left:3px solid #ffb74d;padding:4px 8px;margin-top:4px;border-radius:4px";
+    note.innerHTML = `📝 <b>Catatan:</b> ${VocabAIData.esc2md(teks)}`;
+    target.appendChild(note);
+    const area = el("vfc-transcript");
+    if (area) area.scrollTop = area.scrollHeight;
+    this._lastUserBubbleEl = null;
   },
 
   async _jawabTeks() {
@@ -1634,7 +1650,6 @@ var VocabAIFreeChat = {
     if (parsed._error) return `<span style="color:#c62828">❌ ${VocabAIData.esc2(parsed._error)}</span>`;
     const c = this._cfg.tampilAI;
     let info = "";
-    if (parsed.koreksi) info += `<div style="font-size:12px;color:#e65100;margin-bottom:4px">💡 ${VocabAIData.esc2md(parsed.koreksi)}</div>`;
     if (c.has("hanzi") && parsed.hanzi) info += `<div>${parsed.hanzi} <button class="btn-audio-kecil" onclick="TTS.mandarin('${VocabAIData.esc(parsed.hanzi)}')">🔊</button></div>`;
     if (c.has("pinyin") && parsed.pinyin) info += `<div style="font-size:12px;color:#0277bd">${parsed.pinyin}</div>`;
     if (c.has("indo")) info += `<div style="font-size:13px;color:#37474f;margin-top:2px">${VocabAIData.esc2md(parsed.indonesia || "")}</div>`;
@@ -1646,7 +1661,7 @@ var VocabAIFreeChat = {
 
   _appendChat(role, teks, extraClass = "") {
     const area = el("vfh-chat-area");
-    if (!area) return;
+    if (!area) return null;
     const div = document.createElement("div");
     div.className = `sv-chat-bubble sv-chat-${role} ${extraClass}`;
     div.innerHTML = role === "ai"
@@ -1654,11 +1669,27 @@ var VocabAIFreeChat = {
       : `<span class="sv-chat-label">👤 Kamu:</span> ${VocabAIData.esc2(teks)}`;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
+    if (role === "user") this._lastUserBubbleEl = div;
+    return div;
+  },
+
+  // Tempel catatan/koreksi grammar di bawah bubble ucapan siswa yang barusan dikirim,
+  // supaya jelas catatan ini soal ucapan siswa, bukan bagian dari balasan partner.
+  _tambahCatatanKoreksi(teks) {
+    const target = this._lastUserBubbleEl;
+    if (!target) return;
+    const note = document.createElement("div");
+    note.className = "sv-grammar-note";
+    note.style.cssText = "font-size:11.5px;color:#e65100;background:#fff3e0;border-left:3px solid #ffb74d;padding:4px 8px;margin-top:4px;border-radius:4px";
+    note.innerHTML = `📝 <b>Catatan:</b> ${VocabAIData.esc2md(teks)}`;
+    target.appendChild(note);
+    this._lastUserBubbleEl = null;
   },
 
   _updateLastAI(parsed) {
     const area = el("vfh-chat-area");
     if (!area) return;
+    if (parsed.koreksi) this._tambahCatatanKoreksi(parsed.koreksi);
     const loading = area.querySelector(".sv-chat-ai-loading");
     const html = this._bubbleAIHtml(parsed);
     if (loading) { loading.className = "sv-chat-bubble sv-chat-ai"; loading.innerHTML = html; }
