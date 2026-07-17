@@ -23,7 +23,7 @@ var Vocab = {
       { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya",   fn:"mulai('audio-arti')" },
       { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
       { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking()" },
-      { id:"cocok-kata",   icon:"🧩", label:"Cocok Kata",         desc:"Cocokkan Hanzi & Arti secepat mungkin", fn:"pilihOpsiCocokKata()" },
+      { id:"cocok-kata",   icon:"🧩", label:"Cocok Kata",         desc:"Cocokkan Hanzi/Pinyin/Arti/Audio, pilih sendiri kombinasinya", fn:"pilihOpsiCocokKata()" },
       { id:"all-in",       icon:"🔥", label:"All In",              desc:"Review + 6 tipe soal sekaligus!",fn:"mulaiAllIn()" },
       { id:"ai-latihan",   icon:"🤖", label:"Latihan AI",          desc:"Chat/telepon AI, bahas 5 kata sekaligus", fn:"bukaLatihanAI()" },
     ];
@@ -156,32 +156,62 @@ var Vocab = {
     event.currentTarget.classList.add("sub-card-aktif");
   },
 
-  // ── PILIH OPSI COCOK KATA (arah tampilan bebas) ──────────────
-  arahCocok: "hanzi-kiri",   // "hanzi-kiri" = Hanzi di kiri, Arti di kanan | "arti-kiri" = sebaliknya
+  // ── PILIH OPSI COCOK KATA (pasangan & arah tampilan bebas) ────
+  pasanganCocok: "hanzi-arti", // salah satu key PASANGAN_COCOK
+  arahCocok:  "a-kiri",        // "a-kiri" = field A (lihat PASANGAN_COCOK) di kiri | "b-kiri" = sebaliknya
+  barisCocok: 6,               // jumlah baris/kata yang tampil bersamaan di papan
+
+  PASANGAN_COCOK: {
+    "hanzi-arti":   { a:"hanzi", b:"arti",   iconA:"🈯", iconB:"🔤", labelA:"Hanzi",  labelB:"Arti",   labelMenu:"Hanzi ↔ Arti" },
+    "hanzi-pinyin": { a:"hanzi", b:"pinyin", iconA:"🈯", iconB:"🔠", labelA:"Hanzi",  labelB:"Pinyin", labelMenu:"Hanzi ↔ Pinyin" },
+    "audio-hanzi":  { a:"audio", b:"hanzi",  iconA:"🔊", iconB:"🈯", labelA:"Audio",  labelB:"Hanzi",  labelMenu:"Audio ↔ Hanzi" },
+    "audio-arti":   { a:"audio", b:"arti",   iconA:"🔊", iconB:"🔤", labelA:"Audio",  labelB:"Arti",   labelMenu:"Audio ↔ Arti" },
+    "pinyin-arti":  { a:"pinyin",b:"arti",   iconA:"🔠", iconB:"🔤", labelA:"Pinyin", labelB:"Arti",   labelMenu:"Pinyin ↔ Arti" },
+  },
 
   pilihOpsiCocokKata() {
+    const presetBaris = [4, 6, 8, 10, 12];
+    const pasanganList = Object.keys(this.PASANGAN_COCOK);
+    const p = this.PASANGAN_COCOK[this.pasanganCocok];
+
     el("konten-utama").innerHTML = `
       <div class="soal-wrap">
         <div class="label-mode">🧩 Cocok Kata — Pilih Opsi</div>
-        <div class="soal-hint" style="margin-bottom:14px">Mau Hanzi di sisi mana?</div>
-        <div class="sub-menu-grid">
-          <div class="sub-card ${this.arahCocok === 'hanzi-kiri' ? 'sub-card-aktif' : ''}"
-               onclick="Vocab._pilihArahCocok('hanzi-kiri')">
-            <div class="sub-icon">🈯➡️🔤</div>
-            <div class="sub-label">Hanzi Kiri, Arti Kanan</div>
-            <div class="sub-desc">Kolom kiri Hanzi, kolom kanan Arti Indonesia</div>
-          </div>
-          <div class="sub-card ${this.arahCocok === 'arti-kiri' ? 'sub-card-aktif' : ''}"
-               onclick="Vocab._pilihArahCocok('arti-kiri')">
-            <div class="sub-icon">🔤➡️🈯</div>
-            <div class="sub-label">Arti Kiri, Hanzi Kanan</div>
-            <div class="sub-desc">Kolom kiri Arti Indonesia, kolom kanan Hanzi</div>
-          </div>
+        <div class="soal-hint" style="margin-bottom:10px">Mau mencocokkan apa dengan apa?</div>
+        <div class="sub-menu-grid" id="cocok-pasangan-grid">
+          ${pasanganList.map(key => {
+            const c = this.PASANGAN_COCOK[key];
+            return `<div class="sub-card ${this.pasanganCocok === key ? 'sub-card-aktif' : ''}"
+                 id="cocok-pasangan-${key}"
+                 onclick="Vocab._pilihPasanganCocok('${key}')">
+              <div class="sub-icon">${c.iconA}${c.iconB}</div>
+              <div class="sub-label">${c.labelMenu}</div>
+            </div>`;
+          }).join("")}
         </div>
-        <div class="soal-hint" style="margin-top:14px">
-          Akan tampil 6 baris kata. Klik satu kata di satu sisi, lalu klik pasangannya di sisi lain.
-          Kata yang cocok akan hilang dan diganti kata berikutnya, sampai semua soal habis.
+
+        <div class="soal-hint" style="margin:16px 0 8px" id="cocok-arah-hint">${p.labelA} di sisi mana?</div>
+        <div class="sub-menu-grid" id="cocok-arah-grid">
+          ${this._htmlArahCocok()}
         </div>
+
+        <div class="soal-hint" style="margin:16px 0 8px">Berapa baris kata tampil bersamaan di papan?</div>
+        <div class="ss-opsi-row" id="cocok-baris-preset">
+          ${presetBaris.map(n => `
+            <button class="ss-btn ${this.barisCocok === n ? 'aktif' : ''}"
+              id="cocok-baris-btn-${n}"
+              onclick="Vocab._pilihBarisCocok(${n})">${n}</button>
+          `).join("")}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          <label style="font-size:13px;color:#555">Custom:</label>
+          <input type="number" id="cocok-baris-custom" class="ss-input-num" min="2" max="20"
+            value="${this.barisCocok}"
+            onchange="Vocab._pilihBarisCocokCustom(this.value)">
+          <span style="font-size:12px;color:var(--c-sub)">(min 2, maks 20 — dibatasi jumlah soal tersedia)</span>
+        </div>
+
+        <div class="soal-hint" style="margin-top:14px" id="cocok-ringkasan-hint">${this._htmlRingkasanCocok()}</div>
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="Vocab._mulaiCocokKata()">▶ Mulai</button>
           <button class="btn btn-abu"   onclick="Vocab.kembaliMenu()">← Batal</button>
@@ -189,10 +219,77 @@ var Vocab = {
       </div>`;
   },
 
+  _htmlArahCocok() {
+    const p = this.PASANGAN_COCOK[this.pasanganCocok];
+    return `
+      <div class="sub-card ${this.arahCocok === 'a-kiri' ? 'sub-card-aktif' : ''}"
+           onclick="Vocab._pilihArahCocok('a-kiri')">
+        <div class="sub-icon">${p.iconA}➡️${p.iconB}</div>
+        <div class="sub-label">${p.labelA} Kiri, ${p.labelB} Kanan</div>
+      </div>
+      <div class="sub-card ${this.arahCocok === 'b-kiri' ? 'sub-card-aktif' : ''}"
+           onclick="Vocab._pilihArahCocok('b-kiri')">
+        <div class="sub-icon">${p.iconB}➡️${p.iconA}</div>
+        <div class="sub-label">${p.labelB} Kiri, ${p.labelA} Kanan</div>
+      </div>`;
+  },
+
+  _htmlRingkasanCocok() {
+    return `Akan tampil <b>${this.barisCocok}</b> baris kata sekaligus. Klik satu kata di satu sisi, lalu klik pasangannya di sisi lain.
+      Kata yang cocok akan hilang dan diganti kata berikutnya, sampai semua soal habis.`;
+  },
+
+  _pilihPasanganCocok(key) {
+    this.pasanganCocok = key;
+    document.querySelectorAll("#cocok-pasangan-grid .sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    const btn = el("cocok-pasangan-" + key);
+    if (btn) btn.classList.add("sub-card-aktif");
+    // Refresh bagian arah karena label/icon ikut berubah sesuai pasangan baru
+    const arahGrid = el("cocok-arah-grid");
+    if (arahGrid) arahGrid.innerHTML = this._htmlArahCocok();
+    const arahHint = el("cocok-arah-hint");
+    if (arahHint) arahHint.textContent = `${this.PASANGAN_COCOK[key].labelA} di sisi mana?`;
+  },
+
   _pilihArahCocok(arah) {
     this.arahCocok = arah;
-    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
-    event.currentTarget.classList.add("sub-card-aktif");
+    const arahGrid = el("cocok-arah-grid");
+    if (arahGrid) arahGrid.innerHTML = this._htmlArahCocok();
+  },
+
+  _pilihBarisCocok(n) {
+    this.barisCocok = n;
+    document.querySelectorAll("#cocok-baris-preset .ss-btn").forEach(b => b.classList.remove("aktif"));
+    const btn = el("cocok-baris-btn-" + n);
+    if (btn) btn.classList.add("aktif");
+    const custom = el("cocok-baris-custom");
+    if (custom) custom.value = n;
+    this._refreshHintBarisCocok();
+  },
+
+  _pilihBarisCocokCustom(val) {
+    let n = parseInt(val) || 6;
+    n = Math.max(2, Math.min(20, n));
+    this.barisCocok = n;
+    document.querySelectorAll("#cocok-baris-preset .ss-btn").forEach(b => b.classList.remove("aktif"));
+    const btn = el("cocok-baris-btn-" + n);
+    if (btn) btn.classList.add("aktif");
+    const custom = el("cocok-baris-custom");
+    if (custom) custom.value = n;
+    this._refreshHintBarisCocok();
+  },
+
+  _refreshHintBarisCocok() {
+    const h = el("cocok-ringkasan-hint");
+    if (h) h.innerHTML = this._htmlRingkasanCocok();
+  },
+
+  // Filter soal sesuai field yang dibutuhkan pasangan yang dipilih
+  _filterSoalCocok(soal, pasangan) {
+    const p = this.PASANGAN_COCOK[pasangan];
+    const perluField = f => f === "audio" ? "hanzi" : f;   // audio butuh hanzi utk diucapkan
+    const fA = perluField(p.a), fB = perluField(p.b);
+    return soal.filter(w => w[fA] && w[fB]);
   },
 
   // ── COCOK KATA: mulai game ────────────────────────────────────
@@ -202,12 +299,14 @@ var Vocab = {
       tampilToast("Tidak ada soal! Cek set soal yang dipilih.");
       return;
     }
-    const soal = SetSoal.potongSoal(raw, "vocab").filter(w => w.hanzi && w.arti);
+    const potong = SetSoal.potongSoal(raw, "vocab");
+    const soal = this._filterSoalCocok(potong, this.pasanganCocok);
     if (soal.length < 2) {
-      tampilToast("Butuh minimal 2 kata untuk main Cocok Kata.");
+      tampilToast("Data tidak cukup lengkap (mis. pinyin kosong) untuk pasangan ini. Coba pasangan lain atau set soal lain.");
       return;
     }
-    CocokKata.mulai(acak(soal), this.arahCocok);
+    const jumlahBaris = Math.max(2, Math.min(this.barisCocok || 6, soal.length));
+    CocokKata.mulai(acak(soal), this.arahCocok, jumlahBaris, this.pasanganCocok, this.PASANGAN_COCOK[this.pasanganCocok]);
   },
 
   mulai(mode) {
@@ -718,14 +817,16 @@ var Vocab = {
 // ================================================================
 var CocokKata = {
 
-  N_BARIS: 6,          // jumlah baris tampil bersamaan
+  N_BARIS: 6,          // jumlah baris tampil bersamaan (default, ditimpa oleh parameter mulai())
 
   pool: [],            // seluruh soal (urutan sudah diacak sebelum masuk sini)
   antrian: 0,          // index kata berikutnya di pool yang belum masuk papan
-  arah: "hanzi-kiri",  // "hanzi-kiri" | "arti-kiri"
+  arah: "a-kiri",      // "a-kiri" = field A di kiri | "b-kiri" = sebaliknya
+  pasangan: "hanzi-arti",
+  pasanganCfg: { a:"hanzi", b:"arti", iconA:"🈯", iconB:"🔤", labelA:"Hanzi", labelB:"Arti" },
 
-  slotKiri: [],        // array of {id, hanzi, arti} | null — sejajar kolom kiri
-  slotKanan: [],        // array of {id, hanzi, arti} | null — sejajar kolom kanan (urutan acak sendiri)
+  slotKiri: [],        // array of {id, hanzi, arti, pinyin} | null — sejajar kolom kiri
+  slotKanan: [],       // array of {id, hanzi, arti, pinyin} | null — sejajar kolom kanan (urutan acak sendiri)
 
   pilih: null,         // { sisi:'kiri'|'kanan', idx:Number } | null
   benar: 0,
@@ -737,16 +838,19 @@ var CocokKata = {
   _sedang: false,      // lock saat animasi benar/salah berjalan
 
   // ── MULAI GAME ────────────────────────────────────────────────
-  mulai(soalAcak, arah) {
-    this.pool       = soalAcak.map((w, i) => ({ id:i, hanzi:w.hanzi, arti:w.arti }));
-    this.arah       = arah;
-    this.totalKata  = this.pool.length;
-    this.antrian    = 0;
-    this.benar      = 0;
-    this.salah      = 0;
-    this.selesaiKata= 0;
-    this.pilih      = null;
-    this._sedang    = false;
+  mulai(soalAcak, arah, jumlahBaris, pasanganKey, pasanganCfg) {
+    this.pool        = soalAcak.map((w, i) => ({ id:i, hanzi:w.hanzi, arti:w.arti, pinyin:w.pinyin || "" }));
+    this.arah        = arah || "a-kiri";
+    this.pasangan    = pasanganKey || "hanzi-arti";
+    this.pasanganCfg = pasanganCfg || { a:"hanzi", b:"arti", iconA:"🈯", iconB:"🔤", labelA:"Hanzi", labelB:"Arti" };
+    this.N_BARIS     = Math.max(2, Math.min(jumlahBaris || this.N_BARIS || 6, this.pool.length));
+    this.totalKata   = this.pool.length;
+    this.antrian     = 0;
+    this.benar       = 0;
+    this.salah       = 0;
+    this.selesaiKata = 0;
+    this.pilih       = null;
+    this._sedang     = false;
 
     const nAwal = Math.min(this.N_BARIS, this.pool.length);
     this.slotKiri  = [];
@@ -762,23 +866,40 @@ var CocokKata = {
     this._render();
   },
 
+  // Field yang tampil di sisi tertentu ("kiri"/"kanan"), sesuai arah & pasangan yang dipilih
+  _fieldSisi(sisi) {
+    const p = this.pasanganCfg;
+    const aDiKiri = this.arah === "a-kiri";
+    if (sisi === "kiri") return aDiKiri ? p.a : p.b;
+    return aDiKiri ? p.b : p.a;
+  },
+
   // ── RENDER PAPAN ──────────────────────────────────────────────
   _render() {
-    const labelKiri  = this.arah === "hanzi-kiri" ? "🈯 Hanzi"  : "🔤 Arti";
-    const labelKanan = this.arah === "hanzi-kiri" ? "🔤 Arti"   : "🈯 Hanzi";
+    const p = this.pasanganCfg;
+    const aDiKiri   = this.arah === "a-kiri";
+    const labelKiri  = aDiKiri ? `${p.iconA} ${p.labelA}` : `${p.iconB} ${p.labelB}`;
+    const labelKanan = aDiKiri ? `${p.iconB} ${p.labelB}` : `${p.iconA} ${p.labelA}`;
+    const fieldKiri  = this._fieldSisi("kiri");
+    const fieldKanan = this._fieldSisi("kanan");
 
-    const buatKartu = (w, sisi, idx) => {
+    const buatKartu = (w, sisi, idx, field) => {
       if (!w) return `<div class="cocok-kartu cocok-kosong"></div>`;
-      const tampilHanzi = (sisi === "kiri" && this.arah === "hanzi-kiri") || (sisi === "kanan" && this.arah === "arti-kiri");
-      const teks = tampilHanzi ? w.hanzi : w.arti;
       const dipilih = this.pilih && this.pilih.sisi === sisi && this.pilih.idx === idx;
-      return `<button class="cocok-kartu ${tampilHanzi ? 'cocok-hanzi' : ''} ${dipilih ? 'cocok-dipilih' : ''}"
-        id="cocok-${sisi}-${idx}"
-        onclick="CocokKata._klik('${sisi}', ${idx})">${Vocab._esc(teks)}</button>`;
+      const idAttr  = `id="cocok-${sisi}-${idx}"`;
+      const clickAttr = `onclick="CocokKata._klik('${sisi}', ${idx})"`;
+
+      if (field === "audio") {
+        return `<button class="cocok-kartu cocok-audio ${dipilih ? 'cocok-dipilih' : ''}" ${idAttr} ${clickAttr}>🔊</button>`;
+      }
+      const teks = field === "hanzi" ? w.hanzi : field === "pinyin" ? w.pinyin : w.arti;
+      const isHanzi = field === "hanzi";
+      return `<button class="cocok-kartu ${isHanzi ? 'cocok-hanzi' : ''} ${dipilih ? 'cocok-dipilih' : ''}"
+        ${idAttr} ${clickAttr}>${Vocab._esc(teks)}</button>`;
     };
 
-    const barisKiri  = this.slotKiri.map((w,i) => buatKartu(w, "kiri", i)).join("");
-    const barisKanan = this.slotKanan.map((w,i) => buatKartu(w, "kanan", i)).join("");
+    const barisKiri  = this.slotKiri.map((w,i) => buatKartu(w, "kiri", i, fieldKiri)).join("");
+    const barisKanan = this.slotKanan.map((w,i) => buatKartu(w, "kanan", i, fieldKanan)).join("");
     const sisaSoal = this.totalKata - this.selesaiKata;
 
     el("konten-utama").innerHTML = `
@@ -791,7 +912,7 @@ var CocokKata = {
           <div class="progres-fill" style="width:${(this.selesaiKata/this.totalKata*100).toFixed(1)}%"></div>
         </div>
         <div class="cocok-timer" id="cocok-timer">⏱ ${this._formatWaktu(Date.now()-this.waktuMulai)}</div>
-        <div class="soal-hint" style="margin:8px 0 12px">Klik satu kata, lalu klik pasangannya di sisi lain.</div>
+        <div class="soal-hint" style="margin:8px 0 12px">Klik satu kata, lalu klik pasangannya di sisi lain.${(fieldKiri==="audio"||fieldKanan==="audio") ? " 🔊 = klik untuk dengar audio." : ""}</div>
         <div class="cocok-papan">
           <div class="cocok-kolom">
             <div class="cocok-kolom-label">${labelKiri}</div>
@@ -824,7 +945,11 @@ var CocokKata = {
   _klik(sisi, idx) {
     if (this._sedang) return;
     const arr = sisi === "kiri" ? this.slotKiri : this.slotKanan;
-    if (!arr[idx]) return;   // slot kosong (sudah habis)
+    const w = arr[idx];
+    if (!w) return;   // slot kosong (sudah habis)
+
+    // Kartu audio: selalu putar suara saat diklik, apa pun status pemilihan
+    if (this._fieldSisi(sisi) === "audio") { TTS.mandarin(w.hanzi); }
 
     if (!this.pilih) {
       // Belum ada yang dipilih → pilih ini
