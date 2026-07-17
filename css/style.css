@@ -1232,6 +1232,17 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.cocok-papan.cocok-papan-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.cocok-papan-3 .cocok-kartu {
+  min-height: 46px;
+  padding: 6px 6px;
+  font-size: 13px;
+}
+.cocok-papan-3 .cocok-kartu.cocok-hanzi { font-size: 17px; }
+
 .cocok-kolom {
   display: flex;
   flex-direction: column;
