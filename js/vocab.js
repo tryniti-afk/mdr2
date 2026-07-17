@@ -160,6 +160,8 @@ var Vocab = {
   pasanganCocok: "hanzi-arti", // salah satu key PASANGAN_COCOK
   arahCocok:  "a-kiri",        // "a-kiri" = field A (lihat PASANGAN_COCOK) di kiri | "b-kiri" = sebaliknya
   barisCocok: 6,               // jumlah baris/kata yang tampil bersamaan di papan
+  levelCocok: "normal",        // "normal" = 2 kolom (kiri↔kanan) | "hard" = 3 kolom sekaligus
+  pasanganCocokHard: "hanzi-pinyin-arti", // salah satu key PASANGAN_COCOK_HARD
 
   PASANGAN_COCOK: {
     "hanzi-arti":   { a:"hanzi", b:"arti",   iconA:"🈯", iconB:"🔤", labelA:"Hanzi",  labelB:"Arti",   labelMenu:"Hanzi ↔ Arti" },
@@ -169,33 +171,40 @@ var Vocab = {
     "pinyin-arti":  { a:"pinyin",b:"arti",   iconA:"🔠", iconB:"🔤", labelA:"Pinyin", labelB:"Arti",   labelMenu:"Pinyin ↔ Arti" },
   },
 
+  // Level Hard: 3 kolom tampil sekaligus, harus mencocokkan ke-3 kolom dari 1 kata yang sama.
+  // Klik boleh di kolom mana saja duluan, urutannya bebas — begitu 3 kolom terisi, langsung dicek.
+  PASANGAN_COCOK_HARD: {
+    "hanzi-pinyin-arti": {
+      fields: ["hanzi", "pinyin", "arti"],
+      icons:  ["🈯", "🔠", "🔤"],
+      labels: ["Hanzi", "Pinyin", "Arti"],
+      labelMenu: "Hanzi → Pinyin → Arti",
+    },
+    "audio-pinyin-arti": {
+      fields: ["audio", "pinyin", "arti"],
+      icons:  ["🔊", "🔠", "🔤"],
+      labels: ["Audio", "Pinyin", "Arti"],
+      labelMenu: "Audio → Pinyin → Arti",
+    },
+  },
+
   pilihOpsiCocokKata() {
     const presetBaris = [4, 6, 8, 10, 12];
-    const pasanganList = Object.keys(this.PASANGAN_COCOK);
-    const p = this.PASANGAN_COCOK[this.pasanganCocok];
 
     el("konten-utama").innerHTML = `
       <div class="soal-wrap">
         <div class="label-mode">🧩 Cocok Kata — Pilih Opsi</div>
-        <div class="soal-hint" style="margin-bottom:10px">Mau mencocokkan apa dengan apa?</div>
-        <div class="sub-menu-grid" id="cocok-pasangan-grid">
-          ${pasanganList.map(key => {
-            const c = this.PASANGAN_COCOK[key];
-            return `<div class="sub-card ${this.pasanganCocok === key ? 'sub-card-aktif' : ''}"
-                 id="cocok-pasangan-${key}"
-                 onclick="Vocab._pilihPasanganCocok('${key}')">
-              <div class="sub-icon">${c.iconA}${c.iconB}</div>
-              <div class="sub-label">${c.labelMenu}</div>
-            </div>`;
-          }).join("")}
+
+        <div class="soal-hint" style="margin-bottom:10px">Pilih level permainan</div>
+        <div class="sub-menu-grid" id="cocok-level-grid">
+          ${this._htmlLevelCocok()}
         </div>
 
-        <div class="soal-hint" style="margin:16px 0 8px" id="cocok-arah-hint">${p.labelA} di sisi mana?</div>
-        <div class="sub-menu-grid" id="cocok-arah-grid">
-          ${this._htmlArahCocok()}
+        <div id="cocok-opsi-pasangan">
+          ${this._htmlOpsiPasanganCocok()}
         </div>
 
-        <div class="soal-hint" style="margin:16px 0 8px">Berapa baris kata tampil bersamaan di papan?</div>
+        <div class="soal-hint" style="margin:16px 0 8px">Berapa baris/set kata tampil bersamaan di papan?</div>
         <div class="ss-opsi-row" id="cocok-baris-preset">
           ${presetBaris.map(n => `
             <button class="ss-btn ${this.barisCocok === n ? 'aktif' : ''}"
@@ -219,6 +228,84 @@ var Vocab = {
       </div>`;
   },
 
+  // ── Blok level (Normal / Hard) ───────────────────────────────
+  _htmlLevelCocok() {
+    return `
+      <div class="sub-card ${this.levelCocok === 'normal' ? 'sub-card-aktif' : ''}"
+           id="cocok-level-normal"
+           onclick="Vocab._pilihLevelCocok('normal')">
+        <div class="sub-icon">🧩</div>
+        <div class="sub-label">Normal</div>
+        <div class="sub-desc">2 kolom, cocokkan 1 pasangan</div>
+      </div>
+      <div class="sub-card ${this.levelCocok === 'hard' ? 'sub-card-aktif' : ''}"
+           id="cocok-level-hard"
+           onclick="Vocab._pilihLevelCocok('hard')">
+        <div class="sub-icon">🔥</div>
+        <div class="sub-label">Hard</div>
+        <div class="sub-desc">3 kolom sekaligus, urutan klik bebas</div>
+      </div>`;
+  },
+
+  _pilihLevelCocok(level) {
+    this.levelCocok = level;
+    document.querySelectorAll("#cocok-level-grid .sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    const btn = el("cocok-level-" + level);
+    if (btn) btn.classList.add("sub-card-aktif");
+    const wrap = el("cocok-opsi-pasangan");
+    if (wrap) wrap.innerHTML = this._htmlOpsiPasanganCocok();
+    this._refreshHintBarisCocok();
+  },
+
+  // ── Blok pilihan pasangan, tergantung level ──────────────────
+  _htmlOpsiPasanganCocok() {
+    if (this.levelCocok === "hard") {
+      const hardList = Object.keys(this.PASANGAN_COCOK_HARD);
+      return `
+        <div class="soal-hint" style="margin:16px 0 8px">Mau mencocokkan 3 hal apa saja?</div>
+        <div class="sub-menu-grid" id="cocok-pasangan-hard-grid">
+          ${hardList.map(key => {
+            const c = this.PASANGAN_COCOK_HARD[key];
+            return `<div class="sub-card ${this.pasanganCocokHard === key ? 'sub-card-aktif' : ''}"
+                 id="cocok-pasangan-hard-${key}"
+                 onclick="Vocab._pilihPasanganCocokHard('${key}')">
+              <div class="sub-icon">${c.icons.join(" ")}</div>
+              <div class="sub-label">${c.labelMenu}</div>
+            </div>`;
+          }).join("")}
+        </div>`;
+    }
+
+    const pasanganList = Object.keys(this.PASANGAN_COCOK);
+    const p = this.PASANGAN_COCOK[this.pasanganCocok];
+    return `
+      <div class="soal-hint" style="margin:16px 0 8px">Mau mencocokkan apa dengan apa?</div>
+      <div class="sub-menu-grid" id="cocok-pasangan-grid">
+        ${pasanganList.map(key => {
+          const c = this.PASANGAN_COCOK[key];
+          return `<div class="sub-card ${this.pasanganCocok === key ? 'sub-card-aktif' : ''}"
+               id="cocok-pasangan-${key}"
+               onclick="Vocab._pilihPasanganCocok('${key}')">
+            <div class="sub-icon">${c.iconA}${c.iconB}</div>
+            <div class="sub-label">${c.labelMenu}</div>
+          </div>`;
+        }).join("")}
+      </div>
+
+      <div class="soal-hint" style="margin:16px 0 8px" id="cocok-arah-hint">${p.labelA} di sisi mana?</div>
+      <div class="sub-menu-grid" id="cocok-arah-grid">
+        ${this._htmlArahCocok()}
+      </div>`;
+  },
+
+  _pilihPasanganCocokHard(key) {
+    this.pasanganCocokHard = key;
+    document.querySelectorAll("#cocok-pasangan-hard-grid .sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    const btn = el("cocok-pasangan-hard-" + key);
+    if (btn) btn.classList.add("sub-card-aktif");
+    this._refreshHintBarisCocok();
+  },
+
   _htmlArahCocok() {
     const p = this.PASANGAN_COCOK[this.pasanganCocok];
     return `
@@ -235,6 +322,12 @@ var Vocab = {
   },
 
   _htmlRingkasanCocok() {
+    if (this.levelCocok === "hard") {
+      return `Akan tampil <b>${this.barisCocok}</b> set kata sekaligus, masing-masing dengan <b>3 kolom</b>.
+        Klik satu kartu di kolom mana saja duluan — urutannya bebas. Begitu kartu di ke-3 kolom sudah kepilih,
+        langsung dicek: kalau ke-3 nya dari kata yang sama, kata itu diganti kata berikutnya. Kalau salah satu saja
+        beda, dianggap salah dan pilihan direset.`;
+    }
     return `Akan tampil <b>${this.barisCocok}</b> baris kata sekaligus. Klik satu kata di satu sisi, lalu klik pasangannya di sisi lain.
       Kata yang cocok akan hilang dan diganti kata berikutnya, sampai semua soal habis.`;
   },
@@ -292,6 +385,14 @@ var Vocab = {
     return soal.filter(w => w[fA] && w[fB]);
   },
 
+  // Filter soal sesuai 3 field yang dibutuhkan pasangan hard yang dipilih
+  _filterSoalCocokHard(soal, pasanganHard) {
+    const p = this.PASANGAN_COCOK_HARD[pasanganHard];
+    const perluField = f => f === "audio" ? "hanzi" : f;   // audio butuh hanzi utk diucapkan
+    const fields = [...new Set(p.fields.map(perluField))];
+    return soal.filter(w => fields.every(f => w[f]));
+  },
+
   // ── COCOK KATA: mulai game ────────────────────────────────────
   async _mulaiCocokKata() {
     const raw = await SetSoal.getSoalSiap("vocab", "cocok-kata");
@@ -300,6 +401,18 @@ var Vocab = {
       return;
     }
     const potong = SetSoal.potongSoal(raw, "vocab");
+
+    if (this.levelCocok === "hard") {
+      const soal = this._filterSoalCocokHard(potong, this.pasanganCocokHard);
+      if (soal.length < 2) {
+        tampilToast("Data tidak cukup lengkap (mis. pinyin kosong) untuk kombinasi ini. Coba kombinasi lain atau set soal lain.");
+        return;
+      }
+      const jumlahBaris = Math.max(2, Math.min(this.barisCocok || 6, soal.length));
+      CocokKataHard.mulai(acak(soal), jumlahBaris, this.pasanganCocokHard, this.PASANGAN_COCOK_HARD[this.pasanganCocokHard]);
+      return;
+    }
+
     const soal = this._filterSoalCocok(potong, this.pasanganCocok);
     if (soal.length < 2) {
       tampilToast("Data tidak cukup lengkap (mis. pinyin kosong) untuk pasangan ini. Coba pasangan lain atau set soal lain.");
@@ -1046,6 +1159,224 @@ var CocokKata = {
         <div class="btn-row" style="justify-content:center;margin-top:20px;">
           <button class="btn btn-hijau" onclick="Vocab.pilihOpsiCocokKata()">🔄 Main Lagi</button>
           <button class="btn btn-biru" onclick="CocokKata.berhenti()">← Menu Vocab</button>
+        </div>
+      </div>`;
+  },
+
+  berhenti() {
+    clearInterval(this._timerId);
+    App.renderModul("vocab");
+  },
+};
+
+// ================================================================
+//  COCOK KATA HARD — 3 kolom sekaligus (Hanzi/Audio ↔ Pinyin ↔ Arti)
+//  Klik kartu di kolom mana saja, urutan bebas. Begitu ke-3 kolom
+//  terisi 1 pilihan, langsung dicek apakah dari kata yang sama.
+// ================================================================
+var CocokKataHard = {
+
+  N_BARIS: 6,           // jumlah set kata tampil bersamaan
+
+  pool: [],             // seluruh soal (urutan sudah diacak sebelum masuk sini)
+  antrian: 0,            // index kata berikutnya di pool yang belum masuk papan
+  pasangan: "hanzi-pinyin-arti",
+  pasanganCfg: { fields:["hanzi","pinyin","arti"], icons:["🈯","🔠","🔤"], labels:["Hanzi","Pinyin","Arti"] },
+
+  slots: [[], [], []],   // 3 kolom, masing-masing array of {id, hanzi, arti, pinyin} | null, diacak sendiri-sendiri
+  pilihan: [null, null, null], // idx kartu yang dipilih di tiap kolom (null = belum pilih)
+
+  benar: 0,
+  salah: 0,
+  totalKata: 0,
+  selesaiKata: 0,
+  waktuMulai: 0,
+  _timerId: null,
+  _sedang: false,        // lock saat animasi benar/salah berjalan
+
+  // ── MULAI GAME ────────────────────────────────────────────────
+  mulai(soalAcak, jumlahBaris, pasanganKey, pasanganCfg) {
+    this.pool        = soalAcak.map((w, i) => ({ id:i, hanzi:w.hanzi, arti:w.arti, pinyin:w.pinyin || "" }));
+    this.pasangan    = pasanganKey || "hanzi-pinyin-arti";
+    this.pasanganCfg = pasanganCfg || { fields:["hanzi","pinyin","arti"], icons:["🈯","🔠","🔤"], labels:["Hanzi","Pinyin","Arti"] };
+    this.N_BARIS     = Math.max(2, Math.min(jumlahBaris || this.N_BARIS || 6, this.pool.length));
+    this.totalKata   = this.pool.length;
+    this.antrian     = 0;
+    this.benar       = 0;
+    this.salah       = 0;
+    this.selesaiKata = 0;
+    this.pilihan     = [null, null, null];
+    this._sedang     = false;
+
+    const nAwal = Math.min(this.N_BARIS, this.pool.length);
+    const awal = [];
+    for (let i = 0; i < nAwal; i++) { awal.push(this.pool[i]); }
+    this.antrian = nAwal;
+    // Tiap kolom diacak urutannya sendiri-sendiri supaya tidak sejajar
+    this.slots = [acak(awal), acak(awal), acak(awal)];
+
+    this.waktuMulai = Date.now();
+    clearInterval(this._timerId);
+    this._timerId = setInterval(() => this._updateWaktu(), 1000);
+
+    this._render();
+  },
+
+  // ── RENDER PAPAN ──────────────────────────────────────────────
+  _render() {
+    const p = this.pasanganCfg;
+    const sisaSoal = this.totalKata - this.selesaiKata;
+
+    const buatKartu = (w, kolom, idx, field) => {
+      if (!w) return `<div class="cocok-kartu cocok-kosong"></div>`;
+      const dipilih = this.pilihan[kolom] === idx;
+      const idAttr  = `id="cocok-h-${kolom}-${idx}"`;
+      const clickAttr = `onclick="CocokKataHard._klik(${kolom}, ${idx})"`;
+
+      if (field === "audio") {
+        return `<button class="cocok-kartu cocok-audio ${dipilih ? 'cocok-dipilih' : ''}" ${idAttr} ${clickAttr}>🔊</button>`;
+      }
+      const teks = field === "hanzi" ? w.hanzi : field === "pinyin" ? w.pinyin : w.arti;
+      const isHanzi = field === "hanzi";
+      return `<button class="cocok-kartu ${isHanzi ? 'cocok-hanzi' : ''} ${dipilih ? 'cocok-dipilih' : ''}"
+        ${idAttr} ${clickAttr}>${Vocab._esc(teks)}</button>`;
+    };
+
+    const kolomHtml = p.fields.map((field, kolom) => {
+      const kartuList = this.slots[kolom].map((w, i) => buatKartu(w, kolom, i, field)).join("");
+      return `
+        <div class="cocok-kolom">
+          <div class="cocok-kolom-label">${p.icons[kolom]} ${p.labels[kolom]}</div>
+          ${kartuList}
+        </div>`;
+    }).join("");
+
+    const adaAudio = p.fields.includes("audio");
+
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="soal-header">
+          <div class="progres-teks">🔥 Cocok Kata (Hard) — Sisa ${sisaSoal} / ${this.totalKata}</div>
+          <div class="skor-mini" id="cocok-skor">✅ ${this.benar} ❌ ${this.salah}</div>
+        </div>
+        <div class="progres-bar">
+          <div class="progres-fill" style="width:${(this.selesaiKata/this.totalKata*100).toFixed(1)}%"></div>
+        </div>
+        <div class="cocok-timer" id="cocok-timer">⏱ ${this._formatWaktu(Date.now()-this.waktuMulai)}</div>
+        <div class="soal-hint" style="margin:8px 0 12px">Klik 1 kartu di tiap kolom (urutan bebas) sampai ke-3 nya kepilih dari kata yang sama.${adaAudio ? " 🔊 = klik untuk dengar audio." : ""}</div>
+        <div class="cocok-papan cocok-papan-3">
+          ${kolomHtml}
+        </div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn btn-abu" onclick="CocokKataHard.berhenti()">← Menu</button>
+        </div>
+      </div>`;
+  },
+
+  _updateWaktu() {
+    const t = el("cocok-timer");
+    if (t) t.textContent = "⏱ " + this._formatWaktu(Date.now() - this.waktuMulai);
+  },
+
+  _formatWaktu(ms) {
+    const detik = Math.floor(ms / 1000);
+    const m = Math.floor(detik / 60);
+    const s = detik % 60;
+    return `${m}:${s.toString().padStart(2,"0")}`;
+  },
+
+  // ── KLIK KARTU ─────────────────────────────────────────────────
+  _klik(kolom, idx) {
+    if (this._sedang) return;
+    const w = this.slots[kolom][idx];
+    if (!w) return;   // slot kosong (sudah habis)
+
+    // Kartu audio: selalu putar suara saat diklik, apa pun status pemilihan
+    if (this.pasanganCfg.fields[kolom] === "audio") { TTS.mandarin(w.hanzi); }
+
+    if (this.pilihan[kolom] === idx) {
+      // Klik kartu yang sama 2x di kolom itu → batal pilih kartu itu
+      this.pilihan[kolom] = null;
+      this._render();
+      return;
+    }
+
+    // Pilih (atau ganti pilihan) di kolom ini — bebas urutan, boleh timpa pilihan lama di kolom yang sama
+    this.pilihan[kolom] = idx;
+    this._render();
+
+    // Kalau ke-3 kolom sudah terisi satu pilihan, langsung dicek
+    if (this.pilihan[0] !== null && this.pilihan[1] !== null && this.pilihan[2] !== null) {
+      this._cekTriple();
+    }
+  },
+
+  _cekTriple() {
+    const [i0, i1, i2] = this.pilihan;
+    const w0 = this.slots[0][i0], w1 = this.slots[1][i1], w2 = this.slots[2][i2];
+    if (!w0 || !w1 || !w2) { this.pilihan = [null, null, null]; this._render(); return; }
+
+    const cocok = w0.id === w1.id && w1.id === w2.id;
+    this._sedang = true;
+
+    // Tandai visual benar/salah sesaat pada ke-3 kartu terpilih
+    [0, 1, 2].forEach(k => {
+      const e = el(`cocok-h-${k}-${this.pilihan[k]}`);
+      if (e) e.classList.add(cocok ? "cocok-benar" : "cocok-salah");
+    });
+
+    if (cocok) {
+      this.benar++;
+      this.selesaiKata++;
+      setTimeout(() => {
+        this._gantiSlot(i0, i1, i2);
+        this.pilihan = [null, null, null];
+        this._sedang = false;
+        if (this.selesaiKata >= this.totalKata) { this._selesai(); }
+        else { this._render(); }
+      }, 500);
+    } else {
+      this.salah++;
+      setTimeout(() => {
+        this.pilihan = [null, null, null];
+        this._sedang = false;
+        this._render();
+      }, 600);
+    }
+  },
+
+  // Ganti ke-3 slot yang sudah cocok dengan kata berikutnya dari antrian (jika ada)
+  _gantiSlot(i0, i1, i2) {
+    const idxKolom = [i0, i1, i2];
+    if (this.antrian < this.pool.length) {
+      const wBaru = this.pool[this.antrian];
+      this.antrian++;
+      idxKolom.forEach((idx, kolom) => { this.slots[kolom][idx] = wBaru; });
+    } else {
+      idxKolom.forEach((idx, kolom) => { this.slots[kolom][idx] = null; });
+    }
+  },
+
+  // ── SELESAI ──────────────────────────────────────────────────
+  _selesai() {
+    clearInterval(this._timerId);
+    const totalWaktuMs = Date.now() - this.waktuMulai;
+    App.catatSesiSelesai("vocab", this.benar, this.totalKata);
+    const emoji = this.salah === 0 ? "🏆" : this.salah <= 3 ? "👍" : "💪";
+
+    el("konten-utama").innerHTML = `
+      <div class="selesai-wrap">
+        <div class="selesai-emoji">${emoji}</div>
+        <h2>Cocok Kata Hard — Selesai! 🔥</h2>
+        <div class="selesai-skor">
+          <div>⏱ Waktu: <b>${this._formatWaktu(totalWaktuMs)}</b></div>
+          <div>📚 Kata dicocokkan: <b>${this.totalKata}</b></div>
+          <div>✅ Benar: <b>${this.benar}</b></div>
+          <div>❌ Salah: <b>${this.salah}</b></div>
+        </div>
+        <div class="btn-row" style="justify-content:center;margin-top:20px;">
+          <button class="btn btn-hijau" onclick="Vocab.pilihOpsiCocokKata()">🔄 Main Lagi</button>
+          <button class="btn btn-biru" onclick="CocokKataHard.berhenti()">← Menu Vocab</button>
         </div>
       </div>`;
   },
