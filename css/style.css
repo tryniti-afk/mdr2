@@ -1219,3 +1219,60 @@ body {
   border-bottom: 1px solid var(--c-border);
   font-size: 14px;
 }
+
+/* ── COCOK KATA (Matching Game) ─────────────────────────────── */
+.cocok-timer {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-biru-d);
+  margin-bottom: 4px;
+}
+.cocok-papan {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.cocok-kolom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cocok-kolom-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-sub);
+  text-align: center;
+  margin-bottom: 2px;
+}
+.cocok-kartu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--c-border);
+  background: var(--c-card);
+  color: var(--c-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .2s ease, opacity .2s ease;
+  word-break: break-word;
+}
+.cocok-kartu.cocok-hanzi { font-size: 20px; font-weight: 800; color: var(--c-hanzi); }
+.cocok-kartu:hover:not(.cocok-kosong) { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--c-biru); }
+.cocok-kartu.cocok-dipilih { border-color: var(--c-biru) !important; border-width: 3px !important; background: color-mix(in srgb, var(--c-biru) 12%, var(--c-card)); }
+.cocok-kartu.cocok-benar { border-color: var(--c-hijau) !important; background: color-mix(in srgb, var(--c-hijau) 25%, var(--c-card)) !important; color: var(--c-hijau-d); }
+.cocok-kartu.cocok-salah { border-color: var(--c-merah) !important; background: color-mix(in srgb, var(--c-merah) 20%, var(--c-card)) !important; animation: cocokShake .3s ease; }
+.cocok-kartu.cocok-kosong { border: 2px dashed var(--c-border); background: transparent; cursor: default; opacity: .35; }
+
+@keyframes cocokShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+[data-theme="dark"] .cocok-kartu { background: var(--c-card); border-color: var(--c-border); color: var(--c-text); }
+[data-theme="dark"] .cocok-kartu.cocok-hanzi { color: #ff6659; }
