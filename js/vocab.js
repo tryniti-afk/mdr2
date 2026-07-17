@@ -23,6 +23,7 @@ var Vocab = {
       { id:"audio-arti",   icon:"🔊", label:"Audio → Arti",       desc:"Dengar audio, jawab artinya",   fn:"mulai('audio-arti')" },
       { id:"audio-hanzi",  icon:"🎧", label:"Audio → Hanzi",      desc:"Dengar audio, tulis karakter",  fn:"mulai('audio-hanzi')" },
       { id:"speaking",     icon:"🎤", label:"Speaking Vocab",     desc:"Lihat arti, ucapkan Hanzi-nya", fn:"pilihTipeSpeaking()" },
+      { id:"cocok-kata",   icon:"🧩", label:"Cocok Kata",         desc:"Cocokkan Hanzi & Arti secepat mungkin", fn:"pilihOpsiCocokKata()" },
       { id:"all-in",       icon:"🔥", label:"All In",              desc:"Review + 6 tipe soal sekaligus!",fn:"mulaiAllIn()" },
       { id:"ai-latihan",   icon:"🤖", label:"Latihan AI",          desc:"Chat/telepon AI, bahas 5 kata sekaligus", fn:"bukaLatihanAI()" },
     ];
@@ -153,6 +154,60 @@ var Vocab = {
     this.pinyinStrict = strict;
     document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
     event.currentTarget.classList.add("sub-card-aktif");
+  },
+
+  // ── PILIH OPSI COCOK KATA (arah tampilan bebas) ──────────────
+  arahCocok: "hanzi-kiri",   // "hanzi-kiri" = Hanzi di kiri, Arti di kanan | "arti-kiri" = sebaliknya
+
+  pilihOpsiCocokKata() {
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="label-mode">🧩 Cocok Kata — Pilih Opsi</div>
+        <div class="soal-hint" style="margin-bottom:14px">Mau Hanzi di sisi mana?</div>
+        <div class="sub-menu-grid">
+          <div class="sub-card ${this.arahCocok === 'hanzi-kiri' ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihArahCocok('hanzi-kiri')">
+            <div class="sub-icon">🈯➡️🔤</div>
+            <div class="sub-label">Hanzi Kiri, Arti Kanan</div>
+            <div class="sub-desc">Kolom kiri Hanzi, kolom kanan Arti Indonesia</div>
+          </div>
+          <div class="sub-card ${this.arahCocok === 'arti-kiri' ? 'sub-card-aktif' : ''}"
+               onclick="Vocab._pilihArahCocok('arti-kiri')">
+            <div class="sub-icon">🔤➡️🈯</div>
+            <div class="sub-label">Arti Kiri, Hanzi Kanan</div>
+            <div class="sub-desc">Kolom kiri Arti Indonesia, kolom kanan Hanzi</div>
+          </div>
+        </div>
+        <div class="soal-hint" style="margin-top:14px">
+          Akan tampil 6 baris kata. Klik satu kata di satu sisi, lalu klik pasangannya di sisi lain.
+          Kata yang cocok akan hilang dan diganti kata berikutnya, sampai semua soal habis.
+        </div>
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn btn-hijau" onclick="Vocab._mulaiCocokKata()">▶ Mulai</button>
+          <button class="btn btn-abu"   onclick="Vocab.kembaliMenu()">← Batal</button>
+        </div>
+      </div>`;
+  },
+
+  _pilihArahCocok(arah) {
+    this.arahCocok = arah;
+    document.querySelectorAll(".sub-card").forEach(c => c.classList.remove("sub-card-aktif"));
+    event.currentTarget.classList.add("sub-card-aktif");
+  },
+
+  // ── COCOK KATA: mulai game ────────────────────────────────────
+  async _mulaiCocokKata() {
+    const raw = await SetSoal.getSoalSiap("vocab", "cocok-kata");
+    if (!raw || !raw.length) {
+      tampilToast("Tidak ada soal! Cek set soal yang dipilih.");
+      return;
+    }
+    const soal = SetSoal.potongSoal(raw, "vocab").filter(w => w.hanzi && w.arti);
+    if (soal.length < 2) {
+      tampilToast("Butuh minimal 2 kata untuk main Cocok Kata.");
+      return;
+    }
+    CocokKata.mulai(acak(soal), this.arahCocok);
   },
 
   mulai(mode) {
@@ -655,6 +710,224 @@ var Vocab = {
   // ── ALL IN entry point ───────────────────────────────────────
   async mulaiAllIn() {
     await AllIn.init();
+  },
+};
+
+// ================================================================
+//  COCOK KATA — Game mencocokkan Hanzi ↔ Arti (6 baris berjalan)
+// ================================================================
+var CocokKata = {
+
+  N_BARIS: 6,          // jumlah baris tampil bersamaan
+
+  pool: [],            // seluruh soal (urutan sudah diacak sebelum masuk sini)
+  antrian: 0,          // index kata berikutnya di pool yang belum masuk papan
+  arah: "hanzi-kiri",  // "hanzi-kiri" | "arti-kiri"
+
+  slotKiri: [],        // array of {id, hanzi, arti} | null — sejajar kolom kiri
+  slotKanan: [],        // array of {id, hanzi, arti} | null — sejajar kolom kanan (urutan acak sendiri)
+
+  pilih: null,         // { sisi:'kiri'|'kanan', idx:Number } | null
+  benar: 0,
+  salah: 0,
+  totalKata: 0,
+  selesaiKata: 0,
+  waktuMulai: 0,
+  _timerId: null,
+  _sedang: false,      // lock saat animasi benar/salah berjalan
+
+  // ── MULAI GAME ────────────────────────────────────────────────
+  mulai(soalAcak, arah) {
+    this.pool       = soalAcak.map((w, i) => ({ id:i, hanzi:w.hanzi, arti:w.arti }));
+    this.arah       = arah;
+    this.totalKata  = this.pool.length;
+    this.antrian    = 0;
+    this.benar      = 0;
+    this.salah      = 0;
+    this.selesaiKata= 0;
+    this.pilih      = null;
+    this._sedang    = false;
+
+    const nAwal = Math.min(this.N_BARIS, this.pool.length);
+    this.slotKiri  = [];
+    this.slotKanan = [];
+    for (let i = 0; i < nAwal; i++) { this.slotKiri.push(this.pool[i]); }
+    this.antrian = nAwal;
+    this.slotKanan = acak(this.slotKiri);   // urutan kanan diacak terpisah dari kiri
+
+    this.waktuMulai = Date.now();
+    clearInterval(this._timerId);
+    this._timerId = setInterval(() => this._updateWaktu(), 1000);
+
+    this._render();
+  },
+
+  // ── RENDER PAPAN ──────────────────────────────────────────────
+  _render() {
+    const labelKiri  = this.arah === "hanzi-kiri" ? "🈯 Hanzi"  : "🔤 Arti";
+    const labelKanan = this.arah === "hanzi-kiri" ? "🔤 Arti"   : "🈯 Hanzi";
+
+    const buatKartu = (w, sisi, idx) => {
+      if (!w) return `<div class="cocok-kartu cocok-kosong"></div>`;
+      const tampilHanzi = (sisi === "kiri" && this.arah === "hanzi-kiri") || (sisi === "kanan" && this.arah === "arti-kiri");
+      const teks = tampilHanzi ? w.hanzi : w.arti;
+      const dipilih = this.pilih && this.pilih.sisi === sisi && this.pilih.idx === idx;
+      return `<button class="cocok-kartu ${tampilHanzi ? 'cocok-hanzi' : ''} ${dipilih ? 'cocok-dipilih' : ''}"
+        id="cocok-${sisi}-${idx}"
+        onclick="CocokKata._klik('${sisi}', ${idx})">${Vocab._esc(teks)}</button>`;
+    };
+
+    const barisKiri  = this.slotKiri.map((w,i) => buatKartu(w, "kiri", i)).join("");
+    const barisKanan = this.slotKanan.map((w,i) => buatKartu(w, "kanan", i)).join("");
+    const sisaSoal = this.totalKata - this.selesaiKata;
+
+    el("konten-utama").innerHTML = `
+      <div class="soal-wrap">
+        <div class="soal-header">
+          <div class="progres-teks">🧩 Cocok Kata — Sisa ${sisaSoal} / ${this.totalKata}</div>
+          <div class="skor-mini" id="cocok-skor">✅ ${this.benar} ❌ ${this.salah}</div>
+        </div>
+        <div class="progres-bar">
+          <div class="progres-fill" style="width:${(this.selesaiKata/this.totalKata*100).toFixed(1)}%"></div>
+        </div>
+        <div class="cocok-timer" id="cocok-timer">⏱ ${this._formatWaktu(Date.now()-this.waktuMulai)}</div>
+        <div class="soal-hint" style="margin:8px 0 12px">Klik satu kata, lalu klik pasangannya di sisi lain.</div>
+        <div class="cocok-papan">
+          <div class="cocok-kolom">
+            <div class="cocok-kolom-label">${labelKiri}</div>
+            ${barisKiri}
+          </div>
+          <div class="cocok-kolom">
+            <div class="cocok-kolom-label">${labelKanan}</div>
+            ${barisKanan}
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn btn-abu" onclick="CocokKata.berhenti()">← Menu</button>
+        </div>
+      </div>`;
+  },
+
+  _updateWaktu() {
+    const t = el("cocok-timer");
+    if (t) t.textContent = "⏱ " + this._formatWaktu(Date.now() - this.waktuMulai);
+  },
+
+  _formatWaktu(ms) {
+    const detik = Math.floor(ms / 1000);
+    const m = Math.floor(detik / 60);
+    const s = detik % 60;
+    return `${m}:${s.toString().padStart(2,"0")}`;
+  },
+
+  // ── KLIK KARTU ─────────────────────────────────────────────────
+  _klik(sisi, idx) {
+    if (this._sedang) return;
+    const arr = sisi === "kiri" ? this.slotKiri : this.slotKanan;
+    if (!arr[idx]) return;   // slot kosong (sudah habis)
+
+    if (!this.pilih) {
+      // Belum ada yang dipilih → pilih ini
+      this.pilih = { sisi, idx };
+      this._render();
+      return;
+    }
+
+    if (this.pilih.sisi === sisi && this.pilih.idx === idx) {
+      // Klik kartu yang sama 2x → batal pilih
+      this.pilih = null;
+      this._render();
+      return;
+    }
+
+    if (this.pilih.sisi === sisi) {
+      // Klik kartu lain di sisi yang sama → pindah prioritas ke kartu baru
+      this.pilih = { sisi, idx };
+      this._render();
+      return;
+    }
+
+    // Klik di sisi berlawanan → cek kecocokan
+    this._cekPasangan(this.pilih, { sisi, idx });
+  },
+
+  _cekPasangan(a, b) {
+    const kiri  = a.sisi === "kiri" ? a : b;
+    const kanan = a.sisi === "kiri" ? b : a;
+    const wKiri  = this.slotKiri[kiri.idx];
+    const wKanan = this.slotKanan[kanan.idx];
+    if (!wKiri || !wKanan) { this.pilih = null; this._render(); return; }
+
+    const cocok = wKiri.id === wKanan.id;
+    this._sedang = true;
+
+    // Tandai visual benar/salah sesaat
+    const elKiri  = el(`cocok-kiri-${kiri.idx}`);
+    const elKanan = el(`cocok-kanan-${kanan.idx}`);
+    if (elKiri)  elKiri.classList.add(cocok ? "cocok-benar" : "cocok-salah");
+    if (elKanan) elKanan.classList.add(cocok ? "cocok-benar" : "cocok-salah");
+
+    if (cocok) {
+      this.benar++;
+      this.selesaiKata++;
+      setTimeout(() => {
+        this._gantiSlot(kiri.idx, kanan.idx);
+        this.pilih = null;
+        this._sedang = false;
+        if (this.selesaiKata >= this.totalKata) { this._selesai(); }
+        else { this._render(); }
+      }, 500);
+    } else {
+      this.salah++;
+      setTimeout(() => {
+        this.pilih = null;
+        this._sedang = false;
+        this._render();
+      }, 600);
+    }
+  },
+
+  // Ganti slot yang sudah cocok dengan kata berikutnya dari antrian (jika ada)
+  _gantiSlot(idxKiri, idxKanan) {
+    if (this.antrian < this.pool.length) {
+      const wBaru = this.pool[this.antrian];
+      this.antrian++;
+      this.slotKiri[idxKiri]   = wBaru;
+      this.slotKanan[idxKanan] = wBaru;
+    } else {
+      this.slotKiri[idxKiri]   = null;
+      this.slotKanan[idxKanan] = null;
+    }
+  },
+
+  // ── SELESAI ──────────────────────────────────────────────────
+  _selesai() {
+    clearInterval(this._timerId);
+    const totalWaktuMs = Date.now() - this.waktuMulai;
+    App.catatSesiSelesai("vocab", this.benar, this.totalKata);
+    const pct = this.totalKata ? Math.round((this.benar/(this.benar+this.salah || 1))*100) : 0;
+    const emoji = this.salah === 0 ? "🏆" : this.salah <= 3 ? "👍" : "💪";
+
+    el("konten-utama").innerHTML = `
+      <div class="selesai-wrap">
+        <div class="selesai-emoji">${emoji}</div>
+        <h2>Cocok Kata — Selesai! 🧩</h2>
+        <div class="selesai-skor">
+          <div>⏱ Waktu: <b>${this._formatWaktu(totalWaktuMs)}</b></div>
+          <div>📚 Kata dicocokkan: <b>${this.totalKata}</b></div>
+          <div>✅ Benar: <b>${this.benar}</b></div>
+          <div>❌ Salah: <b>${this.salah}</b></div>
+        </div>
+        <div class="btn-row" style="justify-content:center;margin-top:20px;">
+          <button class="btn btn-hijau" onclick="Vocab.pilihOpsiCocokKata()">🔄 Main Lagi</button>
+          <button class="btn btn-biru" onclick="CocokKata.berhenti()">← Menu Vocab</button>
+        </div>
+      </div>`;
+  },
+
+  berhenti() {
+    clearInterval(this._timerId);
+    App.renderModul("vocab");
   },
 };
 
