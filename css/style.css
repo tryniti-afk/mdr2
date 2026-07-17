@@ -1233,13 +1233,19 @@ body {
   gap: 10px;
 }
 .cocok-papan.cocok-papan-3 {
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: auto;
+  align-items: stretch;
+  gap: 6px 6px;
+}
+.cocok-papan-3 .cocok-kolom-label {
+  margin-bottom: 0;
 }
 .cocok-papan-3 .cocok-kartu {
   min-height: 46px;
   padding: 6px 6px;
   font-size: 13px;
+  height: 100%;
 }
 .cocok-papan-3 .cocok-kartu.cocok-hanzi { font-size: 17px; }
 
