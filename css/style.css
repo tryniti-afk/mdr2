@@ -1262,6 +1262,7 @@ body {
   word-break: break-word;
 }
 .cocok-kartu.cocok-hanzi { font-size: 20px; font-weight: 800; color: var(--c-hanzi); }
+.cocok-kartu.cocok-audio { font-size: 24px; background: color-mix(in srgb, var(--c-biru) 8%, var(--c-card)); }
 .cocok-kartu:hover:not(.cocok-kosong) { transform: translateY(-1px); box-shadow: var(--shadow); border-color: var(--c-biru); }
 .cocok-kartu.cocok-dipilih { border-color: var(--c-biru) !important; border-width: 3px !important; background: color-mix(in srgb, var(--c-biru) 12%, var(--c-card)); }
 .cocok-kartu.cocok-benar { border-color: var(--c-hijau) !important; background: color-mix(in srgb, var(--c-hijau) 25%, var(--c-card)) !important; color: var(--c-hijau-d); }
