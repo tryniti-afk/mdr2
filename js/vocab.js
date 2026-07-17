@@ -1242,14 +1242,18 @@ var CocokKataHard = {
         ${idAttr} ${clickAttr}>${Vocab._esc(teks)}</button>`;
     };
 
-    const kolomHtml = p.fields.map((field, kolom) => {
-      const kartuList = this.slots[kolom].map((w, i) => buatKartu(w, kolom, i, field)).join("");
-      return `
-        <div class="cocok-kolom">
-          <div class="cocok-kolom-label">${p.icons[kolom]} ${p.labels[kolom]}</div>
-          ${kartuList}
-        </div>`;
-    }).join("");
+    const labelHtml = p.fields.map((field, kolom) =>
+      `<div class="cocok-kolom-label">${p.icons[kolom]} ${p.labels[kolom]}</div>`
+    ).join("");
+
+    // Susun baris demi baris (row-major) supaya kartu hanzi/pinyin/arti sejajar 1 baris,
+    // tinggi tiap baris otomatis menyesuaikan kartu terpanjang di baris itu (CSS grid).
+    let barisHtml = "";
+    for (let i = 0; i < this.N_BARIS; i++) {
+      for (let kolom = 0; kolom < p.fields.length; kolom++) {
+        barisHtml += buatKartu(this.slots[kolom][i], kolom, i, p.fields[kolom]);
+      }
+    }
 
     const adaAudio = p.fields.includes("audio");
 
@@ -1265,7 +1269,8 @@ var CocokKataHard = {
         <div class="cocok-timer" id="cocok-timer">⏱ ${this._formatWaktu(Date.now()-this.waktuMulai)}</div>
         <div class="soal-hint" style="margin:8px 0 12px">Klik 1 kartu di tiap kolom (urutan bebas) sampai ke-3 nya kepilih dari kata yang sama.${adaAudio ? " 🔊 = klik untuk dengar audio." : ""}</div>
         <div class="cocok-papan cocok-papan-3">
-          ${kolomHtml}
+          ${labelHtml}
+          ${barisHtml}
         </div>
         <div class="btn-row" style="margin-top:14px">
           <button class="btn btn-abu" onclick="CocokKataHard.berhenti()">← Menu</button>
