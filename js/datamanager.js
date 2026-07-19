@@ -15,6 +15,7 @@ var SHEET_VOCAB = [
   { id:"Hsk3",   label:"HSK 3",    tipe:"vocab" },
   { id:"Hsk4",   label:"HSK 4",    tipe:"vocab" },
   { id:"Hsk5",   label:"HSK 5",    tipe:"vocab" },
+  { id:"Les",    label:"Les",      tipe:"vocab" },
 ];
 var SHEET_SENTENCE = [
   { id:"Grhsk1", label:"GR HSK 1", tipe:"sentence" },
