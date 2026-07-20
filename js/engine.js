@@ -216,7 +216,10 @@ const KONSONAN = ["b","p","m","f","d","t","n","l","g","k","h","j","q","x","r","z
 
 // mode: "tombol" = keyboard tombol pinyin (klik nada+huruf)
 //       "angka"  = ketik biasa + angka nada (mis. xi3hua1n -> xǐhuān)
-let kbState = { nada: 0, teks: "", mode: "tombol", angkaRaw: "" };
+// kbPreferredMode disimpan di luar kbState supaya PERSIST antar soal —
+// begitu user pindah mode, soal berikutnya (termasuk saat jawaban salah/lanjut) pakai mode yang sama.
+let kbPreferredMode = "tombol";
+let kbState = { nada: 0, teks: "", mode: kbPreferredMode, angkaRaw: "", previewOn: false };
 let kbCtx   = { displayId: "kb-display", onUpdate: null };
 
 // ── Konversi pinyin-angka -> pinyin-nada ─────────────────────
@@ -249,8 +252,8 @@ function konversiAngkaKePinyin(teks) {
 }
 
 function buildKbPinyin(displayId, onUpdate) {
-  // reset
-  kbState = { nada: 0, teks: "", mode: "tombol", angkaRaw: "" };
+  // reset (mode ikut preferensi terakhir user, TIDAK selalu balik ke "tombol")
+  kbState = { nada: 0, teks: "", mode: kbPreferredMode, angkaRaw: "", previewOn: false };
   kbCtx   = { displayId: displayId || "kb-display", onUpdate: onUpdate || null };
 
   const cont = el("kb-pinyin-cont");
@@ -261,12 +264,12 @@ function buildKbPinyin(displayId, onUpdate) {
   const toggleSec = document.createElement("div");
   toggleSec.className = "kb-mode-toggle";
   toggleSec.innerHTML = `
-    <button class="kb-mode-btn aktif" id="kb-mode-tombol" onclick="kbSetMode('tombol')">⌨️ Keyboard Pinyin</button>
-    <button class="kb-mode-btn" id="kb-mode-angka" onclick="kbSetMode('angka')">🔢 Ketik + Angka</button>
+    <button class="kb-mode-btn ${kbState.mode==='tombol'?'aktif':''}" id="kb-mode-tombol" onclick="kbSetMode('tombol')">⌨️ Keyboard Pinyin</button>
+    <button class="kb-mode-btn ${kbState.mode==='angka'?'aktif':''}" id="kb-mode-angka" onclick="kbSetMode('angka')">🔢 Ketik + Angka</button>
   `;
   cont.appendChild(toggleSec);
 
-  // display (dipakai bersama oleh kedua mode)
+  // display (dipakai bersama oleh kedua mode; di mode angka bisa disembunyikan)
   const disp = document.createElement("div");
   disp.id = kbCtx.displayId;
   disp.className = "kb-display";
@@ -279,31 +282,40 @@ function buildKbPinyin(displayId, onUpdate) {
   cont.appendChild(body);
 
   // action row: tetap ada di kedua mode (juga titik "kb-section:last-child"
-  // yang dipakai quiz.js untuk menyisipkan tombol Submit)
+  // yang dipakai quiz.js untuk menyisipkan tombol Submit). Tombol Spasi/Hapus/Clear
+  // di dalamnya hanya ditampilkan untuk mode "tombol" (mode "angka" sudah punya keyboard fisik/virtual sendiri).
   const actSec = document.createElement("div");
   actSec.className = "kb-section";
   actSec.id = "kb-action-row";
   actSec.innerHTML = `
-    <button class="kb-btn spesial" onclick="kbSpasi()">Spasi</button>
-    <button class="kb-btn spesial" onclick="kbHapus()">⌫ Hapus</button>
-    <button class="kb-btn spesial" onclick="kbClear()">✕ Clear</button>
+    <div class="kb-row" id="kb-basic-actions">
+      <button class="kb-btn spesial" onclick="kbSpasi()">Spasi</button>
+      <button class="kb-btn spesial" onclick="kbHapus()">⌫ Hapus</button>
+      <button class="kb-btn spesial" onclick="kbClear()">✕ Clear</button>
+    </div>
   `;
   cont.appendChild(actSec);
 
   _renderKbBody();
+  _applyBasicActionsVisibility();
+  _applyPreviewVisibility();
 }
 
 function kbSetMode(mode) {
+  kbPreferredMode = mode; // ingat pilihan user untuk soal-soal berikutnya
   if (kbState.mode === mode) return;
   kbState.mode = mode;
   kbState.teks = "";
   kbState.nada = 0;
   kbState.angkaRaw = "";
+  kbState.previewOn = false;
   const bTombol = el("kb-mode-tombol"), bAngka = el("kb-mode-angka");
   if (bTombol) bTombol.classList.toggle("aktif", mode === "tombol");
   if (bAngka)  bAngka.classList.toggle("aktif", mode === "angka");
   _renderKbBody();
+  _applyBasicActionsVisibility();
   updateKbDisplay(kbCtx.displayId);
+  _applyPreviewVisibility();
   if (kbCtx.onUpdate) kbCtx.onUpdate(kbState.teks);
 }
 
@@ -313,6 +325,21 @@ function _renderKbBody() {
   body.innerHTML = "";
   if (kbState.mode === "angka") _renderKbAngka(body);
   else _renderKbTombol(body);
+}
+
+// Tombol Spasi/Hapus/Clear cuma relevan untuk mode "tombol"
+function _applyBasicActionsVisibility() {
+  const wrap = el("kb-basic-actions");
+  if (wrap) wrap.style.display = (kbState.mode === "tombol") ? "flex" : "none";
+}
+
+// Kotak preview (tampilan nada) selalu terlihat di mode "tombol" (itu satu-satunya
+// feedback saat klik tombol), tapi di mode "angka" defaultnya disembunyikan supaya
+// tidak "ramai" saat mengisi — user bisa munculkan lewat tombol 👁️.
+function _applyPreviewVisibility() {
+  const disp = el(kbCtx.displayId);
+  if (!disp) return;
+  disp.style.display = (kbState.mode === "angka" && !kbState.previewOn) ? "none" : "block";
 }
 
 // ── MODE 1: Keyboard tombol (klik nada, lalu klik huruf) ─────
@@ -376,15 +403,22 @@ function _renderKbTombol(body) {
 
 // ── MODE 2: Ketik biasa + angka nada (mis. xi3hua1n -> xǐhuān) ─
 function _renderKbAngka(body) {
+  // keterangan singkat saja: peta angka nada + catatan ü→v
   const info = document.createElement("div");
   info.className = "kb-angka-info";
-  info.innerHTML = `Ketik pinyin pakai keyboard biasa, taruh <b>angka nada</b> tepat setelah huruf vokalnya. Contoh: <b>xi3hua1n</b> &rarr; <b>xǐhuān</b>. Angka nada: <b>1</b>=ˉ &nbsp;<b>2</b>=ˊ &nbsp;<b>3</b>=ˇ &nbsp;<b>4</b>=ˋ &nbsp; (netral = tanpa angka). Huruf <b>ü</b> bisa ditulis <b>v</b>.`;
+  info.innerHTML = `<b>1</b>=ˉ &nbsp; <b>2</b>=ˊ &nbsp; <b>3</b>=ˇ &nbsp; <b>4</b>=ˋ &nbsp;&nbsp;|&nbsp;&nbsp; <b>ü</b> → <b>v</b>`;
   body.appendChild(info);
 
   const inputWrap = document.createElement("div");
   inputWrap.className = "kb-section";
   inputWrap.innerHTML = `<input type="text" id="kb-angka-input" class="kb-angka-input" placeholder="cth: xi3hua1n" autocomplete="off" autocapitalize="off" spellcheck="false">`;
   body.appendChild(inputWrap);
+
+  // tombol show/hide preview nada, biar tampilan gak ramai saat ngisi
+  const toggleWrap = document.createElement("div");
+  toggleWrap.className = "kb-section";
+  toggleWrap.innerHTML = `<button type="button" class="kb-btn spesial" id="kb-toggle-preview">${kbState.previewOn ? "🙈 Sembunyikan Nada" : "👁️ Lihat Nada"}</button>`;
+  body.appendChild(toggleWrap);
 
   const inp = body.querySelector("#kb-angka-input");
   inp.value = kbState.angkaRaw;
@@ -405,6 +439,13 @@ function _renderKbAngka(body) {
     }
   };
   setTimeout(() => inp.focus(), 50);
+
+  const toggleBtn = toggleWrap.querySelector("#kb-toggle-preview");
+  toggleBtn.onclick = () => {
+    kbState.previewOn = !kbState.previewOn;
+    toggleBtn.innerText = kbState.previewOn ? "🙈 Sembunyikan Nada" : "👁️ Lihat Nada";
+    _applyPreviewVisibility();
+  };
 }
 
 function updateKbDisplay(id) {
@@ -441,10 +482,15 @@ function resetKb() {
   kbState.teks = "";
   kbState.nada = 0;
   kbState.angkaRaw = "";
+  kbState.previewOn = false;
   updateKbDisplay();
+  _applyPreviewVisibility();
+  const toggleBtn = el("kb-toggle-preview");
+  if (toggleBtn) toggleBtn.innerText = "👁️ Lihat Nada";
   const btns = document.querySelectorAll(".nada");
   btns.forEach((b,i) => { b.classList.toggle("nada-aktif", i===0); });
   const inp = el("kb-angka-input");
   if (inp) inp.value = "";
 }
+
 
