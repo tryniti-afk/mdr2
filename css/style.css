@@ -689,6 +689,43 @@ body {
 .kb-btn.nada-aktif { background: var(--c-ungu); color: #fff; }
 .kb-btn.spesial { background: #fff3e0; border-color: var(--c-kuning); color: #555; font-size: 13px; }
 
+.kb-mode-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+.kb-mode-btn {
+  flex: 1;
+  background: #fff;
+  border: 1.5px solid var(--c-border);
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--c-sub);
+  transition: background var(--trans);
+}
+.kb-mode-btn:hover { background: #e3f2fd; border-color: var(--c-biru); }
+.kb-mode-btn.aktif { background: var(--c-biru); border-color: var(--c-biru); color: #fff; }
+
+.kb-angka-info {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--c-sub);
+  background: #fff;
+  border: 1px dashed var(--c-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.kb-angka-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1.5px solid var(--c-biru);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.kb-angka-input:focus { outline: none; border-color: var(--c-biru-d); }
+
 /* ── TIMER ───────────────────────────────────────────────────── */
 .timer-box {
   font-size: 38px;
