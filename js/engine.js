@@ -214,28 +214,114 @@ const NADA_MAP = {
 };
 const KONSONAN = ["b","p","m","f","d","t","n","l","g","k","h","j","q","x","r","z","c","s","y","w"];
 
-let kbState = { nada: 0, teks: "" };
+// mode: "tombol" = keyboard tombol pinyin (klik nada+huruf)
+//       "angka"  = ketik biasa + angka nada (mis. xi3hua1n -> xǐhuān)
+let kbState = { nada: 0, teks: "", mode: "tombol", angkaRaw: "" };
+let kbCtx   = { displayId: "kb-display", onUpdate: null };
+
+// ── Konversi pinyin-angka -> pinyin-nada ─────────────────────
+// Angka (1-4) ditulis TEPAT SETELAH huruf vokal yang mau diberi nada.
+// 1=ˉ 2=ˊ 3=ˇ 4=ˋ , tanpa angka = netral. Huruf "v" dianggap sebagai "ü".
+function konversiAngkaKePinyin(teks) {
+  const raw = (teks || "").toLowerCase();
+  let out = "";
+  let lastVowelIdx = -1;
+  for (let i = 0; i < raw.length; i++) {
+    let ch = raw[i];
+    if (ch === "v") ch = "ü";
+    if (VOKAL_BASE.includes(ch)) {
+      out += ch;
+      lastVowelIdx = out.length - 1;
+    } else if (/[1-4]/.test(ch)) {
+      if (lastVowelIdx >= 0) {
+        const baseVowel = out[lastVowelIdx];
+        const peta = NADA_MAP[baseVowel];
+        if (peta) out = out.slice(0, lastVowelIdx) + peta[parseInt(ch, 10)] + out.slice(lastVowelIdx + 1);
+      }
+      // angka dibuang dari output (bukan bagian dari pinyin)
+    } else if (/[0-9]/.test(ch)) {
+      // angka lain (mis. 0/5) diabaikan, dianggap netral
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
 
 function buildKbPinyin(displayId, onUpdate) {
   // reset
-  kbState = { nada: 0, teks: "" };
+  kbState = { nada: 0, teks: "", mode: "tombol", angkaRaw: "" };
+  kbCtx   = { displayId: displayId || "kb-display", onUpdate: onUpdate || null };
 
   const cont = el("kb-pinyin-cont");
   if (!cont) return;
   cont.innerHTML = "";
 
-  // display
+  // toggle mode keyboard
+  const toggleSec = document.createElement("div");
+  toggleSec.className = "kb-mode-toggle";
+  toggleSec.innerHTML = `
+    <button class="kb-mode-btn aktif" id="kb-mode-tombol" onclick="kbSetMode('tombol')">⌨️ Keyboard Pinyin</button>
+    <button class="kb-mode-btn" id="kb-mode-angka" onclick="kbSetMode('angka')">🔢 Ketik + Angka</button>
+  `;
+  cont.appendChild(toggleSec);
+
+  // display (dipakai bersama oleh kedua mode)
   const disp = document.createElement("div");
-  disp.id = displayId || "kb-display";
+  disp.id = kbCtx.displayId;
   disp.className = "kb-display";
   disp.innerText = "";
   cont.appendChild(disp);
 
+  // body: isi berubah sesuai mode
+  const body = document.createElement("div");
+  body.id = "kb-body-cont";
+  cont.appendChild(body);
+
+  // action row: tetap ada di kedua mode (juga titik "kb-section:last-child"
+  // yang dipakai quiz.js untuk menyisipkan tombol Submit)
+  const actSec = document.createElement("div");
+  actSec.className = "kb-section";
+  actSec.id = "kb-action-row";
+  actSec.innerHTML = `
+    <button class="kb-btn spesial" onclick="kbSpasi()">Spasi</button>
+    <button class="kb-btn spesial" onclick="kbHapus()">⌫ Hapus</button>
+    <button class="kb-btn spesial" onclick="kbClear()">✕ Clear</button>
+  `;
+  cont.appendChild(actSec);
+
+  _renderKbBody();
+}
+
+function kbSetMode(mode) {
+  if (kbState.mode === mode) return;
+  kbState.mode = mode;
+  kbState.teks = "";
+  kbState.nada = 0;
+  kbState.angkaRaw = "";
+  const bTombol = el("kb-mode-tombol"), bAngka = el("kb-mode-angka");
+  if (bTombol) bTombol.classList.toggle("aktif", mode === "tombol");
+  if (bAngka)  bAngka.classList.toggle("aktif", mode === "angka");
+  _renderKbBody();
+  updateKbDisplay(kbCtx.displayId);
+  if (kbCtx.onUpdate) kbCtx.onUpdate(kbState.teks);
+}
+
+function _renderKbBody() {
+  const body = el("kb-body-cont");
+  if (!body) return;
+  body.innerHTML = "";
+  if (kbState.mode === "angka") _renderKbAngka(body);
+  else _renderKbTombol(body);
+}
+
+// ── MODE 1: Keyboard tombol (klik nada, lalu klik huruf) ─────
+function _renderKbTombol(body) {
   // nada
   const nadaSec = document.createElement("div");
   nadaSec.className = "kb-section";
   nadaSec.innerHTML = `<div class="kb-label">Nada</div><div class="kb-row" id="kb-nada-row"></div>`;
-  cont.appendChild(nadaSec);
+  body.appendChild(nadaSec);
   const nadaRow = nadaSec.querySelector("#kb-nada-row");
   [0,1,2,3,4].forEach(n => {
     const b = document.createElement("button");
@@ -244,7 +330,7 @@ function buildKbPinyin(displayId, onUpdate) {
     b.innerText = ["◌","¯","´","ˇ","`"][n];
     b.onclick = () => {
       kbState.nada = n;
-      cont.querySelectorAll(".nada").forEach(x=>x.classList.remove("nada-aktif"));
+      body.querySelectorAll(".nada").forEach(x=>x.classList.remove("nada-aktif"));
       b.classList.add("nada-aktif");
     };
     nadaRow.appendChild(b);
@@ -254,7 +340,7 @@ function buildKbPinyin(displayId, onUpdate) {
   const vokalSec = document.createElement("div");
   vokalSec.className = "kb-section";
   vokalSec.innerHTML = `<div class="kb-label">Vokal</div><div class="kb-row" id="kb-vokal-row"></div>`;
-  cont.appendChild(vokalSec);
+  body.appendChild(vokalSec);
   const vokalRow = vokalSec.querySelector("#kb-vokal-row");
   VOKAL_BASE.forEach(v => {
     const b = document.createElement("button");
@@ -263,8 +349,8 @@ function buildKbPinyin(displayId, onUpdate) {
     b.onclick = () => {
       const ch = NADA_MAP[v][kbState.nada] || v;
       kbState.teks += ch;
-      updateKbDisplay(displayId || "kb-display");
-      if (onUpdate) onUpdate(kbState.teks);
+      updateKbDisplay(kbCtx.displayId);
+      if (kbCtx.onUpdate) kbCtx.onUpdate(kbState.teks);
     };
     vokalRow.appendChild(b);
   });
@@ -273,7 +359,7 @@ function buildKbPinyin(displayId, onUpdate) {
   const konSec = document.createElement("div");
   konSec.className = "kb-section";
   konSec.innerHTML = `<div class="kb-label">Konsonan</div><div class="kb-row" id="kb-kon-row"></div>`;
-  cont.appendChild(konSec);
+  body.appendChild(konSec);
   const konRow = konSec.querySelector("#kb-kon-row");
   KONSONAN.forEach(k => {
     const b = document.createElement("button");
@@ -281,46 +367,84 @@ function buildKbPinyin(displayId, onUpdate) {
     b.innerText = k;
     b.onclick = () => {
       kbState.teks += k;
-      updateKbDisplay(displayId || "kb-display");
-      if (onUpdate) onUpdate(kbState.teks);
+      updateKbDisplay(kbCtx.displayId);
+      if (kbCtx.onUpdate) kbCtx.onUpdate(kbState.teks);
     };
     konRow.appendChild(b);
   });
+}
 
-  // action row
-  const actSec = document.createElement("div");
-  actSec.className = "kb-section";
-  actSec.innerHTML = `
-    <button class="kb-btn spesial" onclick="kbSpasi()">Spasi</button>
-    <button class="kb-btn spesial" onclick="kbHapus()">⌫ Hapus</button>
-    <button class="kb-btn spesial" onclick="kbClear()">✕ Clear</button>
-  `;
-  cont.appendChild(actSec);
+// ── MODE 2: Ketik biasa + angka nada (mis. xi3hua1n -> xǐhuān) ─
+function _renderKbAngka(body) {
+  const info = document.createElement("div");
+  info.className = "kb-angka-info";
+  info.innerHTML = `Ketik pinyin pakai keyboard biasa, taruh <b>angka nada</b> tepat setelah huruf vokalnya. Contoh: <b>xi3hua1n</b> &rarr; <b>xǐhuān</b>. Angka nada: <b>1</b>=ˉ &nbsp;<b>2</b>=ˊ &nbsp;<b>3</b>=ˇ &nbsp;<b>4</b>=ˋ &nbsp; (netral = tanpa angka). Huruf <b>ü</b> bisa ditulis <b>v</b>.`;
+  body.appendChild(info);
+
+  const inputWrap = document.createElement("div");
+  inputWrap.className = "kb-section";
+  inputWrap.innerHTML = `<input type="text" id="kb-angka-input" class="kb-angka-input" placeholder="cth: xi3hua1n" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+  body.appendChild(inputWrap);
+
+  const inp = body.querySelector("#kb-angka-input");
+  inp.value = kbState.angkaRaw;
+  inp.oninput = () => {
+    kbState.angkaRaw = inp.value;
+    kbState.teks = konversiAngkaKePinyin(kbState.angkaRaw);
+    updateKbDisplay(kbCtx.displayId);
+    if (kbCtx.onUpdate) kbCtx.onUpdate(kbState.teks);
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === "Enter") {
+      const cont = el("kb-pinyin-cont");
+      const wrap = cont ? (cont.closest(".soal-wrap") || cont.parentElement) : null;
+      if (!wrap) return;
+      let btn = wrap.querySelector(".btn-hijau");
+      if (!btn) btn = Array.from(wrap.querySelectorAll("button")).find(b => /submit/i.test(b.innerText));
+      if (btn) btn.click();
+    }
+  };
+  setTimeout(() => inp.focus(), 50);
 }
 
 function updateKbDisplay(id) {
-  const e = el(id || "kb-display");
+  const e = el(id || kbCtx.displayId || "kb-display");
   if (e) e.innerText = kbState.teks || "";
 }
 
 function kbSpasi() {
+  if (kbState.mode === "angka") {
+    const inp = el("kb-angka-input");
+    if (inp) { inp.value += " "; inp.dispatchEvent(new Event("input")); inp.focus(); return; }
+  }
   kbState.teks += " ";
   updateKbDisplay();
 }
 function kbHapus() {
+  if (kbState.mode === "angka") {
+    const inp = el("kb-angka-input");
+    if (inp) { inp.value = [...inp.value].slice(0,-1).join(""); inp.dispatchEvent(new Event("input")); inp.focus(); return; }
+  }
   kbState.teks = [...kbState.teks].slice(0,-1).join("");
   updateKbDisplay();
 }
 function kbClear() {
+  if (kbState.mode === "angka") {
+    const inp = el("kb-angka-input");
+    if (inp) { inp.value = ""; inp.dispatchEvent(new Event("input")); inp.focus(); return; }
+  }
   kbState.teks = "";
   updateKbDisplay();
 }
-function getKbTeks() { return kbState.teks.trim(); }
+function getKbTeks() { return (kbState.teks || "").trim(); }
 function resetKb() {
   kbState.teks = "";
   kbState.nada = 0;
+  kbState.angkaRaw = "";
   updateKbDisplay();
   const btns = document.querySelectorAll(".nada");
   btns.forEach((b,i) => { b.classList.toggle("nada-aktif", i===0); });
+  const inp = el("kb-angka-input");
+  if (inp) inp.value = "";
 }
- 
+
