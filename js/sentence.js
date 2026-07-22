@@ -24,6 +24,8 @@ var Sentence = {
       { id:"struktur",    icon:"📐", label:"Lihat Struktur",     desc:"Pola & penjelasan kalimat" },
       { id:"vocab-ai",   icon:"🤖", label:"Generate AI",         desc:"AI buat soal dari vocab HSK kamu" },
       { id:"interview",  icon:"💼", label:"Latihan Interview",   desc:"Tanya-jawab + telepon/chat AI dari sheet interview" },
+      { id:"shadow",     icon:"🗣️", label:"Shadowing",           desc:"Dengar & tirukan kalimat, kata yang meleset ditandai" },
+      { id:"translate-in", icon:"🎧", label:"Translate In",       desc:"Audio pelan tanpa teks, jawab pemahaman ceritanya" },
     ];
     return `
       <div style="padding-bottom:12px">
@@ -49,6 +51,8 @@ var Sentence = {
   mulai(mode) {
     if (mode === "vocab-ai") { el("konten-utama").innerHTML = SentenceVocab.renderMenu(); return; }
     if (mode === "interview") { el("konten-utama").innerHTML = InterviewHub.renderMenu(); return; }
+    if (mode === "shadow") { ShadowModule.bukaSentence(); return; }
+    if (mode === "translate-in") { TranslateIn.buka(); return; }
     const cfg = SetSoal.get("sentence");
     const modeRetry = cfg.mode === "infinity" || cfg.mode === "jumlah";
     if (modeRetry) {
