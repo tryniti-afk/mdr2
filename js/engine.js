@@ -181,6 +181,33 @@ function tambahSkor(benar) {
   else sesiSkor.salah++;
 }
 
+// Dipakai saat memulihkan sesi yang ditinggal ("Lanjutkan") supaya skor lama ikut kembali.
+function setSkor(benar, salah, total) {
+  sesiSkor = { benar: benar || 0, salah: salah || 0, total: total != null ? total : (benar||0)+(salah||0) };
+}
+
+// ── SESI TERTUNDA ("Lanjutkan") ───────────────────────────────
+//  Dipakai modul Vocab / Sentence / Sesi Pintar supaya kalau user
+//  meninggalkan sesi sebelum selesai, progresnya bisa dilanjutkan lagi.
+const LANJUT_PREFIX = "mdr_lanjut_";
+
+function simpanSesiLanjut(modul, data) {
+  try { localStorage.setItem(LANJUT_PREFIX + modul, JSON.stringify({ ...data, _ts: Date.now() })); } catch (e) {}
+}
+function ambilSesiLanjut(modul) {
+  try {
+    const raw = localStorage.getItem(LANJUT_PREFIX + modul);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Kadaluarsa setelah 3 hari supaya tidak menumpuk data basi.
+    if (Date.now() - (data._ts || 0) > 3 * 24 * 60 * 60 * 1000) { hapusSesiLanjut(modul); return null; }
+    return data;
+  } catch (e) { return null; }
+}
+function hapusSesiLanjut(modul) {
+  try { localStorage.removeItem(LANJUT_PREFIX + modul); } catch (e) {}
+}
+
 function updateSkorUI(id) {
   const e = el(id);
   if (!e) return;
