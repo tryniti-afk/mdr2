@@ -27,9 +27,17 @@ var Sentence = {
       { id:"shadow",     icon:"🗣️", label:"Shadowing",           desc:"Dengar & tirukan kalimat, kata yang meleset ditandai" },
       { id:"translate-in", icon:"🎧", label:"Translate In",       desc:"Audio pelan tanpa teks, jawab pemahaman ceritanya" },
     ];
+    const lanjut = ambilSesiLanjut("sentence");
+    const bannerLanjut = lanjut ? `
+      <div class="sub-card sub-card-aktif" style="margin-bottom:12px" onclick="Sentence.lanjutkanSesi()">
+        <div class="sub-icon">▶</div>
+        <div class="sub-label">Lanjutkan Sesi Sebelumnya</div>
+        <div class="sub-desc">Soal ${Math.min(lanjut.idx + 1, lanjut.soalList.length)}/${lanjut.soalList.length} — ✅ ${lanjut.skor.benar} ❌ ${lanjut.skor.salah}</div>
+      </div>` : "";
     return `
       <div style="padding-bottom:12px">
         ${SetSoal.renderWidget("sentence", "s")}
+        ${bannerLanjut}
         <div class="sub-menu-grid" style="margin-top:12px">
           ${subFitur.map(f => `
             <div class="sub-card" onclick="Sentence.mulai('${f.id}')">
@@ -163,6 +171,7 @@ var Sentence = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Sentence._jawabTeks()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Sentence._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -180,6 +189,7 @@ var Sentence = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Sentence._jawabHanzi()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Sentence._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -199,6 +209,7 @@ var Sentence = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Sentence._jawabTeks()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Sentence._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -218,6 +229,7 @@ var Sentence = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Sentence._jawabHanzi()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Sentence._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -236,6 +248,7 @@ var Sentence = {
         <div class="btn-row">
           <button class="btn btn-merah" id="btn-mic" onclick="Sentence._jawabSuara()">🎤 Mulai Bicara</button>
           <button class="btn btn-kuning" onclick="Sentence._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -254,6 +267,7 @@ var Sentence = {
         ${item.note     ? `<div class="ss-info-box" style="background:#fff3e0;color:#e65100;border-color:#ffcc80"><b>Catatan:</b> ${item.note}</div>` : ""}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-biru" onclick="Sentence._lanjut()">→ Lanjut</button>
+          <button class="btn btn-hijau" onclick="Sentence.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -401,13 +415,16 @@ var Sentence = {
 
   // ── SELESAI ──────────────────────────────────────────────────
   tampilSelesai() {
+    hapusSesiLanjut("sentence");
     const pct  = sesiSkor.total ? Math.round((sesiSkor.benar / sesiSkor.total) * 100) : 0;
     const emoji = pct >= 80 ? "🏆" : pct >= 60 ? "👍" : "💪";
     App.catatSesiSelesai("sentence", sesiSkor.benar, sesiSkor.total);
+    const belumSelesai = this.soalList && this.idx < this.soalList.length;
     el("konten-utama").innerHTML = `
       <div class="selesai-wrap">
         <div class="selesai-emoji">${emoji}</div>
         <h2>Sesi Selesai!</h2>
+        ${belumSelesai ? `<div class="soal-hint">Diselesaikan lebih awal — ${this.idx}/${this.soalList.length} soal dikerjakan</div>` : ""}
         <div class="selesai-skor">
           <div>✅ Benar: <b>${sesiSkor.benar}</b></div>
           <div>❌ Salah: <b>${sesiSkor.salah}</b></div>
@@ -420,7 +437,37 @@ var Sentence = {
       </div>`;
   },
 
-  kembaliMenu() { TTS.berhenti(); STT.berhenti(); App.renderModul("sentence"); },
+  kembaliMenu() { TTS.berhenti(); STT.berhenti(); this._simpanLanjut(); App.renderModul("sentence"); },
+
+  // Tombol "✅ Selesai" di tengah soal — tampilkan hasil sekarang juga.
+  selesaiSekarang() {
+    TTS.berhenti(); STT.berhenti();
+    hapusSesiLanjut("sentence");
+    this.tampilSelesai();
+  },
+
+  _simpanLanjut() {
+    if (!this.soalList || !this.soalList.length || this.idx >= this.soalList.length) return;
+    simpanSesiLanjut("sentence", {
+      modeSaat: this.modeSaat,
+      soalList: this.soalList,
+      idx: this.idx,
+      difficulty: this.difficulty,
+      skor: { benar: sesiSkor.benar, salah: sesiSkor.salah, total: sesiSkor.total },
+    });
+  },
+
+  lanjutkanSesi() {
+    const data = ambilSesiLanjut("sentence");
+    if (!data) { tampilToast("⚠️ Tidak ada sesi tersimpan."); return; }
+    hapusSesiLanjut("sentence");
+    this.modeSaat  = data.modeSaat;
+    this.soalList  = data.soalList;
+    this.idx       = data.idx;
+    this.difficulty = data.difficulty || this.difficulty;
+    setSkor(data.skor.benar, data.skor.salah, data.skor.total);
+    this.tampilSoal();
+  },
   _esc(s) { return (s||"").replace(/'/g,"\\'").replace(/\n/g," "); },
 };
 
