@@ -31,9 +31,17 @@ var Vocab = {
       { id:"buat-kalimat", icon:"✍️", label:"Buat Kalimat + Timer", desc:"1 kata → speaking bikin kalimat, dinilai AI", fn:"bukaBuatKalimat()" },
       { id:"baca-ulang",   icon:"🔁", label:"Baca Berulang",       desc:"Baca sama berkali-kali, lihat progres kecepatan", fn:"bukaBacaUlang()" },
     ];
+    const lanjut = ambilSesiLanjut("vocab");
+    const bannerLanjut = lanjut ? `
+      <div class="sub-card sub-card-aktif" style="margin-bottom:12px" onclick="Vocab.lanjutkanSesi()">
+        <div class="sub-icon">▶</div>
+        <div class="sub-label">Lanjutkan Sesi Sebelumnya</div>
+        <div class="sub-desc">Soal ${Math.min(lanjut.idx + 1, lanjut.soalList.length)}/${lanjut.soalList.length} — ✅ ${lanjut.skor.benar} ❌ ${lanjut.skor.salah}</div>
+      </div>` : "";
     return `
       <div style="padding-bottom:12px">
         ${SetSoal.renderWidget("vocab", "v")}
+        ${bannerLanjut}
         <div class="sub-menu-grid" style="margin-top:12px">
           ${subFitur.map(f => `
             <div class="sub-card" onclick="Vocab.${f.fn}">
@@ -557,6 +565,7 @@ var Vocab = {
         <div class="hasil-box" id="hasil-vocab"></div>
         <div class="btn-row">
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -573,6 +582,7 @@ var Vocab = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Vocab._jawabKetikHanzi()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -596,6 +606,7 @@ var Vocab = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Vocab._jawabPinyin()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -619,6 +630,7 @@ var Vocab = {
         <div class="btn-row" style="justify-content:center">
           <button class="btn btn-hijau" onclick="Vocab._jawabPinyin()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -643,6 +655,7 @@ var Vocab = {
         <div class="hasil-box" id="hasil-vocab"></div>
         <div class="btn-row">
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -662,6 +675,7 @@ var Vocab = {
         <div class="btn-row">
           <button class="btn btn-hijau" onclick="Vocab._jawabKetikHanzi()">✅ Submit</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -712,6 +726,7 @@ var Vocab = {
         <div class="btn-row">
           <button class="btn btn-merah" id="btn-mic" onclick="Vocab._jawabSuara()">🎤 Mulai Bicara</button>
           <button class="btn btn-kuning" onclick="Vocab._skip()">⏭ Skip</button>
+          <button class="btn btn-hijau" onclick="Vocab.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -907,13 +922,16 @@ var Vocab = {
 
   // ── SELESAI ──────────────────────────────────────────────────
   tampilSelesai() {
+    hapusSesiLanjut("vocab");
     const pct  = sesiSkor.total ? Math.round((sesiSkor.benar / sesiSkor.total) * 100) : 0;
     const emoji = pct >= 80 ? "🏆" : pct >= 60 ? "👍" : "💪";
     App.catatSesiSelesai("vocab", sesiSkor.benar, sesiSkor.total);
+    const belumSelesai = this.soalList && this.idx < this.soalList.length;
     el("konten-utama").innerHTML = `
       <div class="selesai-wrap">
         <div class="selesai-emoji">${emoji}</div>
         <h2>Sesi Selesai!</h2>
+        ${belumSelesai ? `<div class="soal-hint">Diselesaikan lebih awal — ${this.idx}/${this.soalList.length} soal dikerjakan</div>` : ""}
         <div class="selesai-skor">
           <div>✅ Benar: <b>${sesiSkor.benar}</b></div>
           <div>❌ Salah: <b>${sesiSkor.salah}</b></div>
@@ -926,7 +944,41 @@ var Vocab = {
       </div>`;
   },
 
-  kembaliMenu() { TTS.berhenti(); STT.berhenti(); App.renderModul("vocab"); },
+  // Tombol "✅ Selesai" di tengah soal — tampilkan hasil sekarang juga
+  // tanpa harus menjawab semua soal.
+  selesaiSekarang() {
+    TTS.berhenti(); STT.berhenti();
+    hapusSesiLanjut("vocab");
+    this.tampilSelesai();
+  },
+
+  // Simpan progres saat ini supaya bisa dilanjutkan lagi nanti.
+  _simpanLanjut() {
+    if (!this.soalList || !this.soalList.length || this.idx >= this.soalList.length) return;
+    simpanSesiLanjut("vocab", {
+      modeSaat: this.modeSaat,
+      soalList: this.soalList,
+      idx: this.idx,
+      difficulty: this.difficulty,
+      skor: { benar: sesiSkor.benar, salah: sesiSkor.salah, total: sesiSkor.total },
+    });
+  },
+
+  lanjutkanSesi() {
+    const data = ambilSesiLanjut("vocab");
+    if (!data) { tampilToast("⚠️ Tidak ada sesi tersimpan."); return; }
+    hapusSesiLanjut("vocab");
+    this.modeSaat  = data.modeSaat;
+    this.soalList  = data.soalList;
+    this.idx       = data.idx;
+    this.difficulty = data.difficulty || this.difficulty;
+    this.streak    = 0;
+    this._sedangTransisi = false;
+    setSkor(data.skor.benar, data.skor.salah, data.skor.total);
+    this.tampilSoal();
+  },
+
+  kembaliMenu() { TTS.berhenti(); STT.berhenti(); this._simpanLanjut(); App.renderModul("vocab"); },
   _esc(s) { return (s||"").replace(/'/g,"\\'").replace(/"/g,"&quot;"); },
 
   // ── ALL IN entry point ───────────────────────────────────────
