@@ -111,7 +111,45 @@ var Pintar = {
     this._renderMenuUtama();
   },
 
-  kembaliMenu() { TTS.berhenti(); App.renderModul("pintar"); },
+  kembaliMenu() { TTS.berhenti(); this._simpanLanjut(); App.renderModul("pintar"); },
+
+  // Tombol "✅ Selesai" di tengah soal — tampilkan hasil sekarang juga
+  // tanpa harus menghabiskan seluruh antrian.
+  selesaiSekarang() {
+    TTS.berhenti(); STT.berhenti && STT.berhenti();
+    if (this._soalSekarang && this._antrian) this._antrian.unshift(this._soalSekarang);
+    this._soalSekarang = null;
+    this.tampilSelesaiSesi();
+  },
+
+  // Simpan antrian yang tersisa supaya sesi bisa dilanjutkan lagi nanti.
+  _simpanLanjut() {
+    if (!this._antrian || !this._antrian.length) { hapusSesiLanjut("pintar"); return; }
+    const antrianSisa = this._soalSekarang ? [this._soalSekarang, ...this._antrian] : this._antrian;
+    this._soalSekarang = null;
+    simpanSesiLanjut("pintar", {
+      antrian: antrianSisa,
+      totalAwal: this._totalAwal,
+      selesaiSesi: this._selesaiSesi,
+      sesiBaruCount: this._sesiBaruCount || 0,
+      sesiReviewCount: this._sesiReviewCount || 0,
+      skor: { benar: sesiSkor.benar, salah: sesiSkor.salah, total: sesiSkor.total },
+    });
+  },
+
+  lanjutkanSesi() {
+    const data = ambilSesiLanjut("pintar");
+    if (!data) { tampilToast("⚠️ Tidak ada sesi tersimpan."); return; }
+    hapusSesiLanjut("pintar");
+    this._antrian         = data.antrian;
+    this._totalAwal        = data.totalAwal;
+    this._selesaiSesi      = data.selesaiSesi;
+    this._sesiBaruCount    = data.sesiBaruCount;
+    this._sesiReviewCount  = data.sesiReviewCount;
+    this._sedangTransisi   = false;
+    setSkor(data.skor.benar, data.skor.salah, data.skor.total);
+    this.tampilSoal();
+  },
 
   // ================================================================
   //  ONBOARDING / SEED AWAL
@@ -248,8 +286,15 @@ var Pintar = {
     const sisaBaru    = Math.max(0, settings.kuotaBaru - baruHariIni);
     const totalDilacak = semua.length;
     const mantap      = semua.filter(w => w.box >= 5).length;
+    const lanjut = ambilSesiLanjut("pintar");
+    const bannerLanjut = lanjut ? `
+      <div class="soal-wrap sub-card-aktif" style="margin-bottom:14px;cursor:pointer" onclick="Pintar.lanjutkanSesi()">
+        <div class="label-mode" style="margin:0">▶ Lanjutkan Sesi Sebelumnya</div>
+        <div class="soal-hint" style="margin:4px 0 0">${lanjut.antrian.length} soal tersisa — ✅ ${lanjut.skor.benar} ❌ ${lanjut.skor.salah}</div>
+      </div>` : "";
 
     setHTML("konten-utama", `
+      ${bannerLanjut}
       <div class="soal-wrap" style="margin-bottom:14px">
         <div class="label-mode">🧠 Sesi Pintar</div>
         <div class="soal-hint" style="margin-bottom:16px">Review kata yang mulai lupa + kata baru, otomatis dicampur dalam satu sesi.</div>
@@ -447,6 +492,7 @@ var Pintar = {
         <div class="progres-bar"><div class="progres-fill" style="width:${pct}%"></div></div>
         ${bodyHTML}
         <div class="btn-row">
+          <button class="btn btn-hijau" onclick="Pintar.selesaiSekarang()">✅ Selesai</button>
           <button class="btn btn-abu" onclick="Pintar.kembaliMenu()">← Menu</button>
         </div>
       </div>
@@ -600,12 +646,14 @@ var Pintar = {
 
   tampilSelesaiSesi() {
     App.catatSesiSelesai("pintar", sesiSkor.benar, sesiSkor.total);
+    if (this._antrian.length) this._simpanLanjut(); else hapusSesiLanjut("pintar");
     const pct   = sesiSkor.total ? Math.round((sesiSkor.benar / sesiSkor.total) * 100) : 0;
     const emoji = pct >= 80 ? "🏆" : pct >= 60 ? "👍" : "💪";
     setHTML("konten-utama", `
       <div class="selesai-wrap">
         <div class="selesai-emoji">${emoji}</div>
         <h2>Sesi Selesai!</h2>
+        ${this._antrian.length ? `<div class="soal-hint">Diselesaikan lebih awal — masih ada ${this._antrian.length} soal tersisa, tersimpan untuk dilanjutkan</div>` : ""}
         <div class="selesai-skor">
           <div>🌱 Kata baru: <b>${this._sesiBaruCount || 0}</b></div>
           <div>🔁 Review selesai: <b>${this._sesiReviewCount || 0}</b></div>
