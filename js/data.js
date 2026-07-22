@@ -211,6 +211,32 @@ const DB = {
     }
   ],
 
+  // ── NADA SETS — kelompok suku kata sama, beda nada saja ───────
+  //  Dipakai fitur "Fokus Nada" (vocab). Tiap grup berisi 2-4 hanzi
+  //  yang pelafalannya sama persis kecuali nadanya.
+  nadaSets: [
+    { base:"ma",    list:[ {hanzi:"妈", pinyin:"mā", tone:1, arti:"ibu"}, {hanzi:"麻", pinyin:"má", tone:2, arti:"rami/kebas"}, {hanzi:"马", pinyin:"mǎ", tone:3, arti:"kuda"}, {hanzi:"骂", pinyin:"mà", tone:4, arti:"memarahi"} ] },
+    { base:"ba",    list:[ {hanzi:"八", pinyin:"bā", tone:1, arti:"delapan"}, {hanzi:"拔", pinyin:"bá", tone:2, arti:"mencabut"}, {hanzi:"把", pinyin:"bǎ", tone:3, arti:"(kata bantu)"}, {hanzi:"爸", pinyin:"bà", tone:4, arti:"ayah"} ] },
+    { base:"tang",  list:[ {hanzi:"汤", pinyin:"tāng", tone:1, arti:"sup"}, {hanzi:"糖", pinyin:"táng", tone:2, arti:"gula/permen"}, {hanzi:"躺", pinyin:"tǎng", tone:3, arti:"berbaring"}, {hanzi:"烫", pinyin:"tàng", tone:4, arti:"panas (sentuh)"} ] },
+    { base:"wan",   list:[ {hanzi:"弯", pinyin:"wān", tone:1, arti:"melengkung"}, {hanzi:"玩", pinyin:"wán", tone:2, arti:"bermain"}, {hanzi:"晚", pinyin:"wǎn", tone:3, arti:"malam/terlambat"}, {hanzi:"万", pinyin:"wàn", tone:4, arti:"sepuluh ribu"} ] },
+    { base:"shi",   list:[ {hanzi:"诗", pinyin:"shī", tone:1, arti:"puisi"}, {hanzi:"十", pinyin:"shí", tone:2, arti:"sepuluh"}, {hanzi:"使", pinyin:"shǐ", tone:3, arti:"menyuruh"}, {hanzi:"是", pinyin:"shì", tone:4, arti:"adalah"} ] },
+    { base:"qi",    list:[ {hanzi:"七", pinyin:"qī", tone:1, arti:"tujuh"}, {hanzi:"其", pinyin:"qí", tone:2, arti:"itu/nya"}, {hanzi:"起", pinyin:"qǐ", tone:3, arti:"bangun/mulai"}, {hanzi:"气", pinyin:"qì", tone:4, arti:"udara/marah"} ] },
+    { base:"zhu",   list:[ {hanzi:"猪", pinyin:"zhū", tone:1, arti:"babi"}, {hanzi:"竹", pinyin:"zhú", tone:2, arti:"bambu"}, {hanzi:"主", pinyin:"zhǔ", tone:3, arti:"utama/tuan"}, {hanzi:"住", pinyin:"zhù", tone:4, arti:"tinggal"} ] },
+    { base:"guo",   list:[ {hanzi:"锅", pinyin:"guō", tone:1, arti:"panci/wajan"}, {hanzi:"国", pinyin:"guó", tone:2, arti:"negara"}, {hanzi:"果", pinyin:"guǒ", tone:3, arti:"buah"}, {hanzi:"过", pinyin:"guò", tone:4, arti:"melewati/pernah"} ] },
+    { base:"jiao",  list:[ {hanzi:"交", pinyin:"jiāo", tone:1, arti:"menyerahkan/berteman"}, {hanzi:"嚼", pinyin:"jiáo", tone:2, arti:"mengunyah"}, {hanzi:"脚", pinyin:"jiǎo", tone:3, arti:"kaki"}, {hanzi:"叫", pinyin:"jiào", tone:4, arti:"memanggil/bernama"} ] },
+    { base:"gua",   list:[ {hanzi:"瓜", pinyin:"guā", tone:1, arti:"melon"}, {hanzi:"寡", pinyin:"guǎ", tone:3, arti:"janda/sedikit"}, {hanzi:"挂", pinyin:"guà", tone:4, arti:"menggantung"} ] },
+    { base:"tou",   list:[ {hanzi:"偷", pinyin:"tōu", tone:1, arti:"mencuri"}, {hanzi:"头", pinyin:"tóu", tone:2, arti:"kepala"}, {hanzi:"透", pinyin:"tòu", tone:4, arti:"tembus"} ] },
+    { base:"liang", list:[ {hanzi:"凉", pinyin:"liáng", tone:2, arti:"dingin/sejuk"}, {hanzi:"两", pinyin:"liǎng", tone:3, arti:"dua"}, {hanzi:"亮", pinyin:"liàng", tone:4, arti:"terang"} ] },
+    { base:"zhong", list:[ {hanzi:"中", pinyin:"zhōng", tone:1, arti:"tengah"}, {hanzi:"种", pinyin:"zhǒng", tone:3, arti:"jenis/bibit"}, {hanzi:"重", pinyin:"zhòng", tone:4, arti:"berat/penting"} ] },
+    { base:"wang",  list:[ {hanzi:"王", pinyin:"wáng", tone:2, arti:"raja (marga)"}, {hanzi:"网", pinyin:"wǎng", tone:3, arti:"jaring/internet"}, {hanzi:"忘", pinyin:"wàng", tone:4, arti:"lupa"} ] },
+    { base:"mai",   list:[ {hanzi:"买", pinyin:"mǎi", tone:3, arti:"membeli"}, {hanzi:"卖", pinyin:"mài", tone:4, arti:"menjual"} ] },
+    { base:"hua",   list:[ {hanzi:"花", pinyin:"huā", tone:1, arti:"bunga"}, {hanzi:"滑", pinyin:"huá", tone:2, arti:"licin"}, {hanzi:"画", pinyin:"huà", tone:4, arti:"menggambar"} ] },
+    { base:"mei",   list:[ {hanzi:"没", pinyin:"méi", tone:2, arti:"tidak ada"}, {hanzi:"美", pinyin:"měi", tone:3, arti:"indah"}, {hanzi:"妹", pinyin:"mèi", tone:4, arti:"adik perempuan"} ] },
+    { base:"kan",   list:[ {hanzi:"刊", pinyin:"kān", tone:1, arti:"terbitan"}, {hanzi:"砍", pinyin:"kǎn", tone:3, arti:"menebang"}, {hanzi:"看", pinyin:"kàn", tone:4, arti:"melihat"} ] },
+    { base:"xiang", list:[ {hanzi:"香", pinyin:"xiāng", tone:1, arti:"harum"}, {hanzi:"想", pinyin:"xiǎng", tone:3, arti:"ingin/berpikir"}, {hanzi:"象", pinyin:"xiàng", tone:4, arti:"gajah/mirip"} ] },
+    { base:"kao",   list:[ {hanzi:"考", pinyin:"kǎo", tone:3, arti:"ujian"}, {hanzi:"靠", pinyin:"kào", tone:4, arti:"bersandar"} ] },
+  ],
+
   // ── EXAM QUESTIONS (HSK STYLE) ───────────────────────────────
   hsk: {
     listening: [
