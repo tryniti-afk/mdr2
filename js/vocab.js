@@ -26,6 +26,10 @@ var Vocab = {
       { id:"cocok-kata",   icon:"🧩", label:"Cocok Kata",         desc:"Cocokkan Hanzi/Pinyin/Arti/Audio, pilih sendiri kombinasinya", fn:"pilihOpsiCocokKata()" },
       { id:"all-in",       icon:"🔥", label:"All In",              desc:"Review + 6 tipe soal sekaligus!",fn:"mulaiAllIn()" },
       { id:"ai-latihan",   icon:"🤖", label:"Latihan AI",          desc:"Chat/telepon AI, bahas 5 kata sekaligus", fn:"bukaLatihanAI()" },
+      { id:"nada",         icon:"🎵", label:"Fokus Nada",          desc:"Pilihan mirip nada, atau ucapkan & lihat grafik kontur", fn:"bukaFokusNada()" },
+      { id:"shadow",       icon:"🗣️", label:"Shadowing",           desc:"Dengar & tirukan, kata yang meleset ditandai", fn:"bukaShadowing()" },
+      { id:"buat-kalimat", icon:"✍️", label:"Buat Kalimat + Timer", desc:"1 kata → speaking bikin kalimat, dinilai AI", fn:"bukaBuatKalimat()" },
+      { id:"baca-ulang",   icon:"🔁", label:"Baca Berulang",       desc:"Baca sama berkali-kali, lihat progres kecepatan", fn:"bukaBacaUlang()" },
     ];
     return `
       <div style="padding-bottom:12px">
@@ -47,6 +51,12 @@ var Vocab = {
   bukaLatihanAI() {
     el("konten-utama").innerHTML = VocabAIHub.renderMenu();
   },
+
+  // ── FITUR BARU ─────────────────────────────────────────────
+  bukaFokusNada()  { el("konten-utama").innerHTML = ToneModule.renderMenu(); },
+  bukaShadowing()  { ShadowModule.bukaVocab(); },
+  bukaBuatKalimat(){ VocabMakeSentence.buka(); },
+  bukaBacaUlang()  { VocabRepeatRead.buka(); },
 
   _pasangEventMenu() {
     SetSoal._pilihSheet("vocab", SetSoal.get("vocab").sheet, "v");
