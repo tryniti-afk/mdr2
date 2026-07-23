@@ -12,6 +12,9 @@ var ToneModule = {
   idx: 0,
   modeSaat: null,     // "pilihan" | "urutan"
   _recording: false,
+  cfg: { modeSalah: "lanjut" },  // "lanjut" | "ulangDariAwal" | "munculDiAkhir" | "ulang2Sebelumnya"
+  retryQueue: [],
+  _retryAktif: false,
 
   // ── MENU UTAMA ────────────────────────────────────────────────
   renderMenu() {
@@ -56,12 +59,25 @@ var ToneModule = {
           ${this._dispCard("hanzi", "🈯", "Hanzi")}
           ${this._dispCard("pinyin", "🔤", "Pinyin")}
         </div>
+        ${mode === "pilihan" ? `
+        <div style="margin-top:14px">
+          <label style="font-size:13px;color:var(--c-sub);font-weight:700">🎮 Kalau Salah</label>
+          <div class="opsi-grup" style="margin-top:6px;flex-direction:column;align-items:stretch">
+            <button class="opsi aktif-hijau ${this.cfg.modeSalah === 'lanjut' ? 'aktif' : ''}" onclick="ToneModule._pilihModeSalah('lanjut')">➡️ Lanjut Terus</button>
+            <button class="opsi aktif-merah ${this.cfg.modeSalah === 'ulangDariAwal' ? 'aktif' : ''}" onclick="ToneModule._pilihModeSalah('ulangDariAwal')">🔄 Ulang Lagi dari Awal</button>
+            <button class="opsi aktif-kuning ${this.cfg.modeSalah === 'munculDiAkhir' ? 'aktif' : ''}" onclick="ToneModule._pilihModeSalah('munculDiAkhir')">🔁 Muncul Lagi di Akhir</button>
+            <button class="opsi aktif-ungu ${this.cfg.modeSalah === 'ulang2Sebelumnya' ? 'aktif' : ''}" onclick="ToneModule._pilihModeSalah('ulang2Sebelumnya')">🔂 Ulang Sampai Benar, lalu Mundur 2 Soal</button>
+          </div>
+        </div>` : ""}
+        ${renderKontrolLanjut("ToneModule._renderKontrolUlang")}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="ToneModule.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="ToneModule.renderMenu(), el('konten-utama').innerHTML=ToneModule.renderMenu()">← Batal</button>
         </div>
       </div>`;
   },
+  _renderKontrolUlang() { ToneModule.bukaSetup(ToneModule.modeSaat); },
+  _pilihModeSalah(mode) { this.cfg.modeSalah = mode; this.bukaSetup(this.modeSaat); },
   _dispCard(key, icon, label) {
     const aktif = this.disp[key];
     return `
@@ -82,6 +98,8 @@ var ToneModule = {
   async mulai() {
     resetSkor();
     this.idx = 0;
+    this.retryQueue = [];
+    this._retryAktif = false;
     if (this.modeSaat === "pilihan") {
       const sets = (DB.nadaSets || []).filter(s => s.list.length >= 2);
       this.soalList = acak(sets).slice(0, Math.min(10, sets.length));
@@ -118,7 +136,7 @@ var ToneModule = {
     el("konten-utama").innerHTML = `
       <div class="soal-wrap">
         <div class="soal-header">
-          <div class="progres-teks">Soal ${this.idx + 1}/${this.soalList.length}</div>
+          <div class="progres-teks">${this._retryAktif ? "🔂 Ulangi · " : ""}Soal ${this.idx + 1}/${this.soalList.length}</div>
           <div class="skor-mini" id="skor-mini">✅ ${sesiSkor.benar} ❌ ${sesiSkor.salah}</div>
         </div>
         <div class="label-mode">🎯 Pilih hanzi yang sesuai nadanya</div>
@@ -160,7 +178,60 @@ var ToneModule = {
         Jawaban benar: <b>${target.hanzi}</b> (${target.pinyin}) — ${ToneUtil.LABEL[target.tone]}<br>
         <button class="btn-audio" style="margin-top:8px" onclick="TTS.mandarin('${target.hanzi}')">🔊 Dengar lagi</button>`;
     }
-    setTimeout(() => { this._sedangTransisi = false; this.idx++; this.tampilSoalPilihan(); }, benar ? 1600 : 3200);
+    tampilTombolLanjut("hasil-tone", () => this._lanjutSetelahPilihan(benar));
+  },
+
+  _lanjutSetelahPilihan(benar) {
+    this._sedangTransisi = false;
+    const modeSalah = this.cfg.modeSalah;
+    const targetSet = this._targetSet;
+
+    if (benar) {
+      if (this._retryAktif) {
+        // baru saja berhasil di soal yang diulang paksa -> mundur 2 soal
+        this._retryAktif = false;
+        this.idx = Math.max(0, this.idx - 2);
+        tampilToast("↩️ Mundur 2 soal untuk pengulangan...");
+      } else {
+        this.idx++;
+      }
+      this._lanjutCekAntrian();
+      return;
+    }
+
+    // jawaban salah
+    if (modeSalah === "ulangDariAwal") {
+      tampilToast("🔄 Salah! Diulang dari awal...");
+      this.idx = 0;
+      this._retryAktif = false;
+      resetSkor();
+      this.tampilSoalPilihan();
+      return;
+    }
+    if (modeSalah === "munculDiAkhir") {
+      this.retryQueue.push(targetSet);
+      this.idx++;
+      this._lanjutCekAntrian();
+      return;
+    }
+    if (modeSalah === "ulang2Sebelumnya") {
+      this._retryAktif = true;
+      this.tampilSoalPilihan();
+      return;
+    }
+    // default "lanjut"
+    this.idx++;
+    this._lanjutCekAntrian();
+  },
+
+  _lanjutCekAntrian() {
+    if (this.idx >= this.soalList.length && this.retryQueue.length) {
+      tampilToast(`🔁 Mengulang ${this.retryQueue.length} soal yang salah...`);
+      this.soalList = this.retryQueue;
+      this.retryQueue = [];
+      this.idx = 0;
+    }
+    this.tampilSoalPilihan();
   },
 
   // ── MODE B: UCAPKAN & KONTUR ──────────────────────────────────
@@ -221,7 +292,7 @@ var ToneModule = {
         ${ContourChart.svg(contour, ref)}
         <div style="margin-top:8px;text-align:left">${notes.map(n => `<div>${n}</div>`).join("")}</div>`;
       btn.innerText = "✔ Selesai";
-      setTimeout(() => { this.idx++; this.tampilSoalUrutan(); }, 3600);
+      tampilTombolLanjut("hasil-tone", () => { this.idx++; this.tampilSoalUrutan(); });
     } catch (e) {
       this._recording = false;
       tampilToast("❌ " + (e.message || "Gagal mengakses mic."));
