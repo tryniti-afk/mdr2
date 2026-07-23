@@ -53,12 +53,14 @@ var TranslateIn = {
           ${[4,6,8].map(n => `<div class="sub-card ${this.jumlah===n?"sub-card-aktif":""}" onclick="TranslateIn._pilihJumlah(${n})"><div class="sub-label">${n} soal</div></div>`).join("")}
         </div>
 
+        ${renderKontrolLanjut("TranslateIn._renderUlangSetup")}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="TranslateIn.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="Sentence.kembaliMenu()">← Batal</button>
         </div>
       </div>`;
   },
+  _renderUlangSetup() { el("konten-utama").innerHTML = TranslateIn.renderSetup(); },
   _speedPreset: 0,
   _pilihPreset(i) {
     this._speedPreset = i;
@@ -220,7 +222,7 @@ Balas HANYA JSON valid: {"benar": true/false, "feedback": "1-2 kalimat penjelasa
         <div style="margin-top:6px;font-size:12px;color:#777">Kecepatan berikutnya: <b>${this.speedSteps[this.speedIdx]}x</b></div>`;
     }
     setHTML("skor-mini", `✅ ${this.skor.benar} ❌ ${this.skor.salah}`);
-    setTimeout(() => { this.idx++; this._nextSoal(); }, 4200);
+    tampilTombolLanjut("hasil-ti", () => { this.idx++; this._nextSoal(); });
   },
 
   _selesai() {
