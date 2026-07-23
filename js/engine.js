@@ -57,6 +57,11 @@ const STT = {
   berhenti() {
     try { if (this.rec) this.rec.abort(); } catch(e) {}
     this.rec = null;
+  },
+  // Berhenti "halus": tetap memicu onresult/onend dengan hasil yang sudah
+  // tertangkap sejauh ini (beda dari berhenti() yang membatalkan total).
+  berhentiHalus() {
+    try { if (this.rec) this.rec.stop(); } catch(e) {}
   }
 };
 
@@ -521,3 +526,68 @@ function resetKb() {
 }
 
 
+
+// ================================================================
+//  LANJUT CONTROL — pengaturan global "lanjut otomatis / manual"
+//  Dipakai bersama oleh Psikotes, Fokus Nada, Shadowing,
+//  Buat Kalimat, Translate In, dll supaya konsisten.
+// ================================================================
+const LanjutCfg = {
+  KEY: "mdr_lanjut_cfg",
+  get() {
+    let cfg = { mode: "auto", detik: 3 };
+    try { cfg = Object.assign(cfg, JSON.parse(localStorage.getItem(this.KEY) || "{}")); } catch (e) {}
+    return cfg;
+  },
+  set(patch) {
+    const cfg = Object.assign(this.get(), patch);
+    try { localStorage.setItem(this.KEY, JSON.stringify(cfg)); } catch (e) {}
+    return cfg;
+  },
+};
+
+// Blok UI kecil untuk dipasang di layar setup modul manapun.
+// renderFnGlobal = nama fungsi global (string) yang akan dipanggil untuk
+// me-render ulang tampilan setelah pengaturan berubah (mis. "Vocab._renderSetupNada").
+function renderKontrolLanjut(renderFnGlobal) {
+  const cfg = LanjutCfg.get();
+  return `
+    <div style="margin-top:12px">
+      <label style="font-size:13px;color:var(--c-sub);font-weight:700">⏭️ Lanjut ke Soal Berikutnya</label>
+      <div class="opsi-grup" style="margin-top:6px">
+        <button class="opsi ${cfg.mode === "auto" ? "aktif" : ""}" onclick="LanjutCfg.set({mode:'auto'}); ${renderFnGlobal}();">⏱️ Otomatis</button>
+        <button class="opsi ${cfg.mode === "manual" ? "aktif" : ""}" onclick="LanjutCfg.set({mode:'manual'}); ${renderFnGlobal}();">👆 Manual (klik tombol)</button>
+      </div>
+      ${cfg.mode === "auto" ? `
+      <div style="margin-top:8px">
+        <label style="font-size:12.5px;color:var(--c-sub)">Jeda otomatis (detik):</label><br>
+        <input type="number" class="quiz-select" style="max-width:100px;margin-top:4px" min="1" max="15" value="${cfg.detik}"
+          onchange="LanjutCfg.set({detik: Math.max(1, parseInt(this.value)||3)}); ${renderFnGlobal}();">
+      </div>` : `<p style="font-size:12px;color:var(--c-sub);margin-top:6px">Tombol "➡️ Lanjut" akan muncul setelah tiap jawaban/putaran, kamu klik sendiri kapan mau lanjut.</p>`}
+    </div>
+  `;
+}
+
+// Jadwalkan lanjut ke soal berikutnya: otomatis (setTimeout) atau
+// menunggu klik tombol manual yang disisipkan ke dalam containerId.
+// - containerId: id elemen tempat tombol manual disisipkan (mis. hasil box)
+// - callback: fungsi yang dijalankan saat waktunya lanjut
+// - teksTombol: label tombol manual (opsional)
+function tampilTombolLanjut(containerId, callback, teksTombol) {
+  const cfg = LanjutCfg.get();
+  if (cfg.mode === "manual") {
+    const c = el(containerId);
+    if (c) {
+      const btn = document.createElement("div");
+      btn.className = "btn-row";
+      btn.style.cssText = "justify-content:center;margin-top:10px";
+      btn.innerHTML = `<button class="btn btn-hijau">${teksTombol || "➡️ Lanjut"}</button>`;
+      btn.querySelector("button").onclick = callback;
+      c.appendChild(btn);
+    } else {
+      setTimeout(callback, (cfg.detik || 3) * 1000);
+    }
+  } else {
+    setTimeout(callback, (cfg.detik || 3) * 1000);
+  }
+}
