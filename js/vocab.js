@@ -2428,18 +2428,57 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
         ${hasil.perbaikan ? `<div style="margin-top:4px;font-size:13px;color:var(--c-hijau)">✏️ Versi lebih pas: <b>${(hasil.perbaikan||'').replace(/</g,"&lt;")}</b></div>` : ""}
       `;
     }
+    // Selalu tawarkan 2 pilihan: perbaiki & isi ulang, atau lanjut ke kata berikutnya
     const btnRow = el("kalimat-btn-row");
-    if (this.autoLanjutKalimat) {
-      if (btnRow) btnRow.innerHTML = `<div style="font-size:12px;color:var(--c-sub)">⏳ Lanjut otomatis...</div>`;
-      setTimeout(() => this._lanjutKalimat(), (hasil.saran || hasil.perbaikan) ? 3200 : 1600);
-    } else {
-      if (btnRow) btnRow.innerHTML = `<button class="btn btn-biru" onclick="AllIn._lanjutKalimat()">▶ Lanjut</button>`;
+    if (btnRow) {
+      btnRow.innerHTML = `
+        <button class="btn btn-kuning" onclick="AllIn._perbaikiKalimat()">🔁 Perbaiki &amp; Isi Lagi</button>
+        <button class="btn btn-biru" onclick="AllIn._lanjutKalimat()">▶ Lanjut</button>
+      `;
     }
+    // Kalau mode auto-lanjut aktif, tetap otomatis maju setelah beberapa detik —
+    // TAPI dibatalkan otomatis kalau user pilih "Perbaiki & Isi Lagi" atau klik "Lanjut" duluan.
+    if (this._kalimatAutoTimer) { clearTimeout(this._kalimatAutoTimer); this._kalimatAutoTimer = null; }
+    if (this.autoLanjutKalimat) {
+      const hint = document.createElement("div");
+      hint.id = "kalimat-auto-hint";
+      hint.style.cssText = "text-align:center;font-size:11px;color:var(--c-sub);margin-top:6px";
+      hint.textContent = "⏳ Otomatis lanjut sebentar lagi — pilih \"Perbaiki\" kalau mau isi ulang dulu.";
+      btnRow && btnRow.parentNode && btnRow.parentNode.appendChild(hint);
+      this._kalimatAutoTimer = setTimeout(() => this._lanjutKalimat(), (hasil.saran || hasil.perbaikan) ? 4500 : 2000);
+    }
+  },
+
+  // Batalkan auto-lanjut & buka lagi input supaya user bisa memperbaiki & submit ulang
+  _perbaikiKalimat() {
+    if (this._kalimatAutoTimer) { clearTimeout(this._kalimatAutoTimer); this._kalimatAutoTimer = null; }
+    const hint = el("kalimat-auto-hint");
+    if (hint) hint.remove();
+    this._sedang = false;
+
+    const btnRow = el("kalimat-btn-row");
+    if (btnRow) {
+      btnRow.innerHTML = `
+        <button class="btn btn-hijau" id="btn-submit-kalimat" onclick="AllIn._submitKalimat()">✅ Submit Kalimat</button>
+        <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>`;
+    }
+    const hEl = el("hasil-ai");
+    if (hEl) hEl.innerHTML += `<div style="margin-top:8px;font-size:12px;color:var(--c-biru)">✏️ Perbaiki kalimatmu di bawah, lalu submit lagi.</div>`;
+
+    const inp = el("input-kalimat");
+    if (inp) {
+      inp.disabled = false;
+      inp.focus();
+      if (inp.select) inp.select();
+    }
+    const rek = el("btn-rekam-kalimat");
+    if (rek) rek.disabled = false;
   },
 
   // Lanjut ke kata berikutnya (khusus step "Buat Kalimat" — selalu maju,
   // tidak pakai retry mode easy/hard/ambil karena ini soal open-ended)
   _lanjutKalimat() {
+    if (this._kalimatAutoTimer) { clearTimeout(this._kalimatAutoTimer); this._kalimatAutoTimer = null; }
     this._sedang = false;
     this.wordIdx++;
     this._tampilSoalAllIn();
