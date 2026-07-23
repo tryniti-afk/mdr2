@@ -48,12 +48,14 @@ var VocabMakeSentence = {
             </div>`).join("")}
         </div>
 
+        ${renderKontrolLanjut("VocabMakeSentence._renderUlangSetup")}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="VocabMakeSentence.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
         </div>
       </div>`;
   },
+  _renderUlangSetup() { el("konten-utama").innerHTML = VocabMakeSentence.renderSetup(); },
   _card(key, icon, label) {
     const aktif = this.disp[key];
     return `<div class="sub-card ${aktif?"sub-card-aktif":""}" onclick="VocabMakeSentence._toggle('${key}')">
@@ -142,9 +144,9 @@ var VocabMakeSentence = {
     const hEl = el("hasil-vms");
     hEl.style.display = "block"; hEl.className = "hasil-box info";
     if (!this._sttResult) {
-      hEl.innerHTML = "⚠️ Tidak ada suara terdeteksi. Lanjut ke soal berikutnya...";
+      hEl.innerHTML = "⚠️ Tidak ada suara terdeteksi.";
       tambahSkor(false);
-      setTimeout(() => { this.idx++; this._alreadyShown = false; this.tampilSoal(); }, 2200);
+      tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
       return;
     }
     hEl.innerHTML = `🤖 Menilai kalimat kamu dengan AI...<br><i>"${this._sttResult}"</i>`;
@@ -165,7 +167,7 @@ Jawab ringkas, maksimal 5 kalimat total.`;
     } catch (e) {
       hEl.innerHTML = `<div><b>Kamu:</b> "${this._sttResult}"</div><div style="margin-top:8px;color:#f44336">⚠️ ${e.message}</div>`;
     }
-    setTimeout(() => { this.idx++; this._alreadyShown = false; this.tampilSoal(); }, 6500);
+    tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
   },
 
   _selesai() {
@@ -222,12 +224,14 @@ var VocabRepeatRead = {
           <div class="sub-card ${this.tampilkanPinyin?"sub-card-aktif":""}" onclick="VocabRepeatRead._pilihBool(true)"><div class="sub-label">Hanzi + Pinyin</div></div>
         </div>
 
+        ${renderKontrolLanjut("VocabRepeatRead._renderUlangSetup")}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="VocabRepeatRead.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
         </div>
       </div>`;
   },
+  _renderUlangSetup() { el("konten-utama").innerHTML = VocabRepeatRead.renderSetup(); },
   _pilih(key, val) { this[key] = val; el("konten-utama").innerHTML = this.renderSetup(); },
   _pilihBool(val) { this.tampilkanPinyin = val; el("konten-utama").innerHTML = this.renderSetup(); },
 
@@ -261,6 +265,7 @@ var VocabRepeatRead = {
         <div class="hasil-box" id="hasil-vrr" style="display:none"></div>
         <div class="btn-row">
           <button class="btn btn-merah" id="btn-vrr-mulai" onclick="VocabRepeatRead._mulaiBaca()">🎤 Mulai Baca</button>
+          <button class="btn btn-kuning" id="btn-vrr-stop" style="display:none" onclick="VocabRepeatRead._berhentiManual()">⏹ Berhenti (Sudah Selesai Baca)</button>
           <button class="btn btn-abu" onclick="VocabRepeatRead.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
@@ -269,6 +274,9 @@ var VocabRepeatRead = {
   _mulaiBaca() {
     const btn = el("btn-vrr-mulai");
     btn.disabled = true; btn.innerText = "🎙️ Membaca...";
+    const stopBtn = el("btn-vrr-stop");
+    if (stopBtn) stopBtn.style.display = "inline-block";
+    this._sudahSelesaiBaca = false;
     this._startT = performance.now();
     this._swInterval = setInterval(() => {
       setTeks("vrr-stopwatch", ((performance.now() - this._startT) / 1000).toFixed(1) + "s");
@@ -280,7 +288,18 @@ var VocabRepeatRead = {
     );
   },
 
+  // Tombol manual kalau user sudah selesai membaca sebelum STT
+  // otomatis mendeteksi jeda diam (mis. lingkungan bising).
+  _berhentiManual() {
+    if (this._sudahSelesaiBaca) return;
+    STT.berhentiHalus();
+  },
+
   _selesaiBaca(hasil) {
+    if (this._sudahSelesaiBaca) return;
+    this._sudahSelesaiBaca = true;
+    const stopBtn = el("btn-vrr-stop");
+    if (stopBtn) stopBtn.style.display = "none";
     clearInterval(this._swInterval);
     const detik = (performance.now() - this._startT) / 1000;
     this.waktuPutaran.push(detik);
@@ -295,7 +314,7 @@ var VocabRepeatRead = {
       ${salah.length ? `⚠️ Kemungkinan kurang jelas: <b>${salah.join(" ")}</b>` : "✅ Semua karakter terdengar!"}
     `;
     setTeks("btn-vrr-mulai", "✔ Selesai");
-    setTimeout(() => { this.putaranSaat++; this.tampilSoal(); }, 2400);
+    tampilTombolLanjut("hasil-vrr", () => { this.putaranSaat++; this.tampilSoal(); });
   },
 
   _selesai() {
