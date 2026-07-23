@@ -236,6 +236,10 @@ var Psikotes = {
           </div>
         </div>
 
+        <div class="pk-card">
+          ${renderKontrolLanjut("Psikotes._renderSetupLatihan")}
+        </div>
+
         <p class="pk-hint" style="text-align:center">💡 Trik cepat &amp; saran otomatis pakai AI (Gemini) kalau API key sudah diisi di fitur AI lain — kalau belum, tetap ada saran umum.</p>
 
         <div class="btn-row" style="justify-content:center">
@@ -393,7 +397,7 @@ var Psikotes = {
       this.state.skor.benar++;
       if (hasilEl) { hasilEl.style.display = "block"; hasilEl.className = "hasil-box benar"; hasilEl.innerText = "✅ Benar!"; }
       this._updateSkorMiniLatihan();
-      setTimeout(() => { this.state.sedangTransisi = false; this._advance(); }, 1200);
+      tampilTombolLanjut("pk-hasil", () => { this.state.sedangTransisi = false; this._advance(); });
     } else {
       tambahSkor(false);
       this.state.skor.salah++;
@@ -405,12 +409,11 @@ var Psikotes = {
       this._tampilkanTrik(soal);
       this._updateSkorMiniLatihan();
       if (this.cfg.modeSalah === "akhirKategori") this.state.retryQueue.push(soal);
-      const jeda = this.cfg.modeSalah === "ulangSampaiBenar" ? 2200 : 2600;
-      setTimeout(() => {
+      tampilTombolLanjut("pk-hasil", () => {
         this.state.sedangTransisi = false;
         if (this.cfg.modeSalah === "ulangSampaiBenar") this._tampilSoalLatihan(true);
         else this._advance();
-      }, jeda);
+      });
     }
   },
 
@@ -425,15 +428,15 @@ var Psikotes = {
 
     if (benar) {
       if (hasilEl) { hasilEl.style.display = "block"; hasilEl.className = "hasil-box benar"; hasilEl.innerText = "✅ Benar! Mundur 2 soal untuk pengulangan..."; }
-      setTimeout(() => {
+      tampilTombolLanjut("pk-hasil", () => {
         this.state.sedangTransisi = false;
         this.state.queuePtr = Math.max(0, this.state.queuePtr - 2);
         this._simpanLanjut();
         this._tampilSoalLatihan();
-      }, 1400);
+      });
     } else {
       if (hasilEl) { hasilEl.style.display = "block"; hasilEl.className = "hasil-box salah"; hasilEl.innerText = "❌ Masih salah, coba lagi..."; }
-      setTimeout(() => { this.state.sedangTransisi = false; this._tampilSoalLatihan(true); }, 1400);
+      tampilTombolLanjut("pk-hasil", () => { this.state.sedangTransisi = false; this._tampilSoalLatihan(true); }, "🔁 Coba Lagi");
     }
   },
 
