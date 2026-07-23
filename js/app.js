@@ -12,6 +12,7 @@ var MODUL_CFG = {
   reading:   { label:"📰 Reading",     obj:"Reading",  icon:"📰" },
   writing:   { label:"✍️ Writing",     obj:"Writing",  icon:"✍️" },
   speaking:  { label:"🎤 Speaking",    obj:"Speaking", icon:"🎤" },
+  psikotes:  { label:"🧩 Psikotes",    obj:"Psikotes", icon:"🧩" },
   exam:      { label:"🧪 Exam Mode",   obj:"Exam",     icon:"🧪" },
   quiz:      { label:"🎯 Kuis Bebas",  obj:"Quiz",     icon:"🎯" },
 };
