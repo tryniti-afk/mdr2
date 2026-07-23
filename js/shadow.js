@@ -32,12 +32,14 @@ var ShadowModule = {
           <div class="sub-label">Sertakan Grafik Kontur Nada</div>
           <div class="sub-desc">${this.pakaiKontur ? "Aktif — ada rekaman tambahan per kalimat" : "Nonaktif — hanya cek teks lewat STT"}</div>
         </div>
+        ${renderKontrolLanjut("ShadowModule._renderUlangSetup")}
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="ShadowModule.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="${this.ctx === "vocab" ? "Vocab.kembaliMenu()" : "Sentence.kembaliMenu()"}">← Batal</button>
         </div>
       </div>`;
   },
+  _renderUlangSetup() { el("konten-utama").innerHTML = ShadowModule.renderSetup(); },
   _card(key, icon, label, desc) {
     const aktif = this.disp[key];
     return `
@@ -122,7 +124,7 @@ var ShadowModule = {
           <div style="margin-top:6px;font-size:20px;letter-spacing:1px">${diffHTML}</div>
           <div style="margin-top:6px;font-size:12px;color:#777">Hijau = cocok, merah = meleset/kurang jelas. Kamu ucapkan: "${hasil}"</div>`;
         btn.innerText = "✔ Selesai";
-        setTimeout(() => { this.idx++; this.tampilSoal(); }, 3200);
+        tampilTombolLanjut("hasil-shadow", () => { this.idx++; this.tampilSoal(); });
       },
       err => { setTeks("hasil-shadow", "❌ Error mic: " + err); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; },
       dapat => { if (!dapat) { setTeks("hasil-shadow", "⚠️ Tidak terdeteksi."); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; } }
