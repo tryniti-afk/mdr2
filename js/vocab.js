@@ -1487,10 +1487,16 @@ var AllIn = {
     { id:"hanzi-pinyin",     label:"Hanzi → Pinyin",         icon:"🔤", tipe:"ketik-pinyin",  star:false },
     { id:"indo-pinyin",      label:"Arti → Pinyin",          icon:"🔠", tipe:"ketik-pinyin",  star:false },
     { id:"arti-hanzi",       label:"Arti → Hanzi",           icon:"✍️", tipe:"ketik-hanzi",   star:true },
+    { id:"buat-kalimat",     label:"Buat Kalimat",           icon:"📝", tipe:"buat-kalimat", star:true },
   ],
 
   // Step default yang aktif (bisa diubah user di opsi)
   activeStepIds: ["audio-arti","hanzi-indo","audio-hanzi","hanzi-pinyin","indo-pinyin","arti-hanzi"],
+
+  // ── Pengaturan khusus step "Buat Kalimat" ──────────────────────
+  modeKalimat: "hanzi",        // default cara menjawab: 'pinyin-nada' | 'pinyin-polos' | 'speaking' | 'hanzi'
+  autoLanjutKalimat: true,     // true = otomatis lanjut setelah dapat saran, false = tunggu tombol "Lanjut"
+  _kalimatInfoCache: {},       // cache penjelasan+contoh kalimat per hanzi (biar tidak fetch AI berulang)
 
   get STEPS() {
     const order = this._stepOrder && this._stepOrder.length
@@ -1750,11 +1756,44 @@ var AllIn = {
             </div>
           </div>`;
         })() : ''}
+        ${step.id === 'buat-kalimat' ? `
+          <div style="margin-bottom:14px">
+            <div class="ss-label" style="margin-bottom:6px;font-size:13px;color:var(--c-sub)">✍️ Cara Menjawab Default (bisa diganti saat soal)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+              <button class="ss-btn ${this.modeKalimat==='pinyin-nada'?'aktif':''}"
+                onclick="AllIn._setModeKalimatDefault('pinyin-nada')">🎯 Pinyin+Nada</button>
+              <button class="ss-btn ${this.modeKalimat==='pinyin-polos'?'aktif':''}"
+                onclick="AllIn._setModeKalimatDefault('pinyin-polos')">🔤 Pinyin Polos</button>
+              <button class="ss-btn ${this.modeKalimat==='speaking'?'aktif':''}"
+                onclick="AllIn._setModeKalimatDefault('speaking')">🎙️ Ngomong</button>
+              <button class="ss-btn ${this.modeKalimat==='hanzi'?'aktif':''}"
+                onclick="AllIn._setModeKalimatDefault('hanzi')">✍️ Ketik Hanzi</button>
+            </div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div class="ss-label" style="margin-bottom:6px;font-size:13px;color:var(--c-sub)">⏭️ Setelah Muncul Saran</div>
+            <div style="display:flex;gap:8px;justify-content:center">
+              <button class="ss-btn ${this.autoLanjutKalimat?'aktif':''}"
+                onclick="AllIn._setAutoLanjutKalimat(true)">⚡ Otomatis Lanjut</button>
+              <button class="ss-btn ${!this.autoLanjutKalimat?'aktif':''}"
+                onclick="AllIn._setAutoLanjutKalimat(false)">🖐️ Manual (baca dulu)</button>
+            </div>
+          </div>` : ''}
         <div class="btn-row" style="justify-content:center">
           <button class="btn btn-hijau" onclick="AllIn._mulaiStep()">▶ Mulai Tahap Ini</button>
           <button class="btn btn-abu" onclick="AllIn.mulaiPreview()">← Review Kata Lagi</button>
         </div>
       </div>`;
+  },
+
+  _setModeKalimatDefault(v) {
+    this.modeKalimat = v;
+    this._tampilStepIntro();
+  },
+
+  _setAutoLanjutKalimat(v) {
+    this.autoLanjutKalimat = v;
+    this._tampilStepIntro();
   },
 
   _setPinyinStrictInline(v) {
@@ -1787,6 +1826,7 @@ var AllIn = {
       "arti-hanzi":       "Lihat arti Indonesia → ketik karakter Hanzi-nya.",
       "audio-hanzi-arti": "Dengarkan audio + lihat Hanzi → pilih arti yang benar (4 pilihan).",
       "hanzi-arti-suara": "Lihat Hanzi → ucapkan artinya dengan suara.",
+      "buat-kalimat":     "Baca penjelasan & contoh kalimat, lalu buat kalimatmu sendiri memakai kata ini (bebas pinyin bertanda nada, pinyin polos, ngomong, atau ketik Hanzi).",
     };
     return m[id] || "";
   },
@@ -2134,12 +2174,292 @@ var AllIn = {
         </div>`;
     }
 
+    if (id === "buat-kalimat") {
+      const mode = this._modeKalimatAktif || this.modeKalimat || "hanzi";
+      const modeBtn = (m, ic, lb) => `<button class="ss-btn ${mode===m?'aktif':''}"
+        onclick="AllIn._pilihModeKalimat('${m}')" style="font-size:12px">${ic} ${lb}</button>`;
+      return `
+        <div class="soal-wrap">
+          <div class="label-mode">📝 Buat Kalimat</div>
+          <div class="soal-hanzi" style="margin-bottom:2px">${item.hanzi}
+            <button style="background:none;border:none;cursor:pointer;font-size:16px;vertical-align:middle"
+              onclick="TTS.mandarin('${safeEsc(item.hanzi)}')">🔊</button>
+          </div>
+          <div style="text-align:center;font-size:13px;color:var(--c-biru);margin-bottom:2px">${item.pinyin||''}</div>
+          <div style="text-align:center;font-size:13px;color:var(--c-sub);margin-bottom:10px">${item.arti||''}</div>
+          <div id="kalimat-info-box" style="background:var(--c-card);border:1.5px solid var(--c-border);
+            border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:13px;line-height:1.5">
+            ⏳ Memuat penjelasan &amp; contoh kalimat...
+          </div>
+          <div class="soal-hint" style="margin-bottom:8px">Sekarang buat kalimatmu sendiri pakai kata ini. Pilih cara menjawab:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px">
+            ${modeBtn('pinyin-nada','🎯','Pinyin+Nada')}
+            ${modeBtn('pinyin-polos','🔤','Pinyin Polos')}
+            ${modeBtn('speaking','🎙️','Ngomong')}
+            ${modeBtn('hanzi','✍️','Ketik Hanzi')}
+          </div>
+          <div id="kalimat-input-area">${this._renderInputKalimat(mode)}</div>
+          <div class="hasil-box" id="hasil-ai"></div>
+          <div class="btn-row" style="justify-content:center" id="kalimat-btn-row">
+            <button class="btn btn-hijau" id="btn-submit-kalimat" onclick="AllIn._submitKalimat()">✅ Submit Kalimat</button>
+            <button class="btn btn-abu" onclick="AllIn._skipAllIn()">⏭ Skip</button>
+          </div>
+        </div>`;
+    }
+
     return `<div class="soal-wrap"><div class="soal-hint">Step tidak dikenal.</div></div>`;
+  },
+
+  // ── INPUT AREA UNTUK STEP "BUAT KALIMAT" (tergantung mode) ──
+  _renderInputKalimat(mode) {
+    if (mode === 'speaking') {
+      return `
+        <div style="text-align:center">
+          <div id="speaking-status" style="margin:6px 0;font-size:13px;color:var(--c-sub)">
+            Tekan rekam lalu ucapkan kalimatmu dalam bahasa Mandarin
+          </div>
+          <button class="btn btn-hijau" id="btn-rekam-kalimat" onclick="AllIn._rekamKalimat()">🎙️ Rekam Kalimat</button>
+          <div id="kalimat-transkrip" style="margin-top:8px;font-size:16px;font-weight:700;min-height:22px"></div>
+        </div>`;
+    }
+    const placeholder = mode === 'pinyin-nada' ? "Tulis kalimat pinyin dengan tanda nada..."
+      : mode === 'pinyin-polos' ? "Tulis kalimat pinyin tanpa tanda nada..."
+      : "Ketik kalimat pakai Hanzi...";
+    return `<input type="text" id="input-kalimat" class="input-jawab" placeholder="${placeholder}"
+      autocomplete="off" style="display:block;width:100%;box-sizing:border-box">`;
+  },
+
+  _pilihModeKalimat(m) {
+    this._modeKalimatAktif = m;
+    this._kalimatTranskrip = "";
+    const cont = el("kalimat-input-area");
+    if (cont) cont.innerHTML = this._renderInputKalimat(m);
+    if (m !== 'speaking') {
+      setTimeout(() => {
+        const inp = el("input-kalimat");
+        if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === "Enter") AllIn._submitKalimat(); }; }
+      }, 50);
+    }
+  },
+
+  // ── MUAT PENJELASAN + CONTOH KALIMAT DARI AI (dengan cache) ──
+  async _muatInfoKalimat(item) {
+    const cacheKey = item.hanzi;
+    if (this._kalimatInfoCache[cacheKey]) {
+      this._tampilInfoKalimat(this._kalimatInfoCache[cacheKey]);
+      return;
+    }
+    try {
+      const prompt = `Kamu guru bahasa Mandarin. Untuk kata "${item.hanzi}" (pinyin: ${item.pinyin||'?'}, arti: ${item.arti||'?'}):
+1. Jelaskan singkat (2-3 kalimat, bahasa Indonesia) kata ini biasa dipakai untuk apa saja / dalam konteks apa.
+2. Berikan SATU contoh kalimat Mandarin natural yang memakai kata ini.
+
+Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
+{
+  "penjelasan": "penjelasan penggunaan kata, bahasa Indonesia",
+  "contoh_hanzi": "kalimat contoh hanzi",
+  "contoh_pinyin": "pinyin bertanda nada",
+  "contoh_arti": "terjemahan bahasa Indonesia"
+}`;
+      const raw = await SentenceVocab._callAI([{ role: "user", content: prompt }], 400);
+      const parsed = this._parseJSONAman(raw);
+      if (!parsed) throw new Error("Gagal memproses balasan AI.");
+      this._kalimatInfoCache[cacheKey] = parsed;
+      // Cegah race condition kalau user sudah pindah soal saat fetch masih jalan
+      if (this._currentItem() && this._currentItem().hanzi === item.hanzi) {
+        this._tampilInfoKalimat(parsed);
+      }
+    } catch (e) {
+      const box = el("kalimat-info-box");
+      if (box) {
+        box.innerHTML = `⚠️ Gagal memuat penjelasan AI (${(e.message||'error').replace(/</g,"&lt;")}).
+          Kamu tetap bisa buat kalimat sendiri memakai kata <b>${item.hanzi}</b>.`;
+      }
+    }
+  },
+
+  _tampilInfoKalimat(info) {
+    const box = el("kalimat-info-box");
+    if (!box) return;
+    box.innerHTML = `
+      <div><b>💡 Kegunaan:</b> ${(info.penjelasan||'').replace(/</g,"&lt;")}</div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--c-border)">
+        <b>📌 Contoh:</b> <span style="font-weight:700">${(info.contoh_hanzi||'').replace(/</g,"&lt;")}</span><br>
+        <span style="color:var(--c-biru);font-size:12px">${(info.contoh_pinyin||'').replace(/</g,"&lt;")}</span><br>
+        <span style="font-size:12px;color:var(--c-sub)">${(info.contoh_arti||'').replace(/</g,"&lt;")}</span>
+      </div>`;
+  },
+
+  // Parse JSON dari balasan AI dengan aman (toleran markdown fence dsb)
+  _parseJSONAman(raw) {
+    try {
+      const clean = (raw||"").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      return JSON.parse(clean);
+    } catch (e) {
+      const m = (raw||"").match(/\{[\s\S]*\}/);
+      if (m) { try { return JSON.parse(m[0]); } catch (e2) {} }
+    }
+    return null;
+  },
+
+  // ── REKAM KALIMAT (mode "Ngomong") ───────────────────────────
+  _rekamKalimat() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      const st = el("speaking-status");
+      if (st) st.textContent = "❌ Browser tidak mendukung speech recognition. Gunakan Chrome.";
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this._srKalimat = new SR();
+    this._srKalimat.lang = "zh-CN";
+    this._srKalimat.interimResults = false;
+    this._srKalimat.maxAlternatives = 3;
+
+    const st = el("speaking-status");
+    const btn = el("btn-rekam-kalimat");
+    if (st) st.textContent = "🎙️ Sedang mendengarkan...";
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Rekam..."; }
+
+    this._srKalimat.onresult = (e) => {
+      const t = e.results[0][0].transcript.trim();
+      this._kalimatTranskrip = t;
+      const tEl = el("kalimat-transkrip");
+      if (tEl) tEl.textContent = t;
+      if (st) st.textContent = "✅ Terekam. Bisa rekam ulang atau langsung Submit.";
+    };
+    this._srKalimat.onerror = (e) => {
+      if (st) st.textContent = `❌ Error: ${e.error}. Coba lagi.`;
+      if (btn) { btn.disabled = false; btn.textContent = "🎙️ Rekam Kalimat"; }
+    };
+    this._srKalimat.onend = () => {
+      if (btn) { btn.disabled = false; btn.textContent = "🎙️ Rekam Ulang"; }
+    };
+    this._srKalimat.start();
+  },
+
+  // ── SUBMIT KALIMAT ────────────────────────────────────────────
+  async _submitKalimat() {
+    if (this._sedang) return;
+    const mode = this._modeKalimatAktif || this.modeKalimat || "hanzi";
+    let jawabanUser = "";
+    if (mode === 'speaking') {
+      jawabanUser = (this._kalimatTranskrip || "").trim();
+      if (!jawabanUser) { tampilToast("Rekam kalimatmu dulu!"); return; }
+    } else {
+      const inp = el("input-kalimat");
+      jawabanUser = inp ? inp.value.trim() : "";
+      if (!jawabanUser) return;
+    }
+
+    this._sedang = true;
+    const item = this._currentItem();
+    const si = this.stepIdx, wi = this._origIdx(item);
+    const waktuMulai = this._stat[wi][si].waktuMulai || Date.now();
+    this._stat[wi][si].waktuTotal += (Date.now() - waktuMulai);
+
+    const hEl = el("hasil-ai");
+    if (hEl) { hEl.className = "hasil-box"; hEl.innerHTML = "⏳ Memeriksa kalimatmu..."; }
+    const btnRow = el("kalimat-btn-row");
+    if (btnRow) btnRow.querySelectorAll("button").forEach(b => b.disabled = true);
+    const inpEl = el("input-kalimat");
+    if (inpEl) inpEl.disabled = true;
+    const rekEl = el("btn-rekam-kalimat");
+    if (rekEl) rekEl.disabled = true;
+
+    let hasil;
+    try {
+      hasil = await this._nilaiKalimat(jawabanUser, mode, item);
+    } catch (e) {
+      // AI gagal/tidak ada API key → jangan blokir siswa, tetap lanjut tanpa saran
+      hasil = { benar: true, saran: `⚠️ Tidak bisa memeriksa via AI (${(e.message||'error')}).`, perbaikan: "" };
+    }
+
+    if (!hasil.benar) { this._errorCount[wi][si]++; this._stat[wi][si].salah++; }
+    this._tampilHasilKalimat(hasil, jawabanUser, mode);
+  },
+
+  // ── NILAI KALIMAT VIA AI ──────────────────────────────────────
+  async _nilaiKalimat(jawabanUser, mode, item) {
+    const modeDesc = {
+      'pinyin-nada':  "Jawaban siswa ditulis dalam PINYIN dengan tanda nada.",
+      'pinyin-polos': "Jawaban siswa ditulis dalam PINYIN TANPA tanda nada — jangan nilai soal nada.",
+      'speaking':     "Jawaban siswa berasal dari hasil pengenalan suara (speech-to-text), jadi mungkin ada typo kecil dari mesin, jangan terlalu ketat soal itu.",
+      'hanzi':        "Jawaban siswa ditulis dalam karakter Hanzi.",
+    }[mode] || "";
+
+    const prompt = `Kamu guru bahasa Mandarin yang memeriksa kalimat buatan siswa HSK.
+Kata target yang WAJIB dipakai: "${item.hanzi}" (pinyin: ${item.pinyin||'?'}, arti: ${item.arti||'?'}).
+${modeDesc}
+
+Kalimat buatan siswa: "${jawabanUser}"
+
+Periksa:
+1. Apakah kata target benar-benar dipakai (atau bentuk yang jelas dimaksud, meski ada salah tulis kecil)?
+2. Apakah susunan kata / grammar kalimatnya sudah wajar dalam Mandarin (urutan Subjek-Predikat-Objek, penempatan keterangan waktu/tempat, dsb)?
+3. Apakah pilihan katanya sudah pas untuk konteks yang dimaksud, atau ada kata yang kurang cocok?
+
+Bersikap suportif: kalimat sederhana yang secara umum sudah benar tetap dianggap "benar":true meski masih bisa disempurnakan.
+
+Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
+{
+  "benar": true atau false,
+  "saran": "1-2 kalimat saran perbaikan dalam bahasa Indonesia (kosongkan string jika sudah bagus), fokus ke urutan kata/grammar atau pilihan kosakata jika kurang pas",
+  "perbaikan": "versi kalimat Mandarin (hanzi) yang lebih pas, kosongkan string jika tidak perlu diperbaiki"
+}`;
+
+    const raw = await SentenceVocab._callAI([{ role: "user", content: prompt }], 300);
+    const parsed = this._parseJSONAman(raw);
+    if (!parsed) throw new Error("Gagal memproses balasan AI.");
+    return { benar: !!parsed.benar, saran: parsed.saran || "", perbaikan: parsed.perbaikan || "" };
+  },
+
+  _tampilHasilKalimat(hasil, jawabanUser, mode) {
+    const modeLabel = {
+      'pinyin-nada': 'Pinyin + Nada', 'pinyin-polos': 'Pinyin Polos',
+      'speaking': 'Ucapan', 'hanzi': 'Hanzi',
+    }[mode] || mode;
+    const hEl = el("hasil-ai");
+    if (hEl) {
+      hEl.className = "hasil-box " + (hasil.benar ? "benar" : "salah");
+      hEl.innerHTML = `
+        <div><b>${hasil.benar ? '✅ Kalimat bagus!' : '🔎 Ada yang bisa diperbaiki'}</b></div>
+        <div style="margin-top:4px;font-size:13px">📝 Jawabanmu (${modeLabel}): <i>${(jawabanUser||'').replace(/</g,"&lt;")}</i></div>
+        ${hasil.saran ? `<div style="margin-top:6px;font-size:13px">💬 Saran: ${(hasil.saran||'').replace(/</g,"&lt;")}</div>` : ""}
+        ${hasil.perbaikan ? `<div style="margin-top:4px;font-size:13px;color:var(--c-hijau)">✏️ Versi lebih pas: <b>${(hasil.perbaikan||'').replace(/</g,"&lt;")}</b></div>` : ""}
+      `;
+    }
+    const btnRow = el("kalimat-btn-row");
+    if (this.autoLanjutKalimat) {
+      if (btnRow) btnRow.innerHTML = `<div style="font-size:12px;color:var(--c-sub)">⏳ Lanjut otomatis...</div>`;
+      setTimeout(() => this._lanjutKalimat(), (hasil.saran || hasil.perbaikan) ? 3200 : 1600);
+    } else {
+      if (btnRow) btnRow.innerHTML = `<button class="btn btn-biru" onclick="AllIn._lanjutKalimat()">▶ Lanjut</button>`;
+    }
+  },
+
+  // Lanjut ke kata berikutnya (khusus step "Buat Kalimat" — selalu maju,
+  // tidak pakai retry mode easy/hard/ambil karena ini soal open-ended)
+  _lanjutKalimat() {
+    this._sedang = false;
+    this.wordIdx++;
+    this._tampilSoalAllIn();
   },
 
   // ── PASANG EVENT ─────────────────────────────────────────────
   _pasangEventAllIn(step, item, isExtra) {
     const id = step.id;
+    if (id === "buat-kalimat") {
+      this._modeKalimatAktif = this.modeKalimat || "hanzi";
+      this._kalimatTranskrip = "";
+      this._muatInfoKalimat(item);
+      if (this._modeKalimatAktif !== 'speaking') {
+        setTimeout(() => {
+          const inp = el("input-kalimat");
+          if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === "Enter") AllIn._submitKalimat(); }; }
+        }, 100);
+      }
+      return;
+    }
     if (id === "audio-hanzi-suara" || id === "hanzi-arti-suara") {
       // Speaking step — tidak perlu pasang input event
       return;
