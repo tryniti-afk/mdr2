@@ -1332,3 +1332,149 @@ body {
 
 [data-theme="dark"] .cocok-kartu { background: var(--c-card); border-color: var(--c-border); color: var(--c-text); }
 [data-theme="dark"] .cocok-kartu.cocok-hanzi { color: #ff6659; }
+
+/* ================================================================
+   PSIKOTES MODULE — Latihan Soal Psikotes + Tes Kreplin
+   ================================================================ */
+
+.pk-setup-wrap { display: flex; flex-direction: column; gap: 14px; padding-bottom: 20px; }
+
+.pk-card {
+  background: var(--c-card);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--c-border);
+}
+.pk-card h3 { margin: 0 0 10px; font-size: 15px; }
+
+.pk-hint { font-size: 12.5px; color: var(--c-sub); line-height: 1.5; margin-top: 6px; }
+
+.pk-saran-teks { font-size: 13.5px; line-height: 1.6; color: var(--c-text); }
+.pk-saran-teks ul { padding-left: 18px; margin: 6px 0; }
+.pk-saran-teks li { margin-bottom: 4px; }
+
+/* Tombol pilihan mode salah/kuning */
+.opsi.aktif-kuning.aktif { background: var(--c-kuning); border-color: var(--c-kuning); color: #fff; }
+.opsi.aktif-merah.aktif  { background: var(--c-merah);  border-color: var(--c-merah);  color: #fff; }
+.opsi.aktif-hijau.aktif  { background: var(--c-hijau);  border-color: var(--c-hijau);  color: #fff; }
+
+/* ── Metrik grid (hasil Kreplin) ─────────────────────────────── */
+.pk-metrik-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.pk-metrik-card {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 12px 8px;
+  text-align: center;
+}
+.pk-metrik-icon { font-size: 20px; margin-bottom: 4px; }
+.pk-metrik-label { font-size: 11px; color: var(--c-sub); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.pk-metrik-val { font-size: 16px; font-weight: 800; color: var(--c-biru-d); margin: 3px 0 2px; }
+.pk-metrik-ket { font-size: 11px; color: var(--c-sub); }
+
+@media (max-width: 420px) {
+  .pk-metrik-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Tes Kreplin — papan angka ────────────────────────────────── */
+.pk-kr-wrap {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+.pk-kr-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 260px;
+  overflow: hidden;
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+}
+.pk-kr-digit {
+  width: 34px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-sub);
+  padding: 2px 0;
+  border-radius: 6px;
+}
+.pk-kr-digit.selesai { opacity: .35; }
+.pk-kr-digit.aktif {
+  background: var(--c-biru);
+  color: #fff;
+}
+.pk-kr-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.pk-kr-num {
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--c-text);
+  line-height: 1.1;
+}
+.pk-kr-garis {
+  width: 60px;
+  height: 3px;
+  background: var(--c-text);
+  border-radius: 2px;
+  margin: 4px 0;
+}
+.pk-kr-input {
+  width: 70px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  border: 2.5px solid var(--c-biru);
+  border-radius: 10px;
+  padding: 6px 0;
+  transition: border-color .15s;
+}
+.pk-kr-input:focus { outline: none; border-color: var(--c-biru-d); }
+
+.pk-kr-numpad {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.pk-kr-key {
+  padding: 12px 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--c-border);
+  background: var(--c-card);
+  color: var(--c-text);
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.pk-kr-key:hover { border-color: var(--c-biru); color: var(--c-biru); }
+.pk-kr-key:active { transform: scale(.93); background: var(--c-biru); color: #fff; }
+
+/* ── Dark theme ──────────────────────────────────────────────── */
+[data-theme="dark"] .pk-card       { background: var(--c-card); border-color: var(--c-border); color: var(--c-text); }
+[data-theme="dark"] .pk-metrik-card{ background: var(--c-card); border-color: var(--c-border); }
+[data-theme="dark"] .pk-metrik-val { color: var(--c-biru); }
+[data-theme="dark"] .pk-kr-strip   { background: #14161f; border-color: var(--c-border); }
+[data-theme="dark"] .pk-kr-digit   { color: var(--c-sub); }
+[data-theme="dark"] .pk-kr-num     { color: var(--c-text); }
+[data-theme="dark"] .pk-kr-garis   { background: var(--c-text); }
+[data-theme="dark"] .pk-kr-input   { background: #22253a; color: var(--c-text); border-color: var(--c-biru); }
+[data-theme="dark"] .pk-kr-key     { background: #22253a; color: var(--c-text); border-color: var(--c-border); }
