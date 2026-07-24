@@ -1478,3 +1478,41 @@ body {
 [data-theme="dark"] .pk-kr-garis   { background: var(--c-text); }
 [data-theme="dark"] .pk-kr-input   { background: #22253a; color: var(--c-text); border-color: var(--c-biru); }
 [data-theme="dark"] .pk-kr-key     { background: #22253a; color: var(--c-text); border-color: var(--c-border); }
+
+/* ── Realtime Reading (Deteksi Real-time) ───────────────────── */
+.rtr-passage {
+  font-size: 24px;
+  line-height: 2.4;
+  letter-spacing: 1px;
+  background: var(--c-card);
+  border: 1.5px solid var(--c-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+}
+.rtr-word {
+  display: inline-block;
+  position: relative;
+  padding: 2px 1px;
+  border-radius: 6px;
+  vertical-align: bottom;
+}
+.rtr-current { box-shadow: 0 0 0 2px var(--c-biru) inset; background: color-mix(in srgb, var(--c-biru) 8%, transparent); }
+.rtr-char { color: var(--c-abu); font-weight: 700; transition: color .2s; }
+.rtr-ok   { color: var(--c-text); }
+.rtr-err  { color: var(--c-merah); text-decoration: wavy underline var(--c-merah); text-underline-offset: 4px; }
+.rtr-punct { color: var(--c-sub); }
+.rtr-pinyin {
+  font-size: 11px;
+  color: var(--c-sub);
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  margin-top: -2px;
+}
+.rtr-target-py { font-size: 20px; margin: 6px 0; color: var(--c-text); }
+.rtr-tip { font-size: 12.5px; color: var(--c-sub); margin-top: 4px; }
+
+[data-theme="dark"] .rtr-passage { background: var(--c-card); border-color: var(--c-border); }
+[data-theme="dark"] .rtr-char { color: var(--c-abu); }
+[data-theme="dark"] .rtr-ok   { color: var(--c-text); }
