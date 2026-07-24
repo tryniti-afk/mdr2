@@ -284,21 +284,36 @@ var ToneModule = {
       }
       const notes = ToneUtil.compareContours(contour, ref);
       const skorOk = !notes.some(n => n.includes("⚠️"));
-      tambahSkor(skorOk);
+      // Kalau ini pengulangan (bukan rekaman pertama), jangan hitung skor dua kali.
+      if (!this._modeUlangRekam) tambahSkor(skorOk);
+      this._modeUlangRekam = false;
       const hEl = el("hasil-tone");
       hEl.style.display = "block";
       hEl.className = "hasil-box info";
       hEl.innerHTML = `
         ${ContourChart.svg(contour, ref)}
-        <div style="margin-top:8px;text-align:left">${notes.map(n => `<div>${n}</div>`).join("")}</div>`;
-      btn.innerText = "✔ Selesai";
-      tampilTombolLanjut("hasil-tone", () => { this.idx++; this.tampilSoalUrutan(); });
+        <div style="margin-top:8px;text-align:left">${notes.map(n => `<div>${n}</div>`).join("")}</div>
+        <div class="btn-row" style="justify-content:center;margin-top:10px">
+          <button class="btn btn-kuning" onclick="ToneModule._ulangiRekam()">🔁 Ulangi Ucapan</button>
+        </div>`;
+      // Tombol mic dikunci (bukan diberi label "Selesai" yang membingungkan) —
+      // untuk mengulang pakai tombol "🔁 Ulangi Ucapan" di atas.
+      btn.innerText = "✔ Terekam";
+      this._timerLanjut = tampilTombolLanjut("hasil-tone", () => { this.idx++; this.tampilSoalUrutan(); });
     } catch (e) {
       this._recording = false;
       tampilToast("❌ " + (e.message || "Gagal mengakses mic."));
       btn.disabled = false; btn.innerText = "🎤 Coba Lagi";
     }
   },
+
+  // Batalkan auto-lanjut yang berjalan lalu rekam ulang kata yang sama (tanpa dobel skor).
+  _ulangiRekam() {
+    if (this._timerLanjut) { clearTimeout(this._timerLanjut); this._timerLanjut = null; }
+    this._modeUlangRekam = true;
+    this._rekam();
+  },
+
 
   _skipUrutan() {
     tambahSkor(true);
