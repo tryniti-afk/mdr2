@@ -110,11 +110,24 @@ var ShadowModule = {
     const btn = el("btn-shadow-rec");
     const item = this.soalList[this.idx];
     btn.disabled = true; btn.innerText = "🎙️ Mendengarkan...";
-    setHTML("hasil-shadow", "🎙️ Silakan bicara..."); el("hasil-shadow").style.display = "block"; el("hasil-shadow").className = "hasil-box info";
+    const petunjukPendek = item.hanzi.replace(/[，。！？、,\.!\?\s]/g, "").length <= 2
+      ? "<br><small style='color:#999'>Kata ini pendek — ucapkan dengan jelas &amp; sedikit lebih lantang.</small>" : "";
+    setHTML("hasil-shadow", "🎙️ Silakan bicara..." + petunjukPendek);
+    el("hasil-shadow").style.display = "block"; el("hasil-shadow").className = "hasil-box info";
     STT.mulai("zh-CN",
-      (hasil) => {
-        const diffHTML = this._diffHanzi(item.hanzi, hasil);
-        const cocokPct = this._pctCocok(item.hanzi, hasil);
+      (hasil, semua) => {
+        // Google/Chrome STT sering salah urutkan alternatif untuk kata pendek
+        // (mis. 1 suku kata seperti "ji"), sehingga tebakan #1 belum tentu yang
+        // paling cocok. Di sini SEMUA alternatif dicoba, bukan cuma yang teratas,
+        // lalu dipakai yang paling mirip dengan target.
+        const kandidat = (semua && semua.length) ? semua : [hasil];
+        let terbaik = kandidat[0], terbaikPct = this._pctCocok(item.hanzi, kandidat[0]);
+        for (let i = 1; i < kandidat.length; i++) {
+          const pct = this._pctCocok(item.hanzi, kandidat[i]);
+          if (pct > terbaikPct) { terbaikPct = pct; terbaik = kandidat[i]; }
+        }
+        const diffHTML = this._diffHanzi(item.hanzi, terbaik);
+        const cocokPct = terbaikPct;
         const benar = cocokPct >= 70;
         // Kalau ini pengulangan ucapan (bukan percobaan pertama), jangan hitung skor dua kali.
         if (!this._modeUlangUcap) tambahSkor(benar);
@@ -124,7 +137,7 @@ var ShadowModule = {
         hEl.innerHTML = `
           ${benar ? "✅" : "❌"} Kecocokan ~${cocokPct}%<br>
           <div style="margin-top:6px;font-size:20px;letter-spacing:1px">${diffHTML}</div>
-          <div style="margin-top:6px;font-size:12px;color:#777">Hijau = cocok, merah = meleset/kurang jelas. Kamu ucapkan: "${hasil}"</div>
+          <div style="margin-top:6px;font-size:12px;color:#777">Hijau = cocok, merah = meleset/kurang jelas. Kamu ucapkan: "${terbaik}"</div>
           <div class="btn-row" style="justify-content:center;margin-top:10px">
             <button class="btn btn-kuning" onclick="ShadowModule._ulangiUcap()">🔁 Ulangi Ucapan</button>
           </div>`;
@@ -134,9 +147,10 @@ var ShadowModule = {
         this._timerLanjut = tampilTombolLanjut("hasil-shadow", () => { this.idx++; this.tampilSoal(); });
       },
       err => { setTeks("hasil-shadow", "❌ Error mic: " + err); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; },
-      dapat => { if (!dapat) { setTeks("hasil-shadow", "⚠️ Tidak terdeteksi."); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; } }
+      dapat => { if (!dapat) { setTeks("hasil-shadow", "⚠️ Tidak terdeteksi. Kata pendek kadang perlu diucapkan lebih jelas/lantang — coba lagi."); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; } }
     );
   },
+
 
   // Batalkan auto-lanjut yang berjalan lalu rekam ulang ucapan untuk soal yang sama (tanpa dobel skor).
   _ulangiUcap() {
