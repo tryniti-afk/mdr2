@@ -143,10 +143,16 @@ var VocabMakeSentence = {
     const item = this.soalList[this.idx];
     const hEl = el("hasil-vms");
     hEl.style.display = "block"; hEl.className = "hasil-box info";
+    const ulangiBtn = `
+      <div class="btn-row" style="justify-content:center;margin-top:10px">
+        <button class="btn btn-kuning" onclick="VocabMakeSentence._ulangiKalimat()">🔁 Ulangi Kata Ini</button>
+      </div>`;
     if (!this._sttResult) {
-      hEl.innerHTML = "⚠️ Tidak ada suara terdeteksi.";
-      tambahSkor(false);
-      tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
+      hEl.innerHTML = "⚠️ Tidak ada suara terdeteksi." + ulangiBtn;
+      // Kalau ini pengulangan (bukan percobaan pertama), jangan hitung skor dua kali.
+      if (!this._modeUlangKalimat) tambahSkor(false);
+      this._modeUlangKalimat = false;
+      this._timerLanjut = tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
       return;
     }
     hEl.innerHTML = `🤖 Menilai kalimat kamu dengan AI...<br><i>"${this._sttResult}"</i>`;
@@ -160,15 +166,25 @@ Nilai dalam Bahasa Indonesia, bukan skor angka, dengan format:
 3. Contoh alternatif kalimat yang lebih natural memakai kata yang sama.
 Jawab ringkas, maksimal 5 kalimat total.`;
       const teks = await GeminiAPI.call(prompt, 500);
-      tambahSkor(true);
+      if (!this._modeUlangKalimat) tambahSkor(true);
       hEl.innerHTML = `
         <div><b>Kamu:</b> "${this._sttResult}"</div>
-        <div style="margin-top:8px">${GeminiAPI.esc2(teks)}</div>`;
+        <div style="margin-top:8px">${GeminiAPI.esc2(teks)}</div>${ulangiBtn}`;
     } catch (e) {
-      hEl.innerHTML = `<div><b>Kamu:</b> "${this._sttResult}"</div><div style="margin-top:8px;color:#f44336">⚠️ ${e.message}</div>`;
+      hEl.innerHTML = `<div><b>Kamu:</b> "${this._sttResult}"</div><div style="margin-top:8px;color:#f44336">⚠️ ${e.message}</div>${ulangiBtn}`;
     }
-    tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
+    this._modeUlangKalimat = false;
+    this._timerLanjut = tampilTombolLanjut("hasil-vms", () => { this.idx++; this._alreadyShown = false; this.tampilSoal(); });
   },
+
+  // Batalkan auto-lanjut yang berjalan, lalu ulangi kata yang sama dengan timer & rekaman baru (tanpa dobel skor).
+  _ulangiKalimat() {
+    if (this._timerLanjut) { clearTimeout(this._timerLanjut); this._timerLanjut = null; }
+    this._modeUlangKalimat = true;
+    this._alreadyShown = false;
+    this.tampilSoal(); // idx tidak berubah — soal yang sama tampil lagi dengan timer & STT baru
+  },
+
 
   _selesai() {
     App.catatSesiSelesai("vocab", sesiSkor.benar, sesiSkor.total);
@@ -302,20 +318,42 @@ var VocabRepeatRead = {
     if (stopBtn) stopBtn.style.display = "none";
     clearInterval(this._swInterval);
     const detik = (performance.now() - this._startT) / 1000;
-    this.waktuPutaran.push(detik);
     const targetChars = this.soalTeks.replace(/[，。！？、,\.!\?\s]/g, "").split("");
     const salah = targetChars.filter(ch => !hasil.includes(ch));
-    this._kataSalahPutaran.push(salah);
+
+    if (this._modeUlangBaca && this.waktuPutaran.length) {
+      // Pengulangan putaran ini — timpa hasil percobaan sebelumnya, jangan ditambah sebagai putaran baru.
+      this.waktuPutaran[this.waktuPutaran.length - 1] = detik;
+      this._kataSalahPutaran[this._kataSalahPutaran.length - 1] = salah;
+    } else {
+      this.waktuPutaran.push(detik);
+      this._kataSalahPutaran.push(salah);
+    }
+    this._modeUlangBaca = false;
 
     const hEl = el("hasil-vrr");
     hEl.style.display = "block"; hEl.className = "hasil-box info";
     hEl.innerHTML = `
       ⏱️ Waktu: <b>${detik.toFixed(1)} detik</b><br>
       ${salah.length ? `⚠️ Kemungkinan kurang jelas: <b>${salah.join(" ")}</b>` : "✅ Semua karakter terdengar!"}
+      <div class="btn-row" style="justify-content:center;margin-top:10px">
+        <button class="btn btn-kuning" onclick="VocabRepeatRead._ulangiBaca()">🔁 Ulangi Putaran Ini</button>
+      </div>
     `;
-    setTeks("btn-vrr-mulai", "✔ Selesai");
-    tampilTombolLanjut("hasil-vrr", () => { this.putaranSaat++; this.tampilSoal(); });
+    // Tombol mulai dikunci (bukan diberi label "Selesai" yang membingungkan) —
+    // untuk mengulang pakai tombol "🔁 Ulangi Putaran Ini" di atas.
+    setTeks("btn-vrr-mulai", "✔ Terekam");
+    this._timerLanjut = tampilTombolLanjut("hasil-vrr", () => { this.putaranSaat++; this.tampilSoal(); });
   },
+
+  // Batalkan auto-lanjut yang berjalan, lalu ulangi putaran yang sama (hasil lama ditimpa, bukan ditambah).
+  _ulangiBaca() {
+    if (this._timerLanjut) { clearTimeout(this._timerLanjut); this._timerLanjut = null; }
+    this._modeUlangBaca = true;
+    this._sudahSelesaiBaca = false;
+    this.tampilSoal(); // putaranSaat tidak berubah — putaran yang sama diulang
+  },
+
 
   _selesai() {
     App.catatSesiSelesai("vocab", this.putaran, this.putaran);
