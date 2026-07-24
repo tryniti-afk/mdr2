@@ -4,11 +4,56 @@
 
 // ── TTS (Text-To-Speech) ─────────────────────────────────────
 const TTS = {
+  _voices: [],
+  _voicesReady: false,
+
+  // Muat ulang daftar suara dari browser (beberapa browser memuatnya async)
+  _refreshVoices() {
+    if (typeof speechSynthesis === "undefined") return;
+    const v = speechSynthesis.getVoices();
+    if (v && v.length) { this._voices = v; this._voicesReady = true; }
+  },
+
+  // Daftar suara yang cocok untuk Mandarin (zh-*)
+  daftarSuaraMandarin() {
+    this._refreshVoices();
+    return this._voices.filter(v =>
+      /^zh/i.test(v.lang) || /chinese|mandarin|普通话|中文/i.test(v.name)
+    );
+  },
+
+  // Baca preferensi suara & nada dari pengaturan tersimpan (mdr_settings)
+  _bacaPrefSuara() {
+    try {
+      const s = JSON.parse(localStorage.getItem("mdr_settings") || "{}");
+      return {
+        uri:   s.ttsVoiceURI || null,
+        pitch: (typeof s.ttsPitch === "number" ? s.ttsPitch : 1)
+      };
+    } catch (e) {
+      return { uri: null, pitch: 1 };
+    }
+  },
+
   bicara(teks, lang = null, rate = 0.85, onEnd = null) {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(teks);
     u.lang = lang || deteksiBahasa(teks);
     u.rate = rate;
+
+    // Terapkan pilihan suara & nada khusus untuk Mandarin
+    if (u.lang && u.lang.toLowerCase().startsWith("zh")) {
+      const { uri, pitch } = this._bacaPrefSuara();
+      u.pitch = pitch;
+      if (uri) {
+        this._refreshVoices();
+        const v = this._voices.find(x => x.voiceURI === uri);
+        if (v) u.voice = v;
+      }
+    } else {
+      u.pitch = 1;
+    }
+
     if (onEnd) u.onend = onEnd;
     speechSynthesis.speak(u);
     return u;
@@ -23,6 +68,15 @@ const TTS = {
     speechSynthesis.cancel();
   }
 };
+
+// Muat daftar suara begitu tersedia (Chrome/Edge sering memuatnya async)
+if (typeof speechSynthesis !== "undefined") {
+  TTS._refreshVoices();
+  speechSynthesis.onvoiceschanged = () => {
+    TTS._refreshVoices();
+    if (window.App && typeof App._onVoicesChanged === "function") App._onVoicesChanged();
+  };
+}
 
 // ── STT (Speech-To-Text) ─────────────────────────────────────
 const STT = {
