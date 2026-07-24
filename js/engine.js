@@ -37,7 +37,7 @@ const STT = {
     const r = new SR();
     r.lang = lang || "zh-CN";
     r.interimResults = false;
-    r.maxAlternatives = 3;
+    r.maxAlternatives = 5;
     let dapat = false;
     r.onresult = (e) => {
       dapat = true;
