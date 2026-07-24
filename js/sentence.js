@@ -347,11 +347,17 @@ var Sentence = {
             ? `✅ Bagus! Kamu: "${hasil}"`
             : `❌ Kurang tepat. Kamu: "${hasil}"<br>Target: <b>${item.hanzi}</b>`;
         }
-        if (btnMic) btnMic.innerText = "✔ Selesai";
+        // Aktifkan lagi tombol mic supaya bisa ulangi ucapan sebelum lanjut ke soal berikutnya.
+        if (btnMic) {
+          btnMic.disabled = false;
+          btnMic.innerText = "🔁 Ulangi Ucapan";
+          btnMic.setAttribute("onclick", "Sentence._ulangiSuara()");
+        }
         this._nextOrRetry(benar);
       },
       err => { setTeks("hasil-box","❌ Error mic: "+err); if(btnMic){btnMic.disabled=false;btnMic.innerText="🎤 Coba Lagi";} },
       dapat => { if(!dapat){ setTeks("hasil-box","⚠️ Tidak terdeteksi."); if(btnMic){btnMic.disabled=false;btnMic.innerText="🎤 Coba Lagi";} } }
+
     );
   },
 
@@ -388,7 +394,7 @@ var Sentence = {
           : "🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...";
         const hEl = el("hasil-box");
         if (hEl) hEl.innerHTML += `<br><small>${pesanDiff}</small>`;
-        setTimeout(() => this.tampilSoal(), 2200 + 1400);
+        this._timerNext = setTimeout(() => this.tampilSoal(), 2200 + 1400);
       } else {
         if (this._infinityRetry) {
           // Setelah retry berhasil
@@ -397,21 +403,34 @@ var Sentence = {
           STT.berhenti();
           if (this.idx >= this.soalList.length - 1) {
             // Soal terakhir → selesai
-            setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+            this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
           } else {
             const isEasy = this.difficulty === "easy";
             const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
-            setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1800);
+            this._timerNext = setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1800);
           }
         } else {
-          setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
+          this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, 1800);
         }
       }
     } else {
       const delay = benar ? 1800 : 2200;
-      setTimeout(() => { this.idx++; this.tampilSoal(); }, delay);
+      this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, delay);
     }
   },
+
+  // Batalkan timer auto-lanjut yang sedang berjalan (dipakai saat user pilih "Ulangi Ucapan")
+  _batalkanTimerLanjut() {
+    if (this._timerNext) { clearTimeout(this._timerNext); this._timerNext = null; }
+    this._sedangTransisi = false;
+  },
+
+  // Tombol "🔁 Ulangi Ucapan" pada soal speaking — batalkan auto-lanjut lalu rekam ulang.
+  _ulangiSuara() {
+    this._batalkanTimerLanjut();
+    this._jawabSuara();
+  },
+
 
   // ── SELESAI ──────────────────────────────────────────────────
   tampilSelesai() {
@@ -1125,9 +1144,13 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       (hasil, semua) => {
         const cln  = s => s.replace(/[。，！？\s,.!?]/g, "").toLowerCase();
         const benar = semua.some(h => cln(h).includes(cln(target)) || cln(target).includes(cln(h)));
-        if (benar) this._state.skor.benar++;
-        else this._state.skor.salah++;
-        if (btnMic) btnMic.textContent = "✔ Selesai";
+        // Kalau ini pengulangan ucapan (bukan jawaban pertama), jangan hitung skor dua kali.
+        if (!this._state._ulangiUcapan) {
+          if (benar) this._state.skor.benar++;
+          else this._state.skor.salah++;
+        }
+        this._state._ulangiUcapan = false;
+        if (btnMic) btnMic.textContent = "✔ Terjawab";
         this._tampilHasil(benar, target, soal, hasil);
       },
       err => {
@@ -1230,6 +1253,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       </div>` : ""}
 
       <div class="btn-row" style="margin-top:12px" id="sv-btn-lanjut-wrap">
+        ${s.jawab === "suara" ? `<button class="btn btn-kuning" onclick="SentenceVocab._ulangiUcapan()">🔁 Ulangi Ucapan</button>` : ""}
         ${isGame && !benar
           ? `<button class="btn btn-hijau" onclick="SentenceVocab._gameRetry()">🔄 Coba Lagi</button>`
           : `<button class="btn btn-biru" onclick="SentenceVocab._lanjut()">→ Soal Berikutnya</button>`
@@ -1249,6 +1273,12 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
   // ── GAME MODE RETRY ──────────────────────────────────────────
   _gameRetry() {
     this._state._gameRetry = true;
+    this._tampilSoal();
+  },
+
+  // Ulangi ucapan untuk soal yang sama (tidak generate soal baru, tidak dobel skor)
+  _ulangiUcapan() {
+    this._state._ulangiUcapan = true;
     this._tampilSoal();
   },
 
