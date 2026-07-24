@@ -681,9 +681,10 @@ var Reading = {
       { id:"comprehension",icon:"🧠", label:"Comprehension Q",     desc:"Jawab pertanyaan isi teks" },
       { id:"main-idea",    icon:"💡", label:"Main Idea",           desc:"Temukan ide pokok teks" },
       { id:"cloze",        icon:"📝", label:"Cloze Passage",       desc:"Isi kata-kata yang hilang di teks" },
+      { id:"realtime",     icon:"🎙️", label:"Deteksi Real-time",   desc:"Baca sambil direkam & dikoreksi otomatis" },
     ];
     return `<div class="sub-menu-grid">${sub.map(f=>`
-      <div class="sub-card" onclick="Reading.mulai('${f.id}')">
+      <div class="sub-card" onclick="${f.id === 'realtime' ? 'RealtimeReading.buka()' : `Reading.mulai('${f.id}')`}">
         <div class="sub-icon">${f.icon}</div>
         <div class="sub-label">${f.label}</div>
         <div class="sub-desc">${f.desc}</div>
