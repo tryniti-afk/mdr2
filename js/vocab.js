@@ -852,12 +852,18 @@ var Vocab = {
             : `❌ Salah. Kamu: "${hasil}" — Target: <b>${item.hanzi}</b>`;
           hEl.className = "hasil-box " + (benar?"benar":"salah");
         }
-        if (btnMic) btnMic.innerText = "✔ Selesai";
+        // Aktifkan lagi tombol mic supaya bisa ulangi ucapan sebelum lanjut ke soal berikutnya.
+        if (btnMic) {
+          btnMic.disabled = false;
+          btnMic.innerText = "🔁 Ulangi Ucapan";
+          btnMic.setAttribute("onclick", "Vocab._ulangiSuara()");
+        }
         this._updateStreak(benar);
         this._nextOrRetry(benar);
       },
       err => { setTeks("hasil-vocab", "❌ Error mic: "+err); if(btnMic){btnMic.disabled=false;btnMic.innerText="🎤 Coba Lagi";} },
       dapat => { if(!dapat){ setTeks("hasil-vocab","⚠️ Tidak terdeteksi."); if(btnMic){btnMic.disabled=false;btnMic.innerText="🎤 Coba Lagi";} } }
+
     );
   },
 
@@ -896,29 +902,42 @@ var Vocab = {
           : "🔄 Jawab ulang soal ini hingga benar, lalu mulai dari soal pertama...";
         const hEl = el("hasil-vocab");
         if (hEl) hEl.innerHTML += `<br><small>${pesanDiff}</small>`;
-        setTimeout(() => this.tampilSoal(), 2800);
+        this._timerNext = setTimeout(() => this.tampilSoal(), 2800);
       } else {
         if (this._infinityRetry) {
           // Setelah retry berhasil
           this._infinityRetry = false;
           if (this.idx >= this.soalList.length - 1) {
             // Soal terakhir → selesai
-            setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
+            this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
           } else {
             // Tentukan tujuan berdasarkan difficulty
             const isEasy = this.difficulty === "easy";
             const nomorTuju = isEasy ? Math.max(0, this.idx - 2) : 0;
-            setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1600);
+            this._timerNext = setTimeout(() => { this.idx = nomorTuju; this.tampilSoal(); }, 1600);
           }
         } else {
           // Benar normal → lanjut soal berikutnya
-          setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
+          this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, 1600);
         }
       }
     } else {
-      setTimeout(() => { this.idx++; this.tampilSoal(); }, benar ? 1600 : 2000);
+      this._timerNext = setTimeout(() => { this.idx++; this.tampilSoal(); }, benar ? 1600 : 2000);
     }
   },
+
+  // Batalkan timer auto-lanjut yang sedang berjalan (dipakai saat user pilih "Ulangi Ucapan")
+  _batalkanTimerLanjut() {
+    if (this._timerNext) { clearTimeout(this._timerNext); this._timerNext = null; }
+    this._sedangTransisi = false;
+  },
+
+  // Tombol "🔁 Ulangi Ucapan" pada soal speaking — batalkan auto-lanjut lalu rekam ulang.
+  _ulangiSuara() {
+    this._batalkanTimerLanjut();
+    this._jawabSuara();
+  },
+
 
   // ── SELESAI ──────────────────────────────────────────────────
   tampilSelesai() {
