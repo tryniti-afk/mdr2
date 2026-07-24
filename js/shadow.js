@@ -116,20 +116,35 @@ var ShadowModule = {
         const diffHTML = this._diffHanzi(item.hanzi, hasil);
         const cocokPct = this._pctCocok(item.hanzi, hasil);
         const benar = cocokPct >= 70;
-        tambahSkor(benar);
+        // Kalau ini pengulangan ucapan (bukan percobaan pertama), jangan hitung skor dua kali.
+        if (!this._modeUlangUcap) tambahSkor(benar);
+        this._modeUlangUcap = false;
         const hEl = el("hasil-shadow");
         hEl.className = "hasil-box " + (benar ? "benar" : "salah");
         hEl.innerHTML = `
           ${benar ? "✅" : "❌"} Kecocokan ~${cocokPct}%<br>
           <div style="margin-top:6px;font-size:20px;letter-spacing:1px">${diffHTML}</div>
-          <div style="margin-top:6px;font-size:12px;color:#777">Hijau = cocok, merah = meleset/kurang jelas. Kamu ucapkan: "${hasil}"</div>`;
-        btn.innerText = "✔ Selesai";
-        tampilTombolLanjut("hasil-shadow", () => { this.idx++; this.tampilSoal(); });
+          <div style="margin-top:6px;font-size:12px;color:#777">Hijau = cocok, merah = meleset/kurang jelas. Kamu ucapkan: "${hasil}"</div>
+          <div class="btn-row" style="justify-content:center;margin-top:10px">
+            <button class="btn btn-kuning" onclick="ShadowModule._ulangiUcap()">🔁 Ulangi Ucapan</button>
+          </div>`;
+        // Tombol rekam dikunci (bukan diberi label "Selesai" yang membingungkan) —
+        // untuk mengulang pakai tombol "🔁 Ulangi Ucapan" di atas.
+        btn.innerText = "✔ Terekam";
+        this._timerLanjut = tampilTombolLanjut("hasil-shadow", () => { this.idx++; this.tampilSoal(); });
       },
       err => { setTeks("hasil-shadow", "❌ Error mic: " + err); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; },
       dapat => { if (!dapat) { setTeks("hasil-shadow", "⚠️ Tidak terdeteksi."); btn.disabled = false; btn.innerText = "🎤 Coba Lagi"; } }
     );
   },
+
+  // Batalkan auto-lanjut yang berjalan lalu rekam ulang ucapan untuk soal yang sama (tanpa dobel skor).
+  _ulangiUcap() {
+    if (this._timerLanjut) { clearTimeout(this._timerLanjut); this._timerLanjut = null; }
+    this._modeUlangUcap = true;
+    this._rekamTeks();
+  },
+
 
   // ── REKAM TAMBAHAN UNTUK KONTUR NADA ────────────────────────
   async _rekamKontur() {
