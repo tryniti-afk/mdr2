@@ -584,10 +584,11 @@ function tampilTombolLanjut(containerId, callback, teksTombol) {
       btn.innerHTML = `<button class="btn btn-hijau">${teksTombol || "➡️ Lanjut"}</button>`;
       btn.querySelector("button").onclick = callback;
       c.appendChild(btn);
+      return null;
     } else {
-      setTimeout(callback, (cfg.detik || 3) * 1000);
+      return setTimeout(callback, (cfg.detik || 3) * 1000);
     }
   } else {
-    setTimeout(callback, (cfg.detik || 3) * 1000);
+    return setTimeout(callback, (cfg.detik || 3) * 1000);
   }
 }
