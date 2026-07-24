@@ -68,6 +68,8 @@ var App = {
   // ── DEFAULT SETTINGS ────────────────────────────────────────
   _settings: {
     ttsRate:      0.85,   // kecepatan TTS 0.5 – 1.5
+    ttsVoiceURI:  "",     // voiceURI suara Mandarin pilihan ("" = default browser)
+    ttsPitch:     1,      // nada suara 0.6 (rendah) – 1.6 (tinggi)
     jawabanDelay: 1600,   // ms sebelum lanjut soal (1000–3000)
     theme:        "light", // "light" | "dark"
   },
@@ -230,6 +232,30 @@ var App = {
         <div class="card" style="margin-bottom:14px">
           <h3 style="margin:0 0 12px">🔊 Audio</h3>
 
+          <div class="set-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label>Pilih Suara Mandarin</label>
+            <select id="set-tts-voice" style="width:100%;padding:8px;border-radius:8px"
+              onchange="App._previewTTS()">
+              ${this._optionsSuara()}
+            </select>
+          </div>
+          <div style="font-size:12px;color:#999;margin:4px 0 14px">
+            Jumlah & jenis suara (cewek/cowok) tergantung browser/HP kamu — TTS ini pakai suara bawaan sistem, bukan suara buatan mdr2. Chrome/Edge di laptop biasanya punya lebih banyak pilihan dibanding HP. Coba tiap pilihan pakai tombol ▶ di bawah.
+          </div>
+
+          <div class="set-row">
+            <label>Nada Suara (Pitch)</label>
+            <div class="set-ctrl">
+              <input type="range" id="set-tts-pitch" min="0.6" max="1.6" step="0.05"
+                value="${s.ttsPitch ?? 1}" oninput="App._updatePitchLabel(this.value)"
+                style="width:140px">
+              <span id="set-tts-pitch-val">${this._labelPitch(s.ttsPitch ?? 1)}</span>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#999;margin:4px 0 14px">
+            Geser ke kiri untuk suara lebih rendah/berat, ke kanan untuk lebih tinggi/ringan.
+          </div>
+
           <div class="set-row">
             <label>Kecepatan TTS</label>
             <div class="set-ctrl">
@@ -317,11 +343,68 @@ var App = {
     if (btnDark)  btnDark.classList.toggle("aktif", tema === "dark");
   },
 
+  // ── Bangun daftar <option> suara Mandarin yang tersedia di browser ──
+  _optionsSuara() {
+    const voices = TTS.daftarSuaraMandarin();
+    const cur = this._settings.ttsVoiceURI || "";
+    let html = `<option value="">🔄 Default (bawaan browser)</option>`;
+    if (!voices.length) {
+      html += `<option value="" disabled>(Belum ada suara Mandarin terdeteksi — coba buka lagi sebentar)</option>`;
+    }
+    voices.forEach(v => {
+      const sel = v.voiceURI === cur ? "selected" : "";
+      const label = `${v.name} — ${v.lang}${v.localService ? "" : " (online)"}`;
+      html += `<option value="${v.voiceURI}" ${sel}>${label}</option>`;
+    });
+    return html;
+  },
+
+  // Dipanggil dari engine.js saat daftar suara browser selesai dimuat (async)
+  _onVoicesChanged() {
+    const sel = el("set-tts-voice");
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = this._optionsSuara();
+    sel.value = cur || this._settings.ttsVoiceURI || "";
+  },
+
+  // Label "Rendah / Sedang / Tinggi" berdasarkan nilai pitch
+  _labelPitch(v) {
+    v = parseFloat(v);
+    if (v < 0.85) return "🔉 Rendah";
+    if (v > 1.15) return "🔊 Tinggi";
+    return "🔈 Sedang";
+  },
+
+  _updatePitchLabel(val) {
+    const disp = el("set-tts-pitch-val");
+    if (disp) disp.textContent = this._labelPitch(val);
+    this._previewTTS();
+  },
+
   _previewTTS(val) {
-    const rate = parseFloat(val || document.getElementById("set-tts-rate")?.value || this._settings.ttsRate);
+    const rateEl  = el("set-tts-rate");
+    const pitchEl = el("set-tts-pitch");
+    const voiceEl = el("set-tts-voice");
+
+    const rate  = parseFloat(val || rateEl?.value || this._settings.ttsRate);
+    const pitch = parseFloat(pitchEl?.value ?? this._settings.ttsPitch ?? 1);
+    const voiceURI = voiceEl ? voiceEl.value : (this._settings.ttsVoiceURI || "");
+
     const disp = el("set-tts-val");
     if (disp) disp.textContent = rate.toFixed(2) + "×";
-    TTS.bicara("你好，这是测试。", "zh-CN", rate);
+
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance("你好，这是测试。");
+    u.lang  = "zh-CN";
+    u.rate  = rate;
+    u.pitch = pitch;
+    if (voiceURI) {
+      TTS._refreshVoices();
+      const v = TTS._voices.find(x => x.voiceURI === voiceURI);
+      if (v) u.voice = v;
+    }
+    speechSynthesis.speak(u);
   },
 
   _updateDelayLabel(val) {
@@ -332,8 +415,12 @@ var App = {
 
   _simpanDanTutup() {
     const rateEl  = el("set-tts-rate");
+    const pitchEl = el("set-tts-pitch");
+    const voiceEl = el("set-tts-voice");
     const delayEl = el("set-delay");
     if (rateEl)  this._settings.ttsRate      = parseFloat(rateEl.value);
+    if (pitchEl) this._settings.ttsPitch     = parseFloat(pitchEl.value);
+    if (voiceEl) this._settings.ttsVoiceURI  = voiceEl.value;
     if (delayEl) this._settings.jawabanDelay = parseInt(delayEl.value);
     this._simpanSettings();
     const msg = el("set-msg");
