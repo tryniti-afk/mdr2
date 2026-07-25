@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✂️ Pisah Soal dari Gambar — mdr2</title>
+<style>
+  :root{
+    --biru:#1565c0; --biru-d:#0d47a1; --hijau:#2e7d32; --merah:#c62828; --kuning:#f9a825;
+    --abu:#616161; --bg:#f4f6fa; --card:#ffffff; --border:#e0e0e0; --text:#1a1a1a; --sub:#666;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  header{background:linear-gradient(135deg,#5e35b1,#1565c0);color:#fff;padding:18px 16px}
+  header h1{margin:0 0 4px;font-size:20px}
+  header p{margin:0;font-size:13px;opacity:.9}
+  .wrap{max-width:1000px;margin:0 auto;padding:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card h2{margin:0 0 10px;font-size:16px}
+  .hint{font-size:12.5px;color:var(--sub);line-height:1.5;margin:4px 0 10px}
+  label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
+  input[type=text],input[type=password],input[type=number],textarea,select{
+    width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text)
+  }
+  textarea{resize:vertical}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > div{flex:1;min-width:180px}
+  .btn{border:none;border-radius:9px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;color:#fff;display:inline-flex;align-items:center;gap:6px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-biru{background:var(--biru)} .btn-biru:hover:not(:disabled){background:var(--biru-d)}
+  .btn-hijau{background:var(--hijau)}
+  .btn-merah{background:var(--merah)}
+  .btn-abu{background:var(--abu)}
+  .btn-kuning{background:var(--kuning);color:#3a2a00}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:22px;text-align:center;cursor:pointer;color:var(--sub);font-size:14px}
+  .upload-zone:hover{border-color:var(--biru);color:var(--biru)}
+  #img-stage-wrap{position:relative;display:inline-block;max-width:100%;margin-top:12px;touch-action:none}
+  #img-stage-wrap img{max-width:100%;display:block;border-radius:8px;user-select:none;-webkit-user-drag:none}
+  .box{
+    position:absolute;border:2px solid #ff5252;background:rgba(255,82,82,.12);cursor:move;
+    box-sizing:border-box;
+  }
+  .box.aktif{border-color:#00c853;background:rgba(0,200,83,.16);z-index:5}
+  .box .lbl{
+    position:absolute;top:-22px;left:-2px;background:#ff5252;color:#fff;font-size:10.5px;
+    font-weight:700;padding:2px 6px;border-radius:4px 4px 0 0;white-space:nowrap;pointer-events:none
+  }
+  .box.aktif .lbl{background:#00c853}
+  .box .handle{
+    position:absolute;right:-7px;bottom:-7px;width:16px;height:16px;background:#fff;
+    border:2px solid #ff5252;border-radius:50%;cursor:nwse-resize
+  }
+  .box.aktif .handle{border-color:#00c853}
+
+  .status-pill{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .status-belum{background:#eee;color:#777}
+  .status-proses{background:#fff8e1;color:#f57f17}
+  .status-ok{background:#e8f5e9;color:#2e7d32}
+  .status-gagal{background:#ffebee;color:#c62828}
+
+  .grid-box{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:12px}
+  .item-card{border:1px solid var(--border);border-radius:10px;padding:10px;background:#fafbff}
+  .item-card.role-soal{border-left:4px solid #6a1b9a}
+  .item-card.role-pilihan{border-left:4px solid #1565c0}
+  .item-card canvas{width:100%;border-radius:6px;border:1px solid var(--border);background:#fff;display:block;margin-bottom:8px;cursor:pointer}
+  .item-card .mini-row{display:flex;gap:6px;margin-bottom:6px}
+  .item-card .mini-row > *{flex:1}
+  .item-card .top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .item-card .top-row b{font-size:12.5px}
+  .del-x{background:none;border:none;color:#c62828;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px}
+
+  #hasil-tsv{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;min-height:120px}
+  .preview-soal{border:1px dashed var(--border);border-radius:10px;padding:12px;margin-top:8px;background:#fff}
+  .preview-soal img{max-width:100%;max-height:220px;border-radius:8px;display:block;margin:8px auto}
+  .preview-soal .chip{display:inline-block;background:#f3e5f5;color:#6a1b9a;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-bottom:6px}
+  .preview-pilihan{border:1px solid var(--border);border-radius:8px;padding:6px 10px;margin:4px 0;font-size:13.5px}
+  .preview-pilihan img{max-height:110px;border-radius:6px;display:block;margin-bottom:4px}
+
+  footer{text-align:center;font-size:11.5px;color:#999;padding:24px 16px}
+  a{color:var(--biru)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✂️ Pisah Soal dari Gambar</h1>
+  <p>Upload 1 foto berisi banyak soal psikotes → AI tandai tiap soal otomatis → potong &amp; upload → salin ke spreadsheet.</p>
+</header>
+
+<div class="wrap">
+
+  <!-- 1. API KEYS -->
+  <div class="card">
+    <h2>🔑 API Key</h2>
+    <p class="hint">Key Gemini otomatis dipakai bersama aplikasi utama mdr2 (kalau sudah pernah diisi di Pengaturan, kolom di bawah akan otomatis terisi). Key ImgBB dipakai untuk meng-upload gambar hasil potongan supaya dapat link publik — daftar gratis di <a href="https://api.imgbb.com/" target="_blank" rel="noopener">api.imgbb.com</a>.</p>
+    <div class="row">
+      <div>
+        <label>Gemini API Key</label>
+        <input type="password" id="in-gemini-key" placeholder="AIza...">
+      </div>
+      <div>
+        <label>ImgBB API Key</label>
+        <input type="password" id="in-imgbb-key" placeholder="Tempel API key ImgBB di sini...">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-biru" onclick="simpanKeys()">💾 Simpan Key</button>
+      <span id="key-status" class="hint" style="margin:8px 0 0"></span>
+    </div>
+  </div>
+
+  <!-- 2. UPLOAD -->
+  <div class="card">
+    <h2>1️⃣ Upload Foto Soal</h2>
+    <p class="hint">Boleh 1 foto berisi banyak soal (misalnya hasil scan/screenshot satu halaman buku psikotes). Semakin jelas & tidak miring fotonya, semakin akurat deteksi otomatisnya.</p>
+    <div class="upload-zone" id="upload-zone" onclick="el('in-file').click()">
+      📷 Klik untuk pilih foto, atau drag &amp; drop di sini
+    </div>
+    <input type="file" id="in-file" accept="image/*" style="display:none" onchange="onFilePicked(this.files[0])">
+    <div id="img-stage-wrap" style="display:none">
+      <img id="img-stage" src="">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-hijau" id="btn-deteksi" onclick="deteksiOtomatis()" disabled>🤖 Deteksi Soal Otomatis (AI)</button>
+      <button class="btn btn-kuning" id="btn-tambah-box" onclick="tambahBoxManual()" disabled>➕ Tambah Kotak Manual</button>
+    </div>
+    <p class="hint" id="deteksi-status"></p>
+  </div>
+
+  <!-- 3. DAFTAR ITEM -->
+  <div class="card" id="card-daftar" style="display:none">
+    <h2>2️⃣ Cek &amp; Lengkapi Tiap Soal</h2>
+    <p class="hint">
+      Geser/tarik sudut kanan-bawah tiap kotak merah di foto di atas untuk membetulkan posisinya. Klik kartu di bawah untuk memilihnya (jadi hijau di foto). Tiap kotak punya <b>Peran</b> (gambar soal / gambar pilihan ke berapa) dan <b>Grup</b> (kotak-kotak dengan nomor Grup sama = 1 soal yang sama).
+    </p>
+    <div class="grid-box" id="grid-item"></div>
+  </div>
+
+  <!-- 4. UPLOAD -->
+  <div class="card" id="card-upload" style="display:none">
+    <h2>3️⃣ Potong &amp; Upload ke ImgBB</h2>
+    <div class="btn-row">
+      <button class="btn btn-biru" onclick="potongDanUploadSemua()">✂️ Potong &amp; Upload Semua</button>
+    </div>
+    <p class="hint" id="upload-status"></p>
+  </div>
+
+  <!-- 5. HASIL -->
+  <div class="card" id="card-hasil" style="display:none">
+    <h2>4️⃣ Salin ke Spreadsheet</h2>
+    <p class="hint">
+      Baris di bawah sudah sesuai urutan kolom sheet <b>"psikotes"</b>: <code>Soal | Jawab | Kategori | Pilihan | GambarSoal | GambarPilihan</code>.
+      Klik "Salin", lalu paste langsung ke baris kosong di Google Sheets (mulai dari kolom A).<br>
+      💡 Kalau pilihan jawabannya HANYA gambar (tanpa teks/huruf), sistem otomatis memberi label <b>"Pilihan 1"</b>, <b>"Pilihan 2"</b>, dst sesuai urutan — pastikan kolom <b>Jawaban Benar</b> di kartu soal di atas diisi persis salah satu label itu (mis. "Pilihan 3") kalau jawaban benarnya adalah pilihan gambar tanpa teks.
+    </p>
+    <textarea id="hasil-tsv" rows="6" readonly></textarea>
+    <div class="btn-row">
+      <button class="btn btn-hijau" onclick="salinTSV()">📋 Salin ke Clipboard</button>
+    </div>
+    <h2 style="margin-top:18px">👀 Pratinjau (mirip tampilan di web)</h2>
+    <div id="preview-area"></div>
+  </div>
+
+</div>
+
+<footer>Tool internal mdr2 — untuk menyiapkan soal, bukan bagian dari latihan pemain.</footer>
+
+<script>
+// ================================================================
+//  STATE
+// ================================================================
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent";
+let img = null;          // HTMLImageElement (gambar asli)
+let naturalW = 0, naturalH = 0;
+let boxes = [];          // {id, xPct,yPct,wPct,hPct, peran, grup, teks, kategori, jawaban, uploadUrl, uploadStatus}
+let idCounter = 1;
+let boxAktifId = null;
+
+function el(id){ return document.getElementById(id); }
+
+// ================================================================
+//  API KEYS (localStorage dipakai bersama app utama utk key Gemini)
+// ================================================================
+function muatKeys(){
+  const g = localStorage.getItem("gemini_api_key") || "";
+  const i = localStorage.getItem("imgbb_api_key") || "";
+  el("in-gemini-key").value = g;
+  el("in-imgbb-key").value = i;
+  updateKeyStatus();
+}
+function simpanKeys(){
+  localStorage.setItem("gemini_api_key", el("in-gemini-key").value.trim());
+  localStorage.setItem("imgbb_api_key", el("in-imgbb-key").value.trim());
+  updateKeyStatus();
+}
+function updateKeyStatus(){
+  const g = localStorage.getItem("gemini_api_key") || "";
+  const i = localStorage.getItem("imgbb_api_key") || "";
+  el("key-status").textContent = (g ? "✅ Gemini key tersimpan" : "⚠️ Gemini key belum diisi") + "  |  " + (i ? "✅ ImgBB key tersimpan" : "⚠️ ImgBB key belum diisi");
+}
+muatKeys();
+
+// ================================================================
+//  UPLOAD FOTO
+// ================================================================
+const zone = el("upload-zone");
+zone.addEventListener("dragover", e => { e.preventDefault(); zone.style.borderColor = "#1565c0"; });
+zone.addEventListener("dragleave", () => { zone.style.borderColor = "#e0e0e0"; });
+zone.addEventListener("drop", e => {
+  e.preventDefault(); zone.style.borderColor = "#e0e0e0";
+  if (e.dataTransfer.files[0]) onFilePicked(e.dataTransfer.files[0]);
+});
+
+function onFilePicked(file){
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    img = new Image();
+    img.onload = () => {
+      naturalW = img.naturalWidth; naturalH = img.naturalHeight;
+      const stageImg = el("img-stage");
+      stageImg.src = img.src;
+      el("img-stage-wrap").style.display = "inline-block";
+      el("btn-deteksi").disabled = false;
+      el("btn-tambah-box").disabled = false;
+      boxes = []; boxAktifId = null;
+      renderSemua();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ================================================================
+//  DETEKSI OTOMATIS (Gemini Vision)
+// ================================================================
+async function deteksiOtomatis(){
+  const apiKey = (el("in-gemini-key").value || "").trim();
+  if (!apiKey) { alert("Isi & simpan Gemini API key dulu."); return; }
+  if (!img) { alert("Upload foto dulu."); return; }
+  simpanKeys();
+
+  el("deteksi-status").textContent = "⏳ AI sedang menganalisis foto (bisa 10-30 detik)...";
+  el("btn-deteksi").disabled = true;
+
+  try {
+    const base64 = img.src.split(",")[1];
+    const mimeType = img.src.substring(5, img.src.indexOf(";"));
+    const prompt = `Ini adalah 1 foto yang berisi BEBERAPA soal psikotes/tes potensi akademik (bisa berupa teks, gambar/diagram, atau kombinasi).
+Tugasmu: identifikasi SETIAP elemen visual yang perlu di-crop jadi gambar terpisah, yaitu:
+- Elemen "soal": area yang berisi pertanyaan/diagram utama dari 1 nomor soal (kalau soal cuma teks tanpa gambar/diagram, TETAP LAPORKAN posisinya sebagai peran "soal" supaya teksnya bisa dibaca terpisah).
+- Elemen "pilihan": area gambar untuk 1 opsi jawaban (kalau pilihan jawabannya berupa gambar/diagram, bukan cuma teks/huruf A-E biasa).
+Kalau pilihan jawabannya cuma teks huruf/angka biasa (bukan gambar), JANGAN buat elemen "pilihan" untuk itu — cukup tulis teksnya di field "teks" pada bagian akhir kalau kebaca, atau kosongkan.
+
+Kelompokkan elemen-elemen yang berasal dari 1 nomor soal yang sama dengan nomor "grup" yang sama (mulai dari 1, urut sesuai urutan soal di foto, TIDAK harus sama dengan nomor asli di foto).
+
+Balas HANYA berupa JSON array (tanpa markdown, tanpa teks lain), tiap elemen:
+{
+  "grup": 1,
+  "peran": "soal" | "pilihan",
+  "boxPercent": {"x": 0, "y": 0, "w": 0, "h": 0},
+  "teks": "OCR teks singkat di area ini kalau ada (kosongkan kalau murni gambar/diagram tanpa teks bermakna)",
+  "kategoriTebakan": "tebakan kategori psikotes elemen ini (khusus kalau peran=soal, mis. Deret Gambar / Analogi / Spasial, dst)",
+  "jawabanTebakan": "kalau ada tanda jawaban benar terlihat di foto (misal dilingkari/ditandai), tulis di sini (khusus peran=soal). Kosongkan kalau tidak yakin."
+}
+"boxPercent" adalah posisi kotak pembatas area tsb dalam PERSEN (0-100) relatif terhadap lebar & tinggi FOTO UTUH (x,y = pojok kiri-atas kotak; w,h = lebar & tinggi kotak). Kotak boleh sedikit lebih besar dari objeknya (beri sedikit margin) tapi jangan sampai tumpang tindih terlalu banyak dengan elemen soal lain.`;
+
+    const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType || "image/jpeg", data: base64 } }
+        ]}],
+        generationConfig: { maxOutputTokens: 4000, temperature: 0.2, responseMimeType: "application/json" },
+      }),
+    });
+
+    if (!resp.ok) {
+      let msg = `Gemini error ${resp.status}`;
+      try { const d = await resp.json(); msg = d?.error?.message || msg; } catch(_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    const cand = data?.candidates?.[0];
+    const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
+    if (!text) throw new Error("AI tidak mengembalikan hasil. Coba lagi atau foto ulang dengan pencahayaan lebih baik.");
+
+    const jsonTeks = extractJson(text);
+    let list;
+    try { list = JSON.parse(jsonTeks); } catch(e) { throw new Error("Gagal membaca hasil deteksi AI (format tidak valid). Coba lagi."); }
+    if (!Array.isArray(list) || !list.length) throw new Error("AI tidak mendeteksi elemen soal apa pun di foto ini. Coba tambah kotak manual, atau pakai foto lain.");
+
+    boxes = list.map(it => {
+      const bp = it.boxPercent || {};
+      const peran = it.peran === "pilihan" ? "pilihan1" : "soal"; // default index diatur ulang di bawah
+      return {
+        id: idCounter++,
+        xPct: clamp(num(bp.x), 0, 95), yPct: clamp(num(bp.y), 0, 95),
+        wPct: clamp(num(bp.w) || 15, 3, 100), hPct: clamp(num(bp.h) || 15, 3, 100),
+        peran, grup: parseInt(it.grup, 10) || 1,
+        teks: (it.teks || "").trim(),
+        kategori: (it.kategoriTebakan || "").trim(),
+        jawaban: (it.jawabanTebakan || "").trim(),
+        uploadUrl: "", uploadStatus: "belum",
+      };
+    });
+    // Beri nomor urut pilihan (pilihan1, pilihan2, ...) per grup, sesuai urutan kemunculan
+    const counterPerGrup = {};
+    boxes.forEach(b => {
+      if (b.peran !== "soal") {
+        counterPerGrup[b.grup] = (counterPerGrup[b.grup] || 0) + 1;
+        b.peran = "pilihan" + Math.min(counterPerGrup[b.grup], 5);
+      }
+    });
+
+    el("deteksi-status").textContent = `✅ Terdeteksi ${boxes.length} elemen dari ${new Set(boxes.map(b=>b.grup)).size} soal. Cek &amp; sesuaikan posisi kotak di bawah kalau perlu.`;
+    renderSemua();
+  } catch(e) {
+    el("deteksi-status").textContent = "❌ " + e.message;
+  } finally {
+    el("btn-deteksi").disabled = false;
+  }
+}
+
+function extractJson(text){
+  const cleaned = text.replace(/```json/gi,"").replace(/```/g,"");
+  const startIdx = cleaned.search(/[\{\[]/);
+  if (startIdx === -1) return cleaned.trim();
+  const openCh = cleaned[startIdx], closeCh = openCh === "{" ? "}" : "]";
+  let depth = 0, inStr = false, esc = false;
+  for (let i = startIdx; i < cleaned.length; i++) {
+    const c = cleaned[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === openCh) depth++;
+    else if (c === closeCh) { depth--; if (depth === 0) return cleaned.slice(startIdx, i+1); }
+  }
+  return cleaned.slice(startIdx).trim();
+}
+function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+
+function tambahBoxManual(){
+  if (!img) return;
+  const grupBaru = boxes.length ? Math.max(...boxes.map(b=>b.grup)) + 1 : 1;
+  boxes.push({
+    id: idCounter++, xPct: 30, yPct: 30, wPct: 25, hPct: 20,
+    peran: "soal", grup: grupBaru, teks: "", kategori: "", jawaban: "",
+    uploadUrl: "", uploadStatus: "belum",
+  });
+  renderSemua();
+}
+
+// ================================================================
+//  RENDER OVERLAY (drag & resize) + DAFTAR KARTU
+// ================================================================
+function renderSemua(){
+  renderOverlay();
+  renderDaftar();
+  el("card-daftar").style.display = boxes.length ? "block" : "none";
+  el("card-upload").style.display = boxes.length ? "block" : "none";
+}
+
+function renderOverlay(){
+  const stageWrap = el("img-stage-wrap");
+  stageWrap.querySelectorAll(".box").forEach(b => b.remove());
+  boxes.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "box" + (b.id === boxAktifId ? " aktif" : "");
+    div.style.left = b.xPct + "%";
+    div.style.top = b.yPct + "%";
+    div.style.width = b.wPct + "%";
+    div.style.height = b.hPct + "%";
+    div.dataset.id = b.id;
+    div.innerHTML = `<span class="lbl">${labelPeran(b)}</span><span class="handle"></span>`;
+    div.addEventListener("pointerdown", (e) => onBoxPointerDown(e, b));
+    div.querySelector(".handle").addEventListener("pointerdown", (e) => { e.stopPropagation(); onHandlePointerDown(e, b); });
+    stageWrap.appendChild(div);
+  });
+}
+
+function labelPeran(b){
+  return "G" + b.grup + " · " + (b.peran === "soal" ? "Soal" : "Pil." + b.peran.replace("pilihan",""));
+}
+
+function onBoxPointerDown(e, b){
+  e.preventDefault();
+  boxAktifId = b.id; renderOverlay(); scrollKartuKe(b.id);
+  const wrap = el("img-stage-wrap");
+  const rect = wrap.getBoundingClientRect();
+  const startX = e.clientX, startY = e.clientY;
+  const startXPct = b.xPct, startYPct = b.yPct;
+  function onMove(ev){
+    const dxPct = (ev.clientX - startX) / rect.width * 100;
+    const dyPct = (ev.clientY - startY) / rect.height * 100;
+    b.xPct = clamp(startXPct + dxPct, 0, 100 - b.wPct);
+    b.yPct = clamp(startYPct + dyPct, 0, 100 - b.hPct);
+    renderOverlay(); updateThumb(b.id);
+  }
+  function onUp(){ window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); }
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+function onHandlePointerDown(e, b){
+  e.preventDefault();
+  boxAktifId = b.id; renderOverlay();
+  const wrap = el("img-stage-wrap");
+  const rect = wrap.getBoundingClientRect();
+  const startX = e.clientX, startY = e.clientY;
+  const startW = b.wPct, startH = b.hPct;
+  function onMove(ev){
+    const dwPct = (ev.clientX - startX) / rect.width * 100;
+    const dhPct = (ev.clientY - startY) / rect.height * 100;
+    b.wPct = clamp(startW + dwPct, 3, 100 - b.xPct);
+    b.hPct = clamp(startH + dhPct, 3, 100 - b.yPct);
+    renderOverlay(); updateThumb(b.id);
+  }
+  function onUp(){ window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); }
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+function renderDaftar(){
+  const grid = el("grid-item");
+  grid.innerHTML = "";
+  boxes.forEach(b => {
+    const card = document.createElement("div");
+    card.className = "item-card " + (b.peran === "soal" ? "role-soal" : "role-pilihan");
+    card.id = "kartu-" + b.id;
+    card.innerHTML = `
+      <div class="top-row">
+        <b>${labelPeran(b)}</b>
+        <button class="del-x" onclick="hapusBox(${b.id})" title="Hapus kotak ini">✕</button>
+      </div>
+      <canvas id="thumb-${b.id}" height="120" onclick="pilihBox(${b.id})"></canvas>
+      <div class="mini-row">
+        <div>
+          <label style="font-size:11px">Peran</label>
+          <select onchange="ubahBox(${b.id},'peran',this.value)">
+            <option value="soal" ${b.peran==='soal'?'selected':''}>🧩 Gambar Soal</option>
+            <option value="pilihan1" ${b.peran==='pilihan1'?'selected':''}>🅰️ Pilihan 1</option>
+            <option value="pilihan2" ${b.peran==='pilihan2'?'selected':''}>🅱️ Pilihan 2</option>
+            <option value="pilihan3" ${b.peran==='pilihan3'?'selected':''}>🅲 Pilihan 3</option>
+            <option value="pilihan4" ${b.peran==='pilihan4'?'selected':''}>🅳 Pilihan 4</option>
+            <option value="pilihan5" ${b.peran==='pilihan5'?'selected':''}>🅴 Pilihan 5</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px">Grup Soal #</label>
+          <input type="number" min="1" value="${b.grup}" onchange="ubahBox(${b.id},'grup',parseInt(this.value)||1)">
+        </div>
+      </div>
+      <label style="font-size:11px">Teks (OCR, boleh diedit)</label>
+      <input type="text" value="${escAttr(b.teks)}" placeholder="Teks di area ini..." onchange="ubahBox(${b.id},'teks',this.value)">
+      ${b.peran === 'soal' ? `
+      <div class="mini-row" style="margin-top:6px">
+        <div>
+          <label style="font-size:11px">Kategori</label>
+          <input type="text" value="${escAttr(b.kategori)}" onchange="ubahBox(${b.id},'kategori',this.value)">
+        </div>
+        <div>
+          <label style="font-size:11px">Jawaban Benar</label>
+          <input type="text" value="${escAttr(b.jawaban)}" placeholder="cth: pilihan 1 / B" onchange="ubahBox(${b.id},'jawaban',this.value)">
+        </div>
+      </div>` : ``}
+      <div style="margin-top:6px"><span class="status-pill status-${b.uploadStatus}">${labelStatus(b.uploadStatus)}</span></div>
+    `;
+    grid.appendChild(card);
+    updateThumb(b.id);
+  });
+}
+
+function labelStatus(s){
+  return { belum:"Belum diupload", proses:"⏳ Mengupload...", ok:"✅ Terupload", gagal:"❌ Gagal upload" }[s] || s;
+}
+function escAttr(s){ return String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+
+function pilihBox(id){ boxAktifId = id; renderOverlay(); }
+function scrollKartuKe(id){ const k = el("kartu-"+id); if (k) k.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+
+function ubahBox(id, field, val){
+  const b = boxes.find(x => x.id === id);
+  if (!b) return;
+  b[field] = val;
+  if (field === 'peran') renderOverlay(); // label berubah
+}
+
+function hapusBox(id){
+  boxes = boxes.filter(b => b.id !== id);
+  if (boxAktifId === id) boxAktifId = null;
+  renderSemua();
+}
+
+// ── Thumbnail crop preview (canvas kecil, redraw tiap posisi kotak berubah) ──
+function updateThumb(id){
+  const b = boxes.find(x => x.id === id);
+  const canvas = el("thumb-" + id);
+  if (!b || !canvas || !img) return;
+  const sx = (b.xPct/100) * naturalW, sy = (b.yPct/100) * naturalH;
+  const sw = (b.wPct/100) * naturalW, sh = (b.hPct/100) * naturalH;
+  const aspect = sw / sh || 1;
+  canvas.width = Math.round(canvas.height * aspect);
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  try { ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height); } catch(e) {}
+}
+
+// ================================================================
+//  POTONG & UPLOAD KE IMGBB
+// ================================================================
+async function potongDanUploadSemua(){
+  const imgbbKey = (el("in-imgbb-key").value || "").trim();
+  if (!imgbbKey) { alert("Isi & simpan ImgBB API key dulu."); return; }
+  if (!boxes.length) { alert("Belum ada kotak soal."); return; }
+  simpanKeys();
+
+  const statusEl = el("upload-status");
+  let sukses = 0, gagal = 0;
+  for (const b of boxes) {
+    b.uploadStatus = "proses"; renderDaftar();
+    statusEl.textContent = `⏳ Mengupload ${sukses+gagal+1}/${boxes.length}...`;
+    try {
+      const dataUrl = cropToDataURL(b);
+      const url = await uploadKeImgbb(dataUrl, imgbbKey);
+      b.uploadUrl = url; b.uploadStatus = "ok"; sukses++;
+    } catch(e) {
+      b.uploadStatus = "gagal"; gagal++;
+      console.error("Upload gagal utk kotak", b.id, e);
+    }
+    renderDaftar();
+  }
+  statusEl.textContent = `Selesai: ✅ ${sukses} berhasil, ❌ ${gagal} gagal.` + (gagal ? " Cek koneksi/ImgBB key lalu ulangi khusus yang gagal (upload ulang semua aman, yang sudah OK akan diupload ulang juga)." : "");
+  generateHasil();
+  el("card-hasil").style.display = "block";
+}
+
+function cropToDataURL(b){
+  const sx = (b.xPct/100) * naturalW, sy = (b.yPct/100) * naturalH;
+  const sw = (b.wPct/100) * naturalW, sh = (b.hPct/100) * naturalH;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(sw));
+  canvas.height = Math.max(1, Math.round(sh));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
+
+async function uploadKeImgbb(dataUrl, apiKey){
+  const base64 = dataUrl.split(",")[1];
+  const form = new FormData();
+  form.append("image", base64);
+  const resp = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, { method: "POST", body: form });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) throw new Error(data?.error?.message || `ImgBB error ${resp.status}`);
+  return data.data.url;
+}
+
+// ================================================================
+//  GENERATE TSV + PRATINJAU
+// ================================================================
+function bangunBarisSpreadsheet(){
+  const grupMap = {};
+  boxes.forEach(b => {
+    if (!grupMap[b.grup]) grupMap[b.grup] = { soal: null, pilihan: {} };
+    if (b.peran === "soal") grupMap[b.grup].soal = b;
+    else {
+      const idx = parseInt(b.peran.replace("pilihan",""), 10) || 1;
+      grupMap[b.grup].pilihan[idx] = b;
+    }
+  });
+  const grupKeys = Object.keys(grupMap).map(Number).sort((a,b) => a-b);
+  return grupKeys.map(g => {
+    const grp = grupMap[g];
+    const idxPilihan = Object.keys(grp.pilihan).map(Number).sort((a,b)=>a-b);
+    const maxIdx = idxPilihan.length ? Math.max(...idxPilihan) : 0;
+    const pilihanTeks = [], pilihanGambar = [];
+    for (let i = 1; i <= maxIdx; i++) {
+      const p = grp.pilihan[i];
+      pilihanTeks.push(p ? bersihkan(p.teks) : "");
+      pilihanGambar.push(p ? (p.uploadUrl || "") : "");
+    }
+    return {
+      grup: g,
+      soal: grp.soal ? bersihkan(grp.soal.teks) : "",
+      jawaban: grp.soal ? bersihkan(grp.soal.jawaban) : "",
+      kategori: grp.soal ? bersihkan(grp.soal.kategori) : "",
+      pilihan: pilihanTeks.join(";"),
+      gambarSoal: grp.soal ? (grp.soal.uploadUrl || "") : "",
+      gambarPilihan: pilihanGambar.join(";"),
+    };
+  });
+}
+function bersihkan(s){ return String(s||"").replace(/[\t\r\n]+/g," ").trim(); }
+
+function generateHasil(){
+  const baris = bangunBarisSpreadsheet();
+  const tsv = baris.map(r => [r.soal, r.jawaban, r.kategori, r.pilihan, r.gambarSoal, r.gambarPilihan].join("\t")).join("\n");
+  el("hasil-tsv").value = tsv;
+  renderPreview(baris);
+}
+
+function salinTSV(){
+  const ta = el("hasil-tsv");
+  ta.select();
+  navigator.clipboard?.writeText(ta.value).then(() => {
+    alert("✅ Tersalin! Buka spreadsheet, klik sel kosong di kolom A, lalu Paste (Ctrl/Cmd+V).");
+  }).catch(() => { document.execCommand("copy"); alert("✅ Tersalin (fallback)."); });
+}
+
+function renderPreview(baris){
+  const area = el("preview-area");
+  area.innerHTML = baris.map(r => `
+    <div class="preview-soal">
+      <span class="chip">${escAttr(r.kategori || "Umum")}</span>
+      <div style="font-weight:700">${escAttr(r.soal || "(tanpa teks soal)")}</div>
+      ${r.gambarSoal ? `<img src="${r.gambarSoal}">` : ""}
+      ${r.pilihan.split(";").map((p, i) => {
+        const g = r.gambarPilihan.split(";")[i] || "";
+        if (!p && !g) return "";
+        const labelTampil = p || (g ? `Pilihan ${i + 1}` : "");
+        return `<div class="preview-pilihan">${g ? `<img src="${g}">` : ""}${labelTampil ? escAttr(labelTampil) : ""}</div>`;
+      }).join("")}
+      <div style="font-size:12px;color:#2e7d32;margin-top:6px">✅ Jawaban: ${escAttr(r.jawaban || "(isi manual)")}</div>
+    </div>
+  `).join("") || `<p class="hint">Belum ada data.</p>`;
+}
+</script>
+</body>
+</html>
