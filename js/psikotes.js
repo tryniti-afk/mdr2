@@ -2,7 +2,8 @@
 //  PSIKOTES.JS — Modul Latihan Psikotes + Tes Kreplin (Pauli)
 //  Fitur:
 //    • Soal diambil dari spreadsheet sheet "psikotes"
-//      Kolom: Soal | Jawab | Kategori | Pilihan (opsional, pisah ";")
+//      Kolom: Soal | Jawab | Kategori | Pilihan (opsional, pisah ";") |
+//             GambarSoal (opsional, URL) | GambarPilihan (opsional, URL, pisah ";" sejajar Pilihan)
 //    • Pilih kategori (bebas berapa saja / All In)
 //    • Pengaturan waktu: Tanpa waktu / Stopwatch / Batas waktu
 //    • Mode jika salah: Lanjut terus | Ulang di akhir kategori |
@@ -112,8 +113,25 @@ var Psikotes = {
         jawaban: (col[1] || "").trim(),
         kategori: (col[2] || "").trim() || "Umum",
         pilihanRaw: (col[3] || "").trim(),
+        gambarSoal: (col[4] || "").trim(),        // URL gambar soal (opsional)
+        gambarPilihanRaw: (col[5] || "").trim(),  // URL gambar per-pilihan, pisah ";" sejajar urutan Pilihan (opsional)
       };
     }).filter(Boolean).filter(s => s.soal && s.jawaban);
+  },
+
+  // Peta teks-pilihan -> URL gambar (dari kolom GambarPilihan), utk soal yg pilihannya manual.
+  // Label pilihan gambar-tanpa-teks HARUS sama persis dengan yang dipakai _buatPilihan ("Pilihan N").
+  _petaGambarPilihan(soal) {
+    if (!soal.pilihanRaw || !soal.gambarPilihanRaw) return {};
+    const teksArr = soal.pilihanRaw.split(";").map(s => s.trim());
+    const gambarArr = soal.gambarPilihanRaw.split(";").map(s => s.trim());
+    const peta = {};
+    teksArr.forEach((t, i) => {
+      if (!gambarArr[i]) return;
+      const label = t || `Pilihan ${i + 1}`;
+      peta[label.toLowerCase()] = gambarArr[i];
+    });
+    return peta;
   },
 
   _splitCSVRow(row) {
@@ -132,10 +150,20 @@ var Psikotes = {
   // Bangun 4-6 pilihan ganda dari 1 soal. Kalau kolom Pilihan kosong,
   // otomatis bikin pengecoh: angka acak (kalau jawaban angka) atau
   // jawaban soal lain di kategori yang sama (kalau bukan angka).
+  // Pilihan yang teksnya kosong TAPI punya gambar (GambarPilihan) tidak
+  // dibuang — otomatis diberi label "Pilihan N" supaya gambarnya tetap
+  // tampil & tetap bisa dijawab (kolom Jawab isi "Pilihan N" kalau itu
+  // jawaban yang benar).
   _buatPilihan(soal) {
     const jawabanBenar = String(soal.jawaban).trim();
     let pilihan = [];
-    if (soal.pilihanRaw) pilihan = soal.pilihanRaw.split(";").map(s => s.trim()).filter(Boolean);
+    if (soal.pilihanRaw) {
+      const rawArr = soal.pilihanRaw.split(";").map(s => s.trim());
+      const gambarArr = soal.gambarPilihanRaw ? soal.gambarPilihanRaw.split(";").map(s => s.trim()) : [];
+      pilihan = rawArr
+        .map((t, i) => t || (gambarArr[i] ? `Pilihan ${i + 1}` : ""))
+        .filter(Boolean);
+    }
     if (!pilihan.some(p => p.toLowerCase() === jawabanBenar.toLowerCase())) pilihan.push(jawabanBenar);
 
     const isNumeric = /^-?\d+(\.\d+)?$/.test(jawabanBenar.replace(",", "."));
@@ -354,6 +382,7 @@ var Psikotes = {
     const soal = this.state.currentQueue[this.state.queuePtr];
     if (!soal) { this._tampilSelesai(); return; }
     const pilihan = this._buatPilihan(soal);
+    const petaGambar = this._petaGambarPilihan(soal);
     const totalDiBlok = this.state.currentQueue.length;
     const noSekarang = this.state.queuePtr + 1;
 
@@ -365,7 +394,10 @@ var Psikotes = {
         </div>
         ${this.cfg.waktuMode !== "none" ? `<div class="timer-box" id="pk-timer">--:--</div>` : ""}
         <div class="quiz-label-row"><span class="quiz-chip quiz-chip-ungu">${pkEsc(soal.kategori)}</span></div>
-        <div class="quiz-soal-box">${pkEsc(soal.soal)}</div>
+        <div class="quiz-soal-box">
+          ${soal.soal ? pkEsc(soal.soal) : ""}
+          ${soal.gambarSoal ? `<div class="pk-gambar-wrap"><img src="${pkEsc(soal.gambarSoal)}" alt="Gambar soal" class="pk-gambar-soal" loading="lazy"></div>` : ""}
+        </div>
         <div id="pk-pilihan-wrap" class="sub-menu-grid" style="grid-template-columns:1fr"></div>
         <div id="pk-hasil" class="hasil-box" style="display:none"></div>
         <div class="btn-row" style="margin-top:14px;justify-content:center">
@@ -378,7 +410,12 @@ var Psikotes = {
       const b = document.createElement("button");
       b.className = "btn-pilihan";
       b.style.textAlign = "left";
-      b.innerText = p;
+      const urlGambar = petaGambar[String(p).trim().toLowerCase()];
+      if (urlGambar) {
+        b.innerHTML = `<img src="${pkEsc(urlGambar)}" alt="Pilihan ${i + 1}" class="pk-gambar-pilihan" loading="lazy">${p ? `<div>${pkEsc(p)}</div>` : ""}`;
+      } else {
+        b.innerText = p;
+      }
       b.onclick = () => isRetry ? this._pilihJawabanRetry(wrap, pilihan, soal, i) : this._pilihJawaban(wrap, pilihan, soal, i);
       wrap.appendChild(b);
     });
