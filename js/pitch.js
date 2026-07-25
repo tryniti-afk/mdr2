@@ -58,7 +58,58 @@ var GeminiAPI = {
     return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/\n/g, "<br>")
       .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-  }
+  },
+
+  // ── Panggil Gemini DENGAN akses pencarian Google (grounding) ────
+  // Dipakai saat fitur perlu mengambil informasi/soal nyata dari
+  // internet (bukan sekadar dikarang AI), lengkap dengan daftar
+  // sumber (title + url) yang dipakai AI untuk menjawab.
+  async callSearch(prompt, maxTokens = 1500, temperature = 0.4) {
+    const apiKey = this.getKey();
+    if (!apiKey) throw new Error("API key Gemini belum diisi. Masukkan API key dulu (menu fitur AI lain juga pakai key yang sama).");
+    let resp;
+    try {
+      resp = await fetch(`${this.URL}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
+        }),
+      });
+    } catch (e) {
+      throw new Error("Gagal terhubung ke Gemini API. Cek koneksi internet kamu.");
+    }
+    if (!resp.ok) {
+      let msg = `Gemini error ${resp.status}`;
+      try { const d = await resp.json(); msg = d?.error?.message || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await resp.json();
+    const cand = data?.candidates?.[0];
+    const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
+    if (!text) throw new Error("AI tidak menghasilkan teks (mungkin tidak menemukan hasil pencarian). Coba lagi.");
+    const chunks = cand?.groundingMetadata?.groundingChunks || [];
+    const sources = chunks
+      .map(c => ({ title: c?.web?.title || c?.web?.uri || "Sumber", uri: c?.web?.uri || "" }))
+      .filter(s => s.uri);
+    return { text, sources };
+  },
+
+  // Sama seperti callSearch, tapi hasil teksnya diparse sebagai JSON.
+  async callSearchJSON(prompt, maxTokens = 1500, temperature = 0.4) {
+    const { text, sources } = await this.callSearch(prompt, maxTokens, temperature);
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const m = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    let data;
+    try {
+      data = JSON.parse(m ? m[0] : cleaned);
+    } catch (e) {
+      throw new Error("Gagal membaca format hasil pencarian AI. Coba lagi.");
+    }
+    return { data, sources };
+  },
 };
 
 // ── TONE UTIL — parsing pinyin & kontur nada ideal ───────────
