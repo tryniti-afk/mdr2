@@ -285,6 +285,34 @@ var App = {
           </div>
         </div>
 
+        <!-- AI / GEMINI API KEY -->
+        <div class="card" style="margin-bottom:14px">
+          <h3 style="margin:0 0 12px">🤖 AI (Gemini API)</h3>
+          <div style="font-size:13px;color:var(--c-sub);margin-bottom:10px">
+            Key ini dipakai bersama oleh semua fitur AI di aplikasi (Latihan Psikotes AI, Trik Cepat, Terjemahan, Latihan Kosakata AI, dll).
+          </div>
+          <div id="set-gemini-status" style="font-size:13px;margin-bottom:10px">${this._statusApiKeyHtml()}</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="password" id="set-gemini-input" class="input-teks" placeholder="Tempel API key Gemini di sini..." style="flex:1">
+            <button class="btn btn-abu" style="white-space:nowrap" onclick="App._toggleLihatApiKey()" id="set-gemini-toggle">👁️</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="App._simpanApiKey()">💾 Simpan Key</button>
+            <button class="btn btn-biru" onclick="App._tesApiKey()">🧪 Tes Key</button>
+            <button class="btn btn-merah" onclick="App._hapusApiKey()">🗑️ Hapus Key</button>
+          </div>
+          <p id="set-gemini-tes-hasil" style="font-size:13px;margin-top:8px"></p>
+          <div style="font-size:12px;color:var(--c-sub);margin-top:10px;line-height:1.5">
+            ⚠️ Kalau muncul pesan <b>"quota exceeded"</b>, itu artinya key sedang kena <b>batas gratis Gemini</b> (dibatasi per-menit &amp; per-hari, jumlahnya kecil di tier gratis) — bukan berarti key-nya rusak. Beberapa cara mengatasi:
+            <ul style="margin:6px 0 0 18px;padding:0">
+              <li>Tunggu 1-2 menit lalu coba lagi (limit per-menit biasanya reset cepat).</li>
+              <li>Buat API key baru dari <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a> (akun Google lain juga bisa punya key sendiri) lalu ganti di sini.</li>
+              <li>Cek sisa kuota &amp; batasnya di <a href="https://ai.dev/rate-limit" target="_blank" rel="noopener noreferrer">ai.dev/rate-limit</a>, atau aktifkan billing di <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener noreferrer">Google AI</a> kalau mau kuota lebih besar.</li>
+              <li>Kurangi soal AI/percobaan beruntun dalam waktu singkat — tiap 1 soal bisa memakai lebih dari 1 panggilan API (soal + trik + saran), jadi kuota kecil cepat habis kalau latihan cepat &amp; banyak sekaligus.</li>
+            </ul>
+          </div>
+        </div>
+
         <!-- TEMA -->
         <div class="card" style="margin-bottom:14px">
           <h3 style="margin:0 0 12px">🌙 Tampilan</h3>
@@ -326,6 +354,67 @@ var App = {
   },
 
   tutupSettings() { this._screen("home"); },
+
+  // ================================================================
+  //  KELOLA API KEY GEMINI (dipakai bersama semua fitur AI)
+  // ================================================================
+  _maskApiKey(k) {
+    if (!k) return "";
+    if (k.length <= 8) return "•".repeat(k.length);
+    return k.slice(0, 4) + "•".repeat(Math.max(4, k.length - 8)) + k.slice(-4);
+  },
+
+  _statusApiKeyHtml() {
+    const k = (typeof GeminiAPI !== "undefined") ? GeminiAPI.getKey() : "";
+    return k
+      ? `✅ Key tersimpan: <code>${this._maskApiKey(k)}</code>`
+      : `⚠️ Belum ada API key Gemini tersimpan. Dapatkan gratis di <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>.`;
+  },
+
+  _toggleLihatApiKey() {
+    const inp = el("set-gemini-input");
+    const btn = el("set-gemini-toggle");
+    if (!inp) return;
+    const sedangTerlihat = inp.type === "text";
+    inp.type = sedangTerlihat ? "password" : "text";
+    if (btn) btn.textContent = sedangTerlihat ? "👁️" : "🙈";
+  },
+
+  _simpanApiKey() {
+    const inp = el("set-gemini-input");
+    const v = inp ? inp.value.trim() : "";
+    if (!v) { tampilToast("⚠️ Tempel API key dulu sebelum disimpan."); return; }
+    GeminiAPI.setKey(v);
+    if (inp) inp.value = "";
+    setHTML("set-gemini-status", this._statusApiKeyHtml());
+    setHTML("set-gemini-tes-hasil", "");
+    tampilToast("✅ API key Gemini disimpan.");
+  },
+
+  _hapusApiKey() {
+    GeminiAPI.setKey("");
+    setHTML("set-gemini-status", this._statusApiKeyHtml());
+    setHTML("set-gemini-tes-hasil", "");
+    tampilToast("🗑️ API key Gemini dihapus.");
+  },
+
+  async _tesApiKey() {
+    const hasilEl = el("set-gemini-tes-hasil");
+    if (!GeminiAPI.getKey()) {
+      const inp = el("set-gemini-input");
+      const v = inp ? inp.value.trim() : "";
+      if (v) GeminiAPI.setKey(v);
+    }
+    if (!GeminiAPI.getKey()) { if (hasilEl) hasilEl.innerHTML = "⚠️ Isi/simpan API key dulu."; return; }
+    if (hasilEl) hasilEl.innerHTML = "⏳ Menguji key...";
+    try {
+      const jawab = await GeminiAPI.call('Balas HANYA dengan kata "ok" (huruf kecil, tanpa tanda baca lain).', 10, 0);
+      if (hasilEl) hasilEl.innerHTML = `✅ Key aktif &amp; bisa dipakai! (balasan tes: "${GeminiAPI.esc2(jawab.trim())}")`;
+      setHTML("set-gemini-status", this._statusApiKeyHtml());
+    } catch (e) {
+      if (hasilEl) hasilEl.innerHTML = `❌ Gagal: ${GeminiAPI.esc2(e.message)}`;
+    }
+  },
 
   _applyTheme() {
     const theme = this._settings.theme || "light";
