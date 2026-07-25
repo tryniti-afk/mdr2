@@ -22,6 +22,10 @@ var Psikotes = {
 
   SHEET_NAME: "psikotes",
 
+  // Instruksi format perhitungan yang dipakai di semua prompt AI (trik, saran, tanya-lanjut)
+  // supaya rumus tidak keluar berantakan/ala LaTeX (mis. "$20+10-(20\\times10/10)=30-2)=28\\%$").
+  ATURAN_FORMAT_HITUNG: `Kalau perlu menulis perhitungan: JANGAN pakai notasi LaTeX atau simbol seperti $, \\times, \\frac, \\%. Tulis pakai angka & operator biasa saja (+, -, x, :, %), tanda kurung buka-tutup harus selalu seimbang, dan kalau langkahnya lebih dari satu, tulis tiap langkah di baris baru dengan format "Langkah 1: ...", "Langkah 2: ...", jangan digabung jadi satu baris rumus panjang.`,
+
   allSoal: [],
   kategoriList: [],
 
@@ -495,7 +499,8 @@ var Psikotes = {
     try {
       if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) throw new Error("no-key");
       const prompt = `Kamu tutor psikotes. Soal: "${soal.soal}" (kategori: "${soal.kategori}"). Jawaban benar: "${soal.jawaban}".
-Berikan HANYA 1-2 kalimat singkat berbahasa Indonesia: trik cepat / cara berpikir praktis untuk soal jenis ini tanpa kalkulator, atau analogi sederhana. Jangan mengulang soal atau jawabannya, langsung ke triknya.`;
+Berikan HANYA 1-2 kalimat singkat berbahasa Indonesia: trik cepat / cara berpikir praktis untuk soal jenis ini tanpa kalkulator, atau analogi sederhana. Jangan mengulang soal atau jawabannya, langsung ke triknya.
+${Psikotes.ATURAN_FORMAT_HITUNG}`;
       teks = await GeminiAPI.call(prompt, 200);
     } catch (e) {
       teks = this._localTrik(soal);
@@ -590,7 +595,8 @@ Berikan HANYA 1-2 kalimat singkat berbahasa Indonesia: trik cepat / cara berpiki
       const daftarTeks = daftarSalah.slice(0, 3).map(d => `- ${d.soal.soal} (kategori: ${d.soal.kategori})`).join("\n");
       const prompt = `Pengguna baru saja latihan soal psikotes dan mendapat skor ${pct}%.
 ${daftarTeks ? "Beberapa soal yang sering salah:\n" + daftarTeks : "Tidak ada catatan soal yang salah."}
-Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk paragraf tanpa list) untuk membantu pengguna berlatih lebih baik, termasuk 1 trik berpikir cepat yang relevan.`;
+Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk paragraf tanpa list) untuk membantu pengguna berlatih lebih baik, termasuk 1 trik berpikir cepat yang relevan.
+${Psikotes.ATURAN_FORMAT_HITUNG}`;
       teks = await GeminiAPI.call(prompt, 300);
     } catch (e) {
       teks = pct >= 80
@@ -973,7 +979,7 @@ Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk par
   // ================================================================
   GanjilGenap: {
 
-    cfg: { digit: 1, waktuMode: "stopwatch", batasMenit: 3, jumlahMode: "selesai", jumlahSoal: 30 },
+    cfg: { waktuMode: "stopwatch", batasMenit: 3, jumlahMode: "selesai", jumlahSoal: 30 },
     state: {},
     _interval: null,
     _keyHandlerBound: null,
@@ -983,17 +989,9 @@ Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk par
         <div class="pk-setup-wrap">
           <div class="pk-card">
             <h3>➕ Tes Cepat Ganjil-Genap</h3>
-            <p class="pk-hint">Dua angka dijumlahkan, kamu tentukan hasilnya <b>genap</b> (jawab 0) atau <b>ganjil</b> (jawab 1) —
-            tanpa perlu menghitung penuh, cukup cek digit terakhir tiap angka!</p>
-          </div>
-
-          <div class="pk-card">
-            <h3>🔢 Jenis Angka</h3>
-            <div class="opsi-grup">
-              <button class="opsi ${this.cfg.digit === 1 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(1)">Satuan (0-9)</button>
-              <button class="opsi ${this.cfg.digit === 2 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(2)">Puluhan (10-99)</button>
-              <button class="opsi ${this.cfg.digit === 3 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(3)">Ratusan (100-999)</button>
-            </div>
+            <p class="pk-hint">Dua angka acak dijumlahkan (bisa satuan, puluhan, ratusan, sampai ribuan, campur bebas —
+            misalnya satuan + ribuan, atau ratusan + ratusan), kamu tentukan hasilnya <b>genap</b> (jawab 0) atau
+            <b>ganjil</b> (jawab 1) — tanpa perlu menghitung penuh, cukup cek digit terakhir tiap angka!</p>
           </div>
 
           <div class="pk-card">
@@ -1031,14 +1029,17 @@ Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk par
       `;
     },
 
-    _pilihDigit(d) { this.cfg.digit = d; this.bukaSetup(); },
     _pilihWaktu(m) { this.cfg.waktuMode = m; this.bukaSetup(); },
     _pilihJumlahMode(m) { this.cfg.jumlahMode = m; this.bukaSetup(); },
 
-    _rangeDigit() {
-      if (this.cfg.digit === 1) return [0, 9];
-      if (this.cfg.digit === 2) return [10, 99];
-      return [100, 999];
+    // Angka acak dengan jumlah digit acak (1-4 = satuan/puluhan/ratusan/ribuan),
+    // dipanggil terpisah utk tiap angka supaya kombinasinya bisa campur bebas
+    // (mis. satuan + ribuan, puluhan + ratusan, ratusan + ratusan, dst).
+    _angkaAcak() {
+      const digit = 1 + Math.floor(Math.random() * 4); // 1..4
+      const lo = digit === 1 ? 0 : Math.pow(10, digit - 1);
+      const hi = Math.pow(10, digit) - 1;
+      return lo + Math.floor(Math.random() * (hi - lo + 1));
     },
 
     _mulai() {
@@ -1065,9 +1066,8 @@ Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk par
     },
 
     _soalBaru() {
-      const [lo, hi] = this._rangeDigit();
-      this.state.a = lo + Math.floor(Math.random() * (hi - lo + 1));
-      this.state.b = lo + Math.floor(Math.random() * (hi - lo + 1));
+      this.state.a = this._angkaAcak();
+      this.state.b = this._angkaAcak();
       this.state.soalMulaiTs = Date.now();
     },
 
@@ -1526,13 +1526,65 @@ Balas HANYA JSON valid tanpa markdown, format:
       try {
         if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) throw new Error('no-key');
         const prompt = `Kamu tutor psikotes. Soal: "${soal.pertanyaan}" (kategori: "${soal.kategori}"). Pilihan: ${soal.pilihan.join(' | ')}. Jawaban benar: "${soal.pilihan[soal.jawabanIdx]}".
-Berikan HANYA 1-2 kalimat trik cepat berbahasa Indonesia: cara berpikir sederhana tanpa kalkulator/hitungan rumit, langsung ke inti, atau analogi logis yang mudah dipahami. Jangan mengulang soal atau jawabannya.`;
-        teks = await GeminiAPI.call(prompt, 200);
+Berikan HANYA 1-2 kalimat trik cepat berbahasa Indonesia: cara berpikir sederhana tanpa kalkulator/hitungan rumit, langsung ke inti, atau analogi logis yang mudah dipahami. Jangan mengulang soal atau jawabannya.
+${Psikotes.ATURAN_FORMAT_HITUNG}`;
+        teks = await GeminiAPI.call(prompt, 220);
       } catch (e) {
         teks = Psikotes._localTrik({ kategori: soal.kategori, jawaban: soal.pilihan[soal.jawabanIdx] });
       }
+      this.state.trikKonteks = { soal, teks };
       const el2 = el('ai-trik-loading');
-      if (el2) el2.outerHTML = `<span>💡 <b>Trik:</b> ${typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks)}</span>`;
+      if (el2) el2.outerHTML = `<span>💡 <b>Trik:</b> ${typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks)}</span>` + this._kotakTanya('trik');
+    },
+
+    // ================================================================
+    //  TANYA AI LANJUTAN (dipakai utk kotak trik & kotak saran akhir)
+    //  idPrefix: 'trik' | 'saran'
+    // ================================================================
+    _kotakTanya(idPrefix) {
+      return `
+        <div class="sv-tanya-box" style="margin-top:10px;padding:8px 10px;background:rgba(33,150,243,.08);border-radius:8px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--c-biru)">❓ Masih bingung? Tanya AI</div>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="ai-${idPrefix}-tanya-input" placeholder="Misal: maksud langkah keduanya gimana?"
+              style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--c-border);border-radius:6px;font-size:13px;outline:none;background:var(--c-card);color:var(--c-text)"
+              onkeydown="if(event.key==='Enter')Psikotes.AI._tanyaLanjut('${idPrefix}')">
+            <button class="btn btn-biru" style="padding:7px 14px;white-space:nowrap" onclick="Psikotes.AI._tanyaLanjut('${idPrefix}')">Tanya</button>
+          </div>
+          <div id="ai-${idPrefix}-tanya-hasil" style="font-size:12.5px;margin-top:6px;color:var(--c-sub)"></div>
+        </div>`;
+    },
+
+    async _tanyaLanjut(idPrefix) {
+      const inp = el(`ai-${idPrefix}-tanya-input`);
+      const teks = inp ? inp.value.trim() : "";
+      if (!teks) return;
+      const hasilEl = el(`ai-${idPrefix}-tanya-hasil`);
+      if (hasilEl) hasilEl.innerHTML = "⏳ Mencari jawaban...";
+      if (inp) inp.disabled = true;
+
+      try {
+        if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) throw new Error('Perlu API key Gemini dulu.');
+        let konteks;
+        if (idPrefix === 'trik' && this.state.trikKonteks) {
+          const { soal, teks: trikTeks } = this.state.trikKonteks;
+          konteks = `Soal psikotes: "${soal.pertanyaan}" (kategori: "${soal.kategori}"). Pilihan: ${soal.pilihan.join(' | ')}. Jawaban benar: "${soal.pilihan[soal.jawabanIdx]}".
+Trik cepat yang sudah diberikan sebelumnya: "${trikTeks}"`;
+        } else if (idPrefix === 'saran' && this.state.saranKonteks) {
+          konteks = `Ringkasan hasil latihan psikotes pengguna (skor ${this.state.saranKonteks.pct}%). Saran yang sudah diberikan sebelumnya: "${this.state.saranKonteks.teks}"`;
+        } else {
+          konteks = "Konteks latihan psikotes sebelumnya.";
+        }
+        const prompt = `Kamu tutor psikotes yang ramah. ${konteks}
+Siswa masih bingung dan bertanya lebih lanjut: "${teks}"
+Jawab dengan jelas, singkat (maksimal 3-4 kalimat), berbahasa Indonesia, dengan cara berpikir sederhana/analogi yang mudah dipahami tanpa kalkulator.
+${Psikotes.ATURAN_FORMAT_HITUNG}`;
+        const jawaban = await GeminiAPI.call(prompt, 300);
+        if (hasilEl) hasilEl.innerHTML = `<div style="margin-bottom:3px"><b>❓ ${pkEsc(teks)}</b></div><div>💡 ${GeminiAPI.esc2(jawaban.trim())}</div>`;
+      } catch (e) {
+        if (hasilEl) hasilEl.innerHTML = "❌ " + e.message;
+      }
+      if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
     },
 
     selesaiSekarang() { this._selesai(true); },
@@ -1598,14 +1650,16 @@ Berikan HANYA 1-2 kalimat trik cepat berbahasa Indonesia: cara berpikir sederhan
         const daftarTeks = top5.slice(0, 3).map(d => `- [${d.soal.kategori}] ${d.soal.pertanyaan}`).join('\n');
         const prompt = `Pengguna baru saja latihan soal psikotes buatan AI dan mendapat skor ${pct}%.
 ${daftarTeks ? 'Beberapa soal yang sering salah:\n' + daftarTeks : 'Tidak ada catatan soal yang salah.'}
-Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk paragraf tanpa list) untuk membantu berlatih kategori-kategori tersebut lebih baik, sertakan 1 trik berpikir cepat & analogi sederhana yang relevan agar bisa menjawab tanpa perhitungan rumit.`;
-        teks = await GeminiAPI.call(prompt, 300);
+Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk paragraf tanpa list) untuk membantu berlatih kategori-kategori tersebut lebih baik, sertakan 1 trik berpikir cepat & analogi sederhana yang relevan agar bisa menjawab tanpa perhitungan rumit.
+${Psikotes.ATURAN_FORMAT_HITUNG}`;
+        teks = await GeminiAPI.call(prompt, 350);
       } catch (e) {
         teks = pct >= 80
           ? 'Hasil kamu sudah bagus! Coba tantang diri dengan kategori yang belum dicoba, atau kurangi waktu berpikir per soal supaya makin reflek.'
           : 'Fokus pelajari pola soal dari kategori yang paling sering salah dulu — kenali polanya lewat beberapa contoh, baru coba jawab cepat tanpa mikir rumus panjang. Baca soal sekali dengan teliti, garis bawahi kata kunci, lalu eliminasi dulu pilihan yang jelas salah sebelum memutuskan.';
       }
-      target.innerHTML = typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks).replace(/\n/g, '<br>');
+      this.state.saranKonteks = { pct, teks };
+      target.innerHTML = (typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks).replace(/\n/g, '<br>')) + this._kotakTanya('saran');
     },
   },
 };
