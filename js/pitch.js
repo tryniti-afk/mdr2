@@ -19,7 +19,7 @@ var GeminiAPI = {
   setKey(k) { localStorage.setItem("gemini_api_key", (k || "").trim()); },
 
   // Panggil Gemini dengan 1 prompt teks, kembalikan teks jawaban.
-  async call(prompt, maxTokens = 700) {
+  async call(prompt, maxTokens = 700, temperature = 0.6) {
     const apiKey = this.getKey();
     if (!apiKey) throw new Error("API key Gemini belum diisi. Masukkan API key dulu (menu fitur AI lain juga pakai key yang sama).");
     let resp;
@@ -29,7 +29,7 @@ var GeminiAPI = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.6 },
+          generationConfig: { maxOutputTokens: maxTokens, temperature },
         }),
       });
     } catch (e) {
@@ -47,8 +47,8 @@ var GeminiAPI = {
   },
 
   // Panggil Gemini dan harapkan balasan JSON murni (dibersihkan dari markdown fence).
-  async callJSON(prompt, maxTokens = 700) {
-    const raw = await this.call(prompt, maxTokens);
+  async callJSON(prompt, maxTokens = 700, temperature = 0.6) {
+    const raw = await this.call(prompt, maxTokens, temperature);
     const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
     const m = cleaned.match(/\{[\s\S]*\}/);
     return JSON.parse(m ? m[0] : cleaned);
