@@ -114,8 +114,8 @@
   <div class="card">
     <h2>1️⃣ Upload Foto Soal</h2>
     <p class="hint">Boleh 1 foto berisi banyak soal (misalnya hasil scan/screenshot satu halaman buku psikotes). Semakin jelas & tidak miring fotonya, semakin akurat deteksi otomatisnya.</p>
-    <div class="upload-zone" id="upload-zone" onclick="el('in-file').click()">
-      📷 Klik untuk pilih foto, atau drag &amp; drop di sini
+    <div class="upload-zone" id="upload-zone" tabindex="0" onclick="el('in-file').click()">
+      📷 Klik untuk pilih foto, drag &amp; drop, atau <b>tekan Ctrl+V</b> (Cmd+V di Mac) setelah menyalin/screenshot gambar
     </div>
     <input type="file" id="in-file" accept="image/*" style="display:none" onchange="onFilePicked(this.files[0])">
     <div id="img-stage-wrap" style="display:none">
@@ -210,6 +210,29 @@ zone.addEventListener("dragleave", () => { zone.style.borderColor = "#e0e0e0"; }
 zone.addEventListener("drop", e => {
   e.preventDefault(); zone.style.borderColor = "#e0e0e0";
   if (e.dataTransfer.files[0]) onFilePicked(e.dataTransfer.files[0]);
+});
+
+// ── Paste gambar dari clipboard (Ctrl+V / Cmd+V) ─────────────────
+// Berlaku di seluruh halaman, jadi tidak perlu klik area tertentu dulu
+// (kecuali sedang fokus di kolom teks/textarea lain, supaya paste teks
+// biasa di form tidak ketimpa).
+document.addEventListener("paste", (e) => {
+  const target = e.target;
+  const sedangDiForm = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+  if (sedangDiForm && target.type !== undefined && target.type !== "file") return; // biarkan paste teks normal di form
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) {
+        e.preventDefault();
+        onFilePicked(file);
+        el("deteksi-status").textContent = "✅ Gambar dari clipboard berhasil ditempel. Klik \"Deteksi Soal Otomatis\" untuk lanjut.";
+      }
+      break;
+    }
+  }
 });
 
 function onFilePicked(file){
