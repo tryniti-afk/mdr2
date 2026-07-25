@@ -19,18 +19,21 @@ var GeminiAPI = {
   setKey(k) { localStorage.setItem("gemini_api_key", (k || "").trim()); },
 
   // Panggil Gemini dengan 1 prompt teks, kembalikan teks jawaban.
-  async call(prompt, maxTokens = 700, temperature = 0.6) {
+  // (opsi tools bisa dilewatkan lewat parameter ke-4, dipakai oleh callSearch)
+  async _panggilMentah(prompt, maxTokens, temperature, tools) {
     const apiKey = this.getKey();
     if (!apiKey) throw new Error("API key Gemini belum diisi. Masukkan API key dulu (menu fitur AI lain juga pakai key yang sama).");
+    const body = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens, temperature },
+    };
+    if (tools) body.tools = tools;
     let resp;
     try {
       resp = await fetch(`${this.URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature },
-        }),
+        body: JSON.stringify(body),
       });
     } catch (e) {
       throw new Error("Gagal terhubung ke Gemini API. Cek koneksi internet kamu.");
@@ -38,20 +41,62 @@ var GeminiAPI = {
     if (!resp.ok) {
       let msg = `Gemini error ${resp.status}`;
       try { const d = await resp.json(); msg = d?.error?.message || msg; } catch (_) {}
-      throw new Error(msg);
+      const err = new Error(msg);
+      err.status = resp.status;
+      throw err;
     }
     const data = await resp.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    if (!text) throw new Error("AI tidak menghasilkan teks. Coba lagi.");
+    const cand = data?.candidates?.[0];
+    // Kadang jawaban dipotong (finishReason MAX_TOKENS) atau diblokir (safety) — beri pesan yang jelas.
+    if (!cand) {
+      const alasanBlokir = data?.promptFeedback?.blockReason;
+      throw new Error(alasanBlokir ? `Permintaan diblokir Gemini (${alasanBlokir}). Coba ubah kategori/pertanyaan.` : "AI tidak memberikan balasan. Coba lagi.");
+    }
+    const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
+    if (!text) {
+      const fr = cand?.finishReason;
+      throw new Error(fr && fr !== "STOP" ? `AI berhenti sebelum selesai (${fr}). Coba lagi atau kurangi jumlah soal sekaligus.` : "AI tidak menghasilkan teks. Coba lagi.");
+    }
+    return { text, cand };
+  },
+
+  async call(prompt, maxTokens = 700, temperature = 0.6) {
+    const { text } = await this._panggilMentah(prompt, maxTokens, temperature, null);
     return text;
+  },
+
+  // Ambil blok JSON pertama dari teks secara aman dengan menghitung
+  // kurung kurawal/siku yang seimbang (bukan sekadar regex greedy),
+  // supaya teks tambahan sebelum/sesudah JSON (mis. catatan/sitasi)
+  // tidak bikin parsing gagal.
+  _extractJson(text) {
+    const cleaned = (text || "").replace(/```json/gi, "").replace(/```/g, "");
+    const startIdx = cleaned.search(/[\{\[]/);
+    if (startIdx === -1) return cleaned.trim();
+    const openCh = cleaned[startIdx];
+    const closeCh = openCh === "{" ? "}" : "]";
+    let depth = 0, inStr = false, escNext = false;
+    for (let i = startIdx; i < cleaned.length; i++) {
+      const c = cleaned[i];
+      if (escNext) { escNext = false; continue; }
+      if (c === "\\") { escNext = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === openCh) depth++;
+      else if (c === closeCh) { depth--; if (depth === 0) return cleaned.slice(startIdx, i + 1); }
+    }
+    return cleaned.slice(startIdx).trim(); // kurung tak seimbang (terpotong) — biarkan JSON.parse yg melempar error jelas
   },
 
   // Panggil Gemini dan harapkan balasan JSON murni (dibersihkan dari markdown fence).
   async callJSON(prompt, maxTokens = 700, temperature = 0.6) {
     const raw = await this.call(prompt, maxTokens, temperature);
-    const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const m = cleaned.match(/\{[\s\S]*\}/);
-    return JSON.parse(m ? m[0] : cleaned);
+    const jsonTeks = this._extractJson(raw);
+    try {
+      return JSON.parse(jsonTeks);
+    } catch (e) {
+      throw new Error("AI membalas dengan format yang tidak bisa dibaca (bukan JSON valid). Coba lagi.");
+    }
   },
 
   esc2(s) {
@@ -64,49 +109,42 @@ var GeminiAPI = {
   // Dipakai saat fitur perlu mengambil informasi/soal nyata dari
   // internet (bukan sekadar dikarang AI), lengkap dengan daftar
   // sumber (title + url) yang dipakai AI untuk menjawab.
+  // Nama field tool utk grounding berbeda antar versi model, jadi
+  // dicoba beberapa skema — kalau skema pertama ditolak API, otomatis
+  // coba skema berikutnya alih-alih langsung gagal total.
   async callSearch(prompt, maxTokens = 1500, temperature = 0.4) {
-    const apiKey = this.getKey();
-    if (!apiKey) throw new Error("API key Gemini belum diisi. Masukkan API key dulu (menu fitur AI lain juga pakai key yang sama).");
-    let resp;
-    try {
-      resp = await fetch(`${this.URL}?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature },
-        }),
-      });
-    } catch (e) {
-      throw new Error("Gagal terhubung ke Gemini API. Cek koneksi internet kamu.");
+    const skemaTools = [
+      [{ google_search: {} }],
+      [{ google_search_retrieval: {} }],
+    ];
+    let lastErr = null;
+    for (const tools of skemaTools) {
+      try {
+        const { text, cand } = await this._panggilMentah(prompt, maxTokens, temperature, tools);
+        const chunks = cand?.groundingMetadata?.groundingChunks || [];
+        const sources = chunks
+          .map(c => ({ title: c?.web?.title || c?.web?.uri || "Sumber", uri: c?.web?.uri || "" }))
+          .filter(s => s.uri);
+        return { text, sources };
+      } catch (e) {
+        lastErr = e;
+        // Kalau errornya bukan soal skema tools (mis. API key salah / soal jaringan),
+        // percobaan skema lain juga pasti gagal sama — langsung lempar saja.
+        if (!e.status || (e.status !== 400 && e.status !== 404)) throw e;
+      }
     }
-    if (!resp.ok) {
-      let msg = `Gemini error ${resp.status}`;
-      try { const d = await resp.json(); msg = d?.error?.message || msg; } catch (_) {}
-      throw new Error(msg);
-    }
-    const data = await resp.json();
-    const cand = data?.candidates?.[0];
-    const text = (cand?.content?.parts || []).map(p => p.text || "").join("");
-    if (!text) throw new Error("AI tidak menghasilkan teks (mungkin tidak menemukan hasil pencarian). Coba lagi.");
-    const chunks = cand?.groundingMetadata?.groundingChunks || [];
-    const sources = chunks
-      .map(c => ({ title: c?.web?.title || c?.web?.uri || "Sumber", uri: c?.web?.uri || "" }))
-      .filter(s => s.uri);
-    return { text, sources };
+    throw lastErr || new Error("Gagal melakukan pencarian internet.");
   },
 
   // Sama seperti callSearch, tapi hasil teksnya diparse sebagai JSON.
   async callSearchJSON(prompt, maxTokens = 1500, temperature = 0.4) {
     const { text, sources } = await this.callSearch(prompt, maxTokens, temperature);
-    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-    const m = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+    const jsonTeks = this._extractJson(text);
     let data;
     try {
-      data = JSON.parse(m ? m[0] : cleaned);
+      data = JSON.parse(jsonTeks);
     } catch (e) {
-      throw new Error("Gagal membaca format hasil pencarian AI. Coba lagi.");
+      throw new Error("Gagal membaca format hasil pencarian AI (bukan JSON valid). Coba lagi.");
     }
     return { data, sources };
   },
