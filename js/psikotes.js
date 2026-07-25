@@ -1381,6 +1381,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         history: [],       // soal "normal" yang sudah selesai dijawab, urut
         replayQueue: [],   // antrean soal utk ditampilkan lagi (mundur-2 / tinjauan akhir)
         wrongLog: {},       // key kategori|pertanyaan -> {soal, count}
+        usedTeks: new Set(), // pertanyaan (dinormalisasi) yang sudah pernah muncul di SESI INI, utk cegah duplikat
         reviewDone: false,
         soalMode: "normal", // "normal" | "retry" | "review"
         soalSaatIni: null,
@@ -1389,6 +1390,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
     },
 
     _kunciSoal(soal) { return (soal.kategori || '') + '|' + (soal.pertanyaan || ''); },
+    _normTeks(t) { return (t || '').toLowerCase().replace(/[^a-z0-9\u00e0-\u024f\s]/gi, '').replace(/\s+/g, ' ').trim(); },
 
     async _nextSoal() {
       // 1) layani antrean replay dulu (tinjauan akhir / mundur-2)
@@ -1411,12 +1413,12 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         this._selesai();
         return;
       }
-      // 3) generate soal baru via AI
+      // 3) generate soal baru via AI (dijamin belum pernah muncul di sesi ini)
       this.state.soalMode = "normal";
       setHTML("konten-utama", `<div class="soal-wrap"><div class="soal-header"><span class="progres-teks">Menyiapkan soal...</span></div><div class="pk-card" style="text-align:center;padding:24px">⏳ AI sedang membuat soal psikotes...</div></div>`);
       const kategoriPilih = this.cfg.kategori[Math.floor(Math.random() * this.cfg.kategori.length)];
       try {
-        const soal = await this._generateSoal(kategoriPilih);
+        const soal = await this._generateSoalUnik(kategoriPilih);
         this.state.soalSaatIni = soal;
         this._tampilSoal();
       } catch (e) {
@@ -1425,10 +1427,30 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
       }
     },
 
-    async _generateSoal(kategori) {
+    // Coba generate beberapa kali sampai dapat soal yang belum pernah muncul
+    // di sesi ini (dicek dari daftar pertanyaan yg sudah ditampilkan).
+    async _generateSoalUnik(kategori) {
+      const MAX_COBA = 4;
+      let soal = null;
+      for (let i = 0; i < MAX_COBA; i++) {
+        soal = await this._generateSoal(kategori, i);
+        if (!this.state.usedTeks.has(this._normTeks(soal.pertanyaan))) break;
+      }
+      this.state.usedTeks.add(this._normTeks(soal.pertanyaan));
+      return soal;
+    },
+
+    async _generateSoal(kategori, percobaanKe = 0) {
+      // Kasih tahu AI soal apa saja yg sudah muncul di sesi ini supaya tidak diulang.
+      const daftarLama = Array.from(this.state.usedTeks || []).slice(-20);
+      const hindariBlok = daftarLama.length
+        ? `Pertanyaan-pertanyaan berikut SUDAH pernah ditanyakan di sesi latihan ini — JANGAN membuat soal yang sama atau mirip pola/intinya (walau angka/kata diganti tetap dianggap sama, harus benar-benar variasi baru):\n${daftarLama.map(t => "- " + t).join("\n")}\n\n`
+        : "";
+      const nonce = Math.random().toString(36).slice(2, 8) + (percobaanKe ? "-ulang" + percobaanKe : "");
       const prompt = `Kamu pembuat soal tes psikotes/tes potensi akademik yang umum beredar di Indonesia (mirip soal seleksi kerja/CPNS/TPA).
-Buatkan 1 soal psikotes ORIGINAL dengan kategori: "${kategori}".
+${hindariBlok}Buatkan 1 soal psikotes ORIGINAL dan BARU dengan kategori: "${kategori}". Variasikan angka/kata/topik dan tingkat kesulitannya, jangan pakai contoh soal template yang paling umum/klise terus-menerus.
 Soal harus pilihan ganda, 4-5 pilihan jawaban, hanya 1 jawaban benar, berbahasa Indonesia, jelas & tidak ambigu, tanpa perlu gambar (hanya teks/angka).
+(kode variasi internal — abaikan, jangan disertakan di jawaban: ${nonce})
 Balas HANYA JSON valid tanpa markdown, format:
 {
   "kategori": "${kategori.replace(/"/g, '\\"')}",
@@ -1436,7 +1458,7 @@ Balas HANYA JSON valid tanpa markdown, format:
   "pilihan": ["...","...","...","..."],
   "jawabanIdx": 0
 }`;
-      const data = await GeminiAPI.callJSON(prompt, 600);
+      const data = await GeminiAPI.callJSON(prompt, 650, 1.0);
       if (!data || !data.pertanyaan || !Array.isArray(data.pilihan) || data.pilihan.length < 2) throw new Error('Format soal dari AI tidak valid');
       if (typeof data.jawabanIdx !== 'number' || data.jawabanIdx < 0 || data.jawabanIdx >= data.pilihan.length) data.jawabanIdx = 0;
       data.kategori = data.kategori || kategori;
