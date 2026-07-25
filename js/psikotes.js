@@ -1108,8 +1108,8 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
           </div>
           <p class="pk-hint" style="text-align:center">Hasil penjumlahannya <b>genap</b> atau <b>ganjil</b>?</p>
           <div class="pk-gg-jawab">
-            <button class="pk-gg-btn pk-gg-genap" onclick="Psikotes.GanjilGenap._jawab(0)">GENAP<br><span>(0)</span></button>
             <button class="pk-gg-btn pk-gg-ganjil" onclick="Psikotes.GanjilGenap._jawab(1)">GANJIL<br><span>(1)</span></button>
+            <button class="pk-gg-btn pk-gg-genap" onclick="Psikotes.GanjilGenap._jawab(0)">GENAP<br><span>(0)</span></button>
           </div>
           <div class="btn-row" style="justify-content:center;margin-top:12px">
             <button class="btn btn-abu" onclick="Psikotes.GanjilGenap.selesaiSekarang()">✅ Selesai</button>
@@ -1269,6 +1269,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
       jumlahMode: "tentu", // "tentu" | "selesai"
       jumlahSoal: 10,
       modeSalah: "lanjut", // "lanjut" | "review" | "ulangSampaiBenar"
+      sumberMode: "ai",    // "ai" (dikarang AI) | "internet" (dicari & diambil dari web, dengan sumber)
     },
 
     state: {},
@@ -1297,6 +1298,17 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
           <div class="pk-card">
             <h3>🤖 Latihan Psikotes dari AI</h3>
             <p class="pk-hint">Soal dibuat otomatis oleh AI, mengikuti gaya soal psikotes yang umum beredar (seleksi kerja/CPNS/TPA), lengkap dengan pilihan jawabannya.</p>
+          </div>
+
+          <div class="pk-card">
+            <h3>🌐 Sumber Soal</h3>
+            <div class="opsi-grup">
+              <button class="opsi ${this.cfg.sumberMode === 'ai' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihSumber('ai')">🤖 Dikarang AI</button>
+              <button class="opsi ${this.cfg.sumberMode === 'internet' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihSumber('internet')">🌐 Ambil dari Internet</button>
+            </div>
+            <p class="pk-hint">${this.cfg.sumberMode === 'internet'
+              ? 'AI akan MENCARI situs di internet yang memuat contoh soal psikotes sesuai kategori, lalu memakai soal dari situs itu apa adanya — nama &amp; tautan sumbernya ditampilkan di tiap soal. Selama 1 situs masih punya soal yang belum dipakai, soal-soal berikutnya diambil dulu dari situs yang sama sebelum pindah mencari situs lain.'
+              : 'Soal DIKARANG/dibuat sendiri oleh AI mengikuti gaya soal psikotes umum (bukan disalin dari internet) — cocok untuk latihan variatif tanpa batas, tapi bukan soal asli yang pernah dipakai di tes sungguhan.'}</p>
           </div>
 
           <div class="pk-card">
@@ -1334,7 +1346,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
             ${renderKontrolLanjut("Psikotes.AI._render")}
           </div>
 
-          <p class="pk-hint" style="text-align:center">⚠️ Fitur ini butuh Gemini API key (sama seperti fitur AI lain di aplikasi ini).</p>
+          <p class="pk-hint" style="text-align:center">⚠️ Fitur ini butuh Gemini API key (sama seperti fitur AI lain di aplikasi ini)${this.cfg.sumberMode === 'internet' ? '. Mode "Ambil dari Internet" memakai fitur pencarian Google bawaan Gemini, jadi butuh koneksi internet yang stabil dan bisa sedikit lebih lambat.' : '.'}</p>
 
           <div class="btn-row" style="justify-content:center">
             <button class="btn btn-hijau" onclick="Psikotes.AI._mulai()">▶ Mulai Latihan AI</button>
@@ -1361,6 +1373,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
     },
     _pilihJumlahMode(m) { this.cfg.jumlahMode = m; this._render(); },
     _pilihModeSalah(m) { this.cfg.modeSalah = m; this._render(); },
+    _pilihSumber(m) { this.cfg.sumberMode = m; this._render(); },
 
     // ================================================================
     //  MULAI SESI
@@ -1382,6 +1395,8 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         replayQueue: [],   // antrean soal utk ditampilkan lagi (mundur-2 / tinjauan akhir)
         wrongLog: {},       // key kategori|pertanyaan -> {soal, count}
         usedTeks: new Set(), // pertanyaan (dinormalisasi) yang sudah pernah muncul di SESI INI, utk cegah duplikat
+        usedPola: [],        // deskripsi singkat pola soal yg sudah dipakai (mode AI) — utk cegah pola berulang
+        internetPools: {},   // kategori -> {queue:[...soal belum dipakai dari sumber saat ini], sourceUrl, sourceTitle} (mode internet)
         reviewDone: false,
         soalMode: "normal", // "normal" | "retry" | "review"
         soalSaatIni: null,
@@ -1413,16 +1428,21 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         this._selesai();
         return;
       }
-      // 3) generate soal baru via AI (dijamin belum pernah muncul di sesi ini)
+      // 3) siapkan soal baru (dijamin belum pernah muncul di sesi ini)
       this.state.soalMode = "normal";
-      setHTML("konten-utama", `<div class="soal-wrap"><div class="soal-header"><span class="progres-teks">Menyiapkan soal...</span></div><div class="pk-card" style="text-align:center;padding:24px">⏳ AI sedang membuat soal psikotes...</div></div>`);
+      const pesanMuat = this.cfg.sumberMode === 'internet'
+        ? '🔎 Mencari &amp; mengambil soal psikotes dari internet...'
+        : '⏳ AI sedang membuat soal psikotes...';
+      setHTML("konten-utama", `<div class="soal-wrap"><div class="soal-header"><span class="progres-teks">Menyiapkan soal...</span></div><div class="pk-card" style="text-align:center;padding:24px">${pesanMuat}</div></div>`);
       const kategoriPilih = this.cfg.kategori[Math.floor(Math.random() * this.cfg.kategori.length)];
       try {
-        const soal = await this._generateSoalUnik(kategoriPilih);
+        const soal = this.cfg.sumberMode === 'internet'
+          ? await this._ambilSoalInternet(kategoriPilih)
+          : await this._generateSoalUnik(kategoriPilih);
         this.state.soalSaatIni = soal;
         this._tampilSoal();
       } catch (e) {
-        tampilToast('❌ Gagal membuat soal: ' + e.message);
+        tampilToast('❌ Gagal menyiapkan soal: ' + e.message);
         this._selesai();
       }
     },
@@ -1437,6 +1457,10 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         if (!this.state.usedTeks.has(this._normTeks(soal.pertanyaan))) break;
       }
       this.state.usedTeks.add(this._normTeks(soal.pertanyaan));
+      if (soal.pola) {
+        if (!this.state.usedPola) this.state.usedPola = [];
+        this.state.usedPola.push(soal.pola);
+      }
       return soal;
     },
 
@@ -1446,14 +1470,22 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
       const hindariBlok = daftarLama.length
         ? `Pertanyaan-pertanyaan berikut SUDAH pernah ditanyakan di sesi latihan ini — JANGAN membuat soal yang sama atau mirip pola/intinya (walau angka/kata diganti tetap dianggap sama, harus benar-benar variasi baru):\n${daftarLama.map(t => "- " + t).join("\n")}\n\n`
         : "";
+      // Kasih tahu AI pola/mekanisme yg sudah dipakai, supaya soal berikutnya BUKAN cuma
+      // ganti objek/angka dari pola yang sama (ini akar masalah soal "mirip-mirip terus").
+      const polaLama = (this.state.usedPola || []).slice(-10);
+      const hindariPola = polaLama.length
+        ? `Pola/mekanisme logika soal berikut SUDAH dipakai di sesi ini — WAJIB pakai pola/mekanisme yang BENAR-BENAR BERBEDA sekarang, jangan cuma mengganti angka/kata/objek dari pola yang sama:\n${polaLama.map(p => "- " + p).join("\n")}\n\n`
+        : "";
       const nonce = Math.random().toString(36).slice(2, 8) + (percobaanKe ? "-ulang" + percobaanKe : "");
       const prompt = `Kamu pembuat soal tes psikotes/tes potensi akademik yang umum beredar di Indonesia (mirip soal seleksi kerja/CPNS/TPA).
-${hindariBlok}Buatkan 1 soal psikotes ORIGINAL dan BARU dengan kategori: "${kategori}". Variasikan angka/kata/topik dan tingkat kesulitannya, jangan pakai contoh soal template yang paling umum/klise terus-menerus.
+${hindariBlok}${hindariPola}Buatkan 1 soal psikotes ORIGINAL dan BARU dengan kategori: "${kategori}".
+PENTING soal harus benar-benar variatif dari segi POLA, bukan cuma tampilannya: ganti juga mekanisme/logika dasarnya, bukan sekadar mengganti angka/kata/objek dari pola yang sama. Contoh utk kategori deret angka: kadang aritmatika naik, kadang turun, kadang rasio/perkalian, kadang selisih yang berubah-ubah, kadang pola dua-suku berselang-seling, dst — jangan selalu memakai pola yang paling umum/klise berulang-ulang. Variasikan juga tingkat kesulitannya.
 Soal harus pilihan ganda, 4-5 pilihan jawaban, hanya 1 jawaban benar, berbahasa Indonesia, jelas & tidak ambigu, tanpa perlu gambar (hanya teks/angka).
 (kode variasi internal — abaikan, jangan disertakan di jawaban: ${nonce})
 Balas HANYA JSON valid tanpa markdown, format:
 {
   "kategori": "${kategori.replace(/"/g, '\\"')}",
+  "pola": "deskripsi singkat 1 frasa tentang pola/mekanisme soal ini (utk pelacakan internal, TIDAK ditampilkan ke user)",
   "pertanyaan": "...",
   "pilihan": ["...","...","...","..."],
   "jawabanIdx": 0
@@ -1463,6 +1495,78 @@ Balas HANYA JSON valid tanpa markdown, format:
       if (typeof data.jawabanIdx !== 'number' || data.jawabanIdx < 0 || data.jawabanIdx >= data.pilihan.length) data.jawabanIdx = 0;
       data.kategori = data.kategori || kategori;
       return data;
+    },
+
+    // ================================================================
+    //  MODE "AMBIL DARI INTERNET" — cari 1 sumber (situs) berisi
+    //  kumpulan soal utk kategori ini, lalu HABISKAN dulu semua soal
+    //  dari sumber itu sebelum mencari sumber lain. Tiap soal yang
+    //  ditampilkan menyertakan judul & tautan sumbernya.
+    // ================================================================
+    async _ambilSoalInternet(kategori) {
+      if (!this.state.internetPools) this.state.internetPools = {};
+      let pool = this.state.internetPools[kategori];
+
+      // 1) Habiskan dulu soal yang belum dipakai dari sumber yang sedang aktif
+      while (pool && pool.queue && pool.queue.length) {
+        const soal = pool.queue.shift();
+        if (!this.state.usedTeks.has(this._normTeks(soal.pertanyaan))) {
+          this.state.usedTeks.add(this._normTeks(soal.pertanyaan));
+          return soal;
+        }
+      }
+
+      // 2) Sumber aktif sudah habis (atau belum ada) → cari sumber baru
+      pool = await this._cariSumberBaru(kategori);
+      this.state.internetPools[kategori] = pool;
+
+      while (pool.queue.length) {
+        const soal = pool.queue.shift();
+        if (!this.state.usedTeks.has(this._normTeks(soal.pertanyaan))) {
+          this.state.usedTeks.add(this._normTeks(soal.pertanyaan));
+          return soal;
+        }
+      }
+      throw new Error('Tidak menemukan soal baru dari internet untuk kategori ini. Coba lagi, atau ganti/kurangi kategori.');
+    },
+
+    async _cariSumberBaru(kategori) {
+      const sumberDipakai = Object.values(this.state.internetPools || {})
+        .map(p => p && p.sourceUrl).filter(Boolean);
+      const hindariSumber = sumberDipakai.length
+        ? `Jangan gunakan lagi situs berikut karena sudah dipakai sebelumnya di sesi ini: ${sumberDipakai.join(', ')}.\n`
+        : '';
+      const daftarLama = Array.from(this.state.usedTeks || []).slice(-15);
+      const hindariBlok = daftarLama.length
+        ? `Hindari soal yang isinya sama dengan pertanyaan-pertanyaan berikut (sudah pernah dipakai di sesi ini):\n${daftarLama.map(t => "- " + t).join("\n")}\n`
+        : '';
+      const prompt = `Cari SATU halaman/situs web nyata di internet (misalnya blog edukasi, bank soal, atau artikel kumpulan contoh soal) yang memuat kumpulan CONTOH SOAL psikotes / tes potensi akademik (TPA/CPNS/seleksi kerja) untuk kategori "${kategori}", lengkap dengan pilihan jawaban & jawaban yang benar (atau minimal pembahasannya sehingga jawaban benar bisa ditentukan).
+${hindariSumber}${hindariBlok}Dari halaman itu, ambil SEBANYAK MUNGKIN soal (maksimal 10) APA ADANYA sesuai sumber (isi pertanyaan & jawabannya tetap sesuai sumber asli; boleh disesuaikan formatnya jadi pilihan ganda 4-5 opsi kalau di sumber aslinya belum berbentuk pilihan ganda).
+Balas HANYA JSON valid tanpa markdown, format persis seperti ini:
+{
+  "sumberUrl": "https://alamat-halaman-sumber",
+  "sumberJudul": "judul singkat halaman/situs sumber",
+  "soal": [
+    {"pertanyaan":"...", "pilihan":["...","...","...","..."], "jawabanIdx":0}
+  ]
+}`;
+      const { data, sources } = await GeminiAPI.callSearchJSON(prompt, 2500, 0.3);
+      const srcUtama = (sources && sources[0]) || {};
+      const sourceUrl = (data && data.sumberUrl) || srcUtama.uri || '';
+      const sourceTitle = (data && data.sumberJudul) || srcUtama.title || sourceUrl || 'Sumber internet';
+      const listMentah = (data && Array.isArray(data.soal)) ? data.soal : [];
+      const queue = listMentah
+        .filter(s => s && s.pertanyaan && Array.isArray(s.pilihan) && s.pilihan.length >= 2)
+        .map(s => ({
+          kategori,
+          pertanyaan: s.pertanyaan,
+          pilihan: s.pilihan,
+          jawabanIdx: (typeof s.jawabanIdx === 'number' && s.jawabanIdx >= 0 && s.jawabanIdx < s.pilihan.length) ? s.jawabanIdx : 0,
+          sumberUrl: sourceUrl,
+          sumberJudul: sourceTitle,
+        }));
+      if (!queue.length) throw new Error('AI tidak menemukan soal yang bisa diambil dari internet untuk kategori ini.');
+      return { queue, sourceUrl, sourceTitle };
     },
 
     _tampilSoal() {
@@ -1477,6 +1581,7 @@ Balas HANYA JSON valid tanpa markdown, format:
           </div>
           <div class="quiz-label-row"><span class="quiz-chip quiz-chip-ungu">${pkEsc(soal.kategori)}</span></div>
           <div class="quiz-soal-box">${pkEsc(soal.pertanyaan)}</div>
+          ${soal.sumberUrl ? `<p class="pk-hint">🌐 Sumber: <a href="${pkEsc(soal.sumberUrl)}" target="_blank" rel="noopener noreferrer">${pkEsc(soal.sumberJudul || soal.sumberUrl)}</a></p>` : ""}
           <div id="ai-pilihan-wrap" class="sub-menu-grid" style="grid-template-columns:1fr"></div>
           <div id="ai-hasil" class="hasil-box" style="display:none"></div>
           <div class="btn-row" style="margin-top:14px;justify-content:center">
@@ -1646,6 +1751,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
                 <b>${pkEsc(d.soal.pertanyaan)}</b><br>
                 Jawaban benar: <span style="color:var(--c-hijau-d);font-weight:700">${pkEsc(d.soal.pilihan[d.soal.jawabanIdx])}</span>
                 ${d.count > 1 ? ` (salah ${d.count}×)` : ''}
+                ${d.soal.sumberUrl ? `<br><span style="color:var(--c-sub);font-size:12px">🌐 <a href="${pkEsc(d.soal.sumberUrl)}" target="_blank" rel="noopener noreferrer">${pkEsc(d.soal.sumberJudul || d.soal.sumberUrl)}</a></span>` : ''}
               </li>`).join('')}
             </ul>
           </div>` : ''}
