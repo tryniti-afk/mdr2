@@ -1331,6 +1331,7 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
               <button class="opsi aktif-kuning ${this.cfg.modeSalah === 'review' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihModeSalah('review')">🔁 Muncul Lagi di Akhir Sesi — soal yang salah diulang setelah sesi utama selesai</button>
               <button class="opsi aktif-merah ${this.cfg.modeSalah === 'ulangSampaiBenar' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihModeSalah('ulangSampaiBenar')">🔂 Ulang Sampai Benar — jawab ulang soal yang sama sampai benar, lalu mundur 2 soal</button>
             </div>
+            ${renderKontrolLanjut("Psikotes.AI._render")}
           </div>
 
           <p class="pk-hint" style="text-align:center">⚠️ Fitur ini butuh Gemini API key (sama seperti fitur AI lain di aplikasi ini).</p>
