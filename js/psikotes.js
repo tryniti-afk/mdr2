@@ -1477,7 +1477,9 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
     // Coba generate beberapa kali sampai dapat soal yang belum pernah muncul
     // di sesi ini (dicek dari daftar pertanyaan yg sudah ditampilkan).
     async _generateSoalUnik(kategori) {
-      const MAX_COBA = 4;
+      // Dibatasi 2× (bukan lebih) supaya tidak boros kuota API gratis — cukup
+      // untuk hindari duplikat tanpa terlalu banyak memanggil API per soal.
+      const MAX_COBA = 2;
       let soal = null;
       for (let i = 0; i < MAX_COBA; i++) {
         soal = await this._generateSoal(kategori, i);
