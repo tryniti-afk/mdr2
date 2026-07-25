@@ -61,6 +61,16 @@ var Psikotes = {
             <div class="sub-label">Tes Kreplin</div>
             <div class="sub-desc">Hitung cepat ala tes Pauli/Kraepelin</div>
           </div>
+          <div class="sub-card" onclick="Psikotes.GanjilGenap.bukaSetup()">
+            <div class="sub-icon">➕</div>
+            <div class="sub-label">Tes Cepat Ganjil-Genap</div>
+            <div class="sub-desc">Jumlahkan 2 angka, tentukan genap (0) / ganjil (1)</div>
+          </div>
+          <div class="sub-card" onclick="Psikotes.AI.bukaSetup()">
+            <div class="sub-icon">🤖</div>
+            <div class="sub-label">Latihan Psikotes AI</div>
+            <div class="sub-desc">Soal dibuat AI sesuai kategori pilihanmu</div>
+          </div>
         </div>
       </div>
     `;
@@ -71,6 +81,7 @@ var Psikotes = {
   kembaliMenu() {
     this._hentikanTimerSesi();
     if (this.Kreplin) this.Kreplin._bersihkan();
+    if (this.GanjilGenap) this.GanjilGenap._bersihkan();
     App.renderModul("psikotes");
   },
 
@@ -950,6 +961,651 @@ Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk par
       if (a === 0 || b === 0) return "salah satu angka 0, jawabannya = angka satunya, tidak perlu dihitung.";
       if (a + b >= 10) return `karena ${a}+${b}≥10, cukup jumlahkan lalu buang angka puluhannya (${a}+${b}=${a + b} → ambil ${(a + b) % 10}).`;
       return `jumlah langsung ${a}+${b}=${a + b}, hafalkan pasangan ini agar makin reflek.`;
+    },
+  },
+
+  // ================================================================
+  //  ============  SUB-MODUL: TES CEPAT GANJIL-GENAP  ==============
+  //  Dua angka (satuan/puluhan/ratusan) dijumlahkan, jawab genap (0)
+  //  atau ganjil (1). Ada timer & pilihan jumlah soal bebas / sampai
+  //  klik "Selesai". Hasil akhir: 5 pasangan tersulit + saran & trik,
+  //  plus validasi aturan genap/ganjil.
+  // ================================================================
+  GanjilGenap: {
+
+    cfg: { digit: 1, waktuMode: "stopwatch", batasMenit: 3, jumlahMode: "selesai", jumlahSoal: 30 },
+    state: {},
+    _interval: null,
+    _keyHandlerBound: null,
+
+    bukaSetup() {
+      el("konten-utama").innerHTML = `
+        <div class="pk-setup-wrap">
+          <div class="pk-card">
+            <h3>➕ Tes Cepat Ganjil-Genap</h3>
+            <p class="pk-hint">Dua angka dijumlahkan, kamu tentukan hasilnya <b>genap</b> (jawab 0) atau <b>ganjil</b> (jawab 1) —
+            tanpa perlu menghitung penuh, cukup cek digit terakhir tiap angka!</p>
+          </div>
+
+          <div class="pk-card">
+            <h3>🔢 Jenis Angka</h3>
+            <div class="opsi-grup">
+              <button class="opsi ${this.cfg.digit === 1 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(1)">Satuan (0-9)</button>
+              <button class="opsi ${this.cfg.digit === 2 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(2)">Puluhan (10-99)</button>
+              <button class="opsi ${this.cfg.digit === 3 ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihDigit(3)">Ratusan (100-999)</button>
+            </div>
+          </div>
+
+          <div class="pk-card">
+            <h3>⏱️ Pengaturan Waktu</h3>
+            <div class="opsi-grup">
+              <button class="opsi ${this.cfg.waktuMode === 'none' ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihWaktu('none')">🚫 Tanpa Waktu</button>
+              <button class="opsi ${this.cfg.waktuMode === 'stopwatch' ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihWaktu('stopwatch')">⏱️ Stopwatch</button>
+              <button class="opsi ${this.cfg.waktuMode === 'limit' ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihWaktu('limit')">⏳ Batas Waktu</button>
+            </div>
+            <div id="gg-batas-wrap" style="display:${this.cfg.waktuMode === 'limit' ? 'block' : 'none'};margin-top:10px">
+              <label style="font-size:13px;color:var(--c-sub)">Batas waktu (menit):</label><br>
+              <input type="number" id="gg-batas-menit" class="quiz-select" style="max-width:120px;margin-top:6px" min="1" max="60"
+                value="${this.cfg.batasMenit}" onchange="Psikotes.GanjilGenap.cfg.batasMenit = Math.max(1, parseInt(this.value)||3)">
+            </div>
+          </div>
+
+          <div class="pk-card">
+            <h3>🎯 Jumlah Soal</h3>
+            <div class="opsi-grup">
+              <button class="opsi ${this.cfg.jumlahMode === 'selesai' ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihJumlahMode('selesai')">✅ Sampai Klik "Selesai"</button>
+              <button class="opsi ${this.cfg.jumlahMode === 'tentu' ? 'aktif' : ''}" onclick="Psikotes.GanjilGenap._pilihJumlahMode('tentu')">🔢 Jumlah Tertentu</button>
+            </div>
+            <div id="gg-jumlah-wrap" style="display:${this.cfg.jumlahMode === 'tentu' ? 'block' : 'none'};margin-top:10px">
+              <label style="font-size:13px;color:var(--c-sub)">Berapa soal:</label><br>
+              <input type="number" id="gg-jumlah-soal" class="quiz-select" style="max-width:120px;margin-top:6px" min="5" max="500"
+                value="${this.cfg.jumlahSoal}" onchange="Psikotes.GanjilGenap.cfg.jumlahSoal = Math.max(5, parseInt(this.value)||30)">
+            </div>
+          </div>
+
+          <div class="btn-row" style="justify-content:center">
+            <button class="btn btn-hijau" onclick="Psikotes.GanjilGenap._mulai()">▶ Mulai</button>
+            <button class="btn btn-abu" onclick="Psikotes.kembaliMenu()">← Kembali</button>
+          </div>
+        </div>
+      `;
+    },
+
+    _pilihDigit(d) { this.cfg.digit = d; this.bukaSetup(); },
+    _pilihWaktu(m) { this.cfg.waktuMode = m; this.bukaSetup(); },
+    _pilihJumlahMode(m) { this.cfg.jumlahMode = m; this.bukaSetup(); },
+
+    _rangeDigit() {
+      if (this.cfg.digit === 1) return [0, 9];
+      if (this.cfg.digit === 2) return [10, 99];
+      return [100, 999];
+    },
+
+    _mulai() {
+      const bEl = el("gg-batas-menit"); if (bEl) this.cfg.batasMenit = Math.max(1, parseInt(bEl.value) || 3);
+      const jEl = el("gg-jumlah-soal"); if (jEl) this.cfg.jumlahSoal = Math.max(5, parseInt(jEl.value) || 30);
+
+      resetSkor();
+      this.state = {
+        soalKe: 0,
+        totalBenar: 0, totalSalah: 0,
+        mulaiTs: Date.now(),
+        deadlineTs: this.cfg.waktuMode === 'limit' ? Date.now() + this.cfg.batasMenit * 60000 : 0,
+        waktuHabis: false,
+        soalMulaiTs: Date.now(),
+        detail: {}, // key "a+b" -> {a,b,jumlah,salah,waktu:[]}
+        _transisi: false,
+        a: 0, b: 0,
+      };
+      this._soalBaru();
+      this._tampilSoal();
+      if (this.cfg.waktuMode !== 'none') this._mulaiTimer();
+      this._keyHandlerBound = (e) => this._onKeydown(e);
+      document.addEventListener('keydown', this._keyHandlerBound);
+    },
+
+    _soalBaru() {
+      const [lo, hi] = this._rangeDigit();
+      this.state.a = lo + Math.floor(Math.random() * (hi - lo + 1));
+      this.state.b = lo + Math.floor(Math.random() * (hi - lo + 1));
+      this.state.soalMulaiTs = Date.now();
+    },
+
+    _mulaiTimer() {
+      this._hentikanTimer();
+      this._interval = setInterval(() => {
+        const t = el("gg-timer"); if (!t) return;
+        if (this.cfg.waktuMode === 'stopwatch') {
+          t.textContent = this._formatWaktu(Math.floor((Date.now() - this.state.mulaiTs) / 1000));
+        } else if (this.cfg.waktuMode === 'limit') {
+          const sisaMs = this.state.deadlineTs - Date.now();
+          const sisaDetik = Math.max(0, Math.floor(sisaMs / 1000));
+          t.textContent = this._formatWaktu(sisaDetik);
+          if (sisaMs <= 0) { this.state.waktuHabis = true; this._hentikanTimer(); this._selesai(); }
+        }
+      }, 1000);
+    },
+    _hentikanTimer() { if (this._interval) clearInterval(this._interval); this._interval = null; },
+    _formatWaktu(detik) { const m = Math.floor(detik / 60), s = detik % 60; return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0"); },
+
+    _tampilSoal() {
+      const { a, b, soalKe } = this.state;
+      const totalLabel = this.cfg.jumlahMode === 'tentu' ? `Soal ${soalKe + 1}/${this.cfg.jumlahSoal}` : `Soal ke-${soalKe + 1}`;
+      const timerAwal = this.cfg.waktuMode === 'limit'
+        ? Math.max(0, Math.floor((this.state.deadlineTs - Date.now()) / 1000))
+        : Math.floor((Date.now() - this.state.mulaiTs) / 1000);
+      el("konten-utama").innerHTML = `
+        <div class="soal-wrap">
+          <div class="soal-header">
+            <span class="progres-teks">${totalLabel}</span>
+            <span id="gg-skor-mini">✅ ${this.state.totalBenar} &nbsp;❌ ${this.state.totalSalah}</span>
+          </div>
+          ${this.cfg.waktuMode !== 'none' ? `<div class="timer-box" id="gg-timer">${this._formatWaktu(timerAwal)}</div>` : ""}
+          <div class="pk-gg-soal">
+            <div class="pk-gg-num">${a}</div>
+            <div class="pk-gg-plus">+</div>
+            <div class="pk-gg-num">${b}</div>
+          </div>
+          <p class="pk-hint" style="text-align:center">Hasil penjumlahannya <b>genap</b> atau <b>ganjil</b>?</p>
+          <div class="pk-gg-jawab">
+            <button class="pk-gg-btn pk-gg-genap" onclick="Psikotes.GanjilGenap._jawab(0)">GENAP<br><span>(0)</span></button>
+            <button class="pk-gg-btn pk-gg-ganjil" onclick="Psikotes.GanjilGenap._jawab(1)">GANJIL<br><span>(1)</span></button>
+          </div>
+          <div class="btn-row" style="justify-content:center;margin-top:12px">
+            <button class="btn btn-abu" onclick="Psikotes.GanjilGenap.selesaiSekarang()">✅ Selesai</button>
+          </div>
+        </div>
+      `;
+    },
+
+    _onKeydown(e) {
+      if (e.key === '0') this._jawab(0);
+      else if (e.key === '1') this._jawab(1);
+    },
+
+    _jawab(pilihan) {
+      if (this.state._transisi) return;
+      const { a, b } = this.state;
+      const jumlah = a + b;
+      const jawabanBenar = jumlah % 2; // 0 genap, 1 ganjil
+      const benar = pilihan === jawabanBenar;
+      const waktuMs = Date.now() - this.state.soalMulaiTs;
+
+      const key = [a, b].sort((x, y) => x - y).join('+');
+      if (!this.state.detail[key]) this.state.detail[key] = { a, b, jumlah, salah: 0, waktu: [] };
+      this.state.detail[key].waktu.push(waktuMs);
+
+      if (benar) { this.state.totalBenar++; tambahSkor(true); }
+      else { this.state.totalSalah++; tambahSkor(false); this.state.detail[key].salah++; }
+
+      const wrap = document.querySelector('.pk-gg-soal');
+      if (wrap) wrap.style.borderColor = benar ? 'var(--c-hijau)' : 'var(--c-merah)';
+      const mini = el("gg-skor-mini");
+      if (mini) mini.textContent = `✅ ${this.state.totalBenar} ❌ ${this.state.totalSalah}`;
+
+      this.state._transisi = true;
+      setTimeout(() => {
+        this.state._transisi = false;
+        this.state.soalKe++;
+        if (this.cfg.jumlahMode === 'tentu' && this.state.soalKe >= this.cfg.jumlahSoal) { this._selesai(); return; }
+        this._soalBaru();
+        this._tampilSoal();
+      }, benar ? 150 : 350);
+    },
+
+    selesaiSekarang() { this._selesai(true); },
+
+    _bersihkan() {
+      this._hentikanTimer();
+      if (this._keyHandlerBound) { document.removeEventListener('keydown', this._keyHandlerBound); this._keyHandlerBound = null; }
+    },
+
+    // ================================================================
+    //  HASIL AKHIR GANJIL-GENAP
+    // ================================================================
+    _selesai(dipercepat) {
+      this._bersihkan();
+      const total = this.state.totalBenar + this.state.totalSalah;
+      const pct = total ? Math.round(this.state.totalBenar / total * 100) : 0;
+      const emoji = pct >= 85 ? '🏆' : pct >= 65 ? '👍' : '💪';
+      const totalDetik = Math.floor((Date.now() - this.state.mulaiTs) / 1000);
+      App.catatSesiSelesai('psikotes-ganjilgenap', this.state.totalBenar, total);
+
+      const daftar = Object.values(this.state.detail).map(d => {
+        const avgWaktu = d.waktu.reduce((s, v) => s + v, 0) / d.waktu.length;
+        return { ...d, avgWaktu, dicoba: d.waktu.length };
+      }).filter(d => d.dicoba > 0);
+      // Rangking: yang paling sering salah didahulukan, lalu yang paling lama dikerjakan.
+      const top5 = daftar.sort((x, y) => (y.salah - x.salah) || (y.avgWaktu - x.avgWaktu)).slice(0, 5);
+      const rataWaktu = daftar.length ? daftar.reduce((s, d) => s + d.avgWaktu, 0) / daftar.length : 0;
+
+      el("konten-utama").innerHTML = `
+        <div class="selesai-wrap" style="text-align:left">
+          <div style="text-align:center">
+            <div class="selesai-emoji">${emoji}</div>
+            <h2 style="text-align:center">Tes Ganjil-Genap Selesai!</h2>
+            ${dipercepat ? '<div class="soal-hint">Diselesaikan lebih awal</div>' : ''}
+            ${this.state.waktuHabis ? '<div class="soal-hint">⏰ Waktu habis</div>' : ''}
+          </div>
+          <div class="selesai-skor" style="text-align:center">
+            <div>✅ Benar: <b>${this.state.totalBenar}</b> &nbsp; ❌ Salah: <b>${this.state.totalSalah}</b> &nbsp; (${total} soal)</div>
+            <div class="skor-pct">${pct}%</div>
+            <div class="soal-hint">⏱️ Waktu: ${this._formatWaktu(totalDetik)} · ⚡ Rata-rata ${(rataWaktu / 1000).toFixed(1)} dtk/soal</div>
+          </div>
+
+          ${top5.length ? `
+          <div class="pk-card" style="margin-top:14px">
+            <h3>🔁 5 Pasangan Angka Tersulit</h3>
+            <ul style="margin:6px 0 0 18px;padding:0;font-size:13.5px">
+              ${top5.map(t => `<li style="margin-bottom:8px">
+                <b>${t.a} + ${t.b} = ${t.jumlah}</b> (${t.jumlah % 2 === 0 ? 'genap' : 'ganjil'})
+                ${t.salah > 0 ? ` — ❌ salah ${t.salah}×` : ''} · ⏱️ rata-rata ${(t.avgWaktu / 1000).toFixed(1)} dtk
+                <br><span style="color:var(--c-sub)">💡 ${pkEsc(this._trik(t.a, t.b))}</span>
+              </li>`).join('')}
+            </ul>
+          </div>` : ''}
+
+          <div class="pk-card" style="margin-top:14px">
+            <h3>💡 Saran &amp; Validasi Aturan Ganjil-Genap</h3>
+            <div class="pk-saran-teks">${this._buatSaran(pct)}</div>
+          </div>
+
+          <div class="btn-row" style="justify-content:center;margin-top:16px">
+            <button class="btn btn-hijau" onclick="Psikotes.GanjilGenap._mulai()">🔄 Ulangi</button>
+            <button class="btn btn-biru" onclick="Psikotes.GanjilGenap.bukaSetup()">⚙️ Ganti Pengaturan</button>
+            <button class="btn btn-abu" onclick="Psikotes.kembaliMenu()">← Menu Psikotes</button>
+          </div>
+        </div>
+      `;
+    },
+
+    _trik(a, b) {
+      const pa = a % 2 === 0 ? 'genap' : 'ganjil';
+      const pb = b % 2 === 0 ? 'genap' : 'ganjil';
+      const hasil = (a + b) % 2 === 0 ? 'genap' : 'ganjil';
+      return `${a} digit terakhirnya ${a % 10} (${pa}), ${b} digit terakhirnya ${b % 10} (${pb}) → ${pa}+${pb} = ${hasil}. Tidak perlu menjumlahkan seluruh angka, cukup lihat digit paling belakang saja.`;
+    },
+
+    // Validasi matematis: paritas jumlah 2 bilangan hanya ditentukan oleh
+    // paritas digit terakhirnya, jadi aturan di bawah ini SELALU benar.
+    _buatSaran(pct) {
+      let html = `<p>Aturan ganjil-genap berikut <b>selalu berlaku pasti</b> dan sudah tervalidasi secara matematis (paritas jumlah dua bilangan hanya bergantung pada paritas digit terakhirnya):</p>
+        <ul>
+          <li>Genap + Genap = <b>Genap</b></li>
+          <li>Genap + Ganjil = <b>Ganjil</b></li>
+          <li>Ganjil + Ganjil = <b>Genap</b></li>
+          <li>Ganjil + Genap = <b>Ganjil</b></li>
+        </ul>
+        <p>Karena itu, kamu tidak perlu menjumlahkan angka puluhan/ratusan secara penuh — cukup lihat <b>digit satuan</b> (paling belakang) dari kedua angka, tentukan genap/ganjilnya masing-masing, lalu cocokkan ke tabel di atas. Jauh lebih cepat, terutama untuk angka ratusan.</p>`;
+      if (pct < 70) html += `<p>🎯 Akurasi masih ${pct}% — perlambat sedikit dan biasakan pola: <i>lihat digit terakhir → tentukan genap/ganjil masing-masing → gunakan tabel aturan</i>, tanpa menjumlahkan penuh.</p>`;
+      else if (pct < 90) html += `<p>👍 Akurasi ${pct}% sudah cukup baik. Tingkatkan kecepatan dengan sering berlatih level puluhan/ratusan agar makin reflek mengenali digit terakhir.</p>`;
+      else html += `<p>🏆 Akurasi ${pct}% sangat baik! Coba naikkan level ke Ratusan atau kurangi batas waktu untuk tantangan lebih tinggi.</p>`;
+      return html;
+    },
+  },
+
+  // ================================================================
+  //  ================  SUB-MODUL: LATIHAN PSIKOTES AI  ==============
+  //  Soal dibuat AI (mirip soal psikotes yang umum beredar) lengkap
+  //  dengan pilihan jawaban, berdasarkan kategori yang dipilih/dicari
+  //  atau ditulis sendiri. Jumlah soal bebas atau sampai klik Selesai.
+  //  Mode jika salah: Lanjut Terus / Muncul Lagi di Akhir Sesi /
+  //  Ulang Sampai Benar (lalu mundur 2 soal, replay soal sebelumnya).
+  //  Saat salah tampil trik cepat (AI, fallback lokal). Hasil akhir:
+  //  5 soal tersering salah + saran & trik dari AI.
+  // ================================================================
+  AI: {
+
+    KATEGORI_PRESET: [
+      "Deret Angka", "Deret Huruf", "Aritmatika Dasar", "Analogi Verbal (Padanan Kata)",
+      "Sinonim (Persamaan Kata)", "Antonim (Lawan Kata)", "Logika Penalaran (Silogisme)",
+      "Logika Matematika", "Pemahaman Bacaan Singkat", "Perbandingan Kuantitatif",
+      "Kemampuan Numerik Cepat", "Klasifikasi / Pengelompokan Kata",
+    ],
+
+    cfg: {
+      kategori: [],        // kategori terpilih
+      kategoriCustom: [],  // kategori tambahan buatan sendiri
+      jumlahMode: "tentu", // "tentu" | "selesai"
+      jumlahSoal: 10,
+      modeSalah: "lanjut", // "lanjut" | "review" | "ulangSampaiBenar"
+    },
+
+    state: {},
+    _cariTeks: "",
+
+    bukaSetup() {
+      if (!this.cfg.kategori.length && !this.cfg.kategoriCustom.length) {
+        this.cfg.kategori = [this.KATEGORI_PRESET[0]];
+      }
+      this._cariTeks = "";
+      this._render();
+    },
+
+    _daftarKategori() { return [...this.KATEGORI_PRESET, ...this.cfg.kategoriCustom]; },
+
+    _render() {
+      const filterTeks = (this._cariTeks || "").toLowerCase();
+      const list = this._daftarKategori().filter(k => !filterTeks || k.toLowerCase().includes(filterTeks));
+      const kategoriHtml = list.map(k => {
+        const aktif = this.cfg.kategori.includes(k) ? 'aktif' : '';
+        return `<button class="opsi aktif-ungu ${aktif}" onclick="Psikotes.AI._toggleKategori('${k.replace(/'/g, "\\'")}')">${pkEsc(k)}</button>`;
+      }).join("") || `<p class="pk-hint">Tidak ada kategori cocok pencarian "${pkEsc(this._cariTeks)}".</p>`;
+
+      el("konten-utama").innerHTML = `
+        <div class="pk-setup-wrap">
+          <div class="pk-card">
+            <h3>🤖 Latihan Psikotes dari AI</h3>
+            <p class="pk-hint">Soal dibuat otomatis oleh AI, mengikuti gaya soal psikotes yang umum beredar (seleksi kerja/CPNS/TPA), lengkap dengan pilihan jawabannya.</p>
+          </div>
+
+          <div class="pk-card">
+            <h3>📂 Kategori Soal</h3>
+            <input type="text" class="input-teks" placeholder="🔍 Cari kategori..." value="${pkEsc(this._cariTeks)}"
+              oninput="Psikotes.AI._cariTeks=this.value; Psikotes.AI._render();" style="margin-bottom:10px;width:100%">
+            <div class="opsi-grup">${kategoriHtml}</div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <input type="text" id="ai-kategori-baru" class="input-teks" placeholder="Tulis kategori sendiri..." style="flex:1">
+              <button class="btn btn-biru" style="white-space:nowrap" onclick="Psikotes.AI._tambahKategoriCustom()">➕ Tambah</button>
+            </div>
+            <p class="pk-hint">📊 ${this.cfg.kategori.length} kategori dipilih.</p>
+          </div>
+
+          <div class="pk-card">
+            <h3>🎯 Jumlah Soal</h3>
+            <div class="opsi-grup">
+              <button class="opsi ${this.cfg.jumlahMode === 'tentu' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihJumlahMode('tentu')">🔢 Jumlah Tertentu</button>
+              <button class="opsi ${this.cfg.jumlahMode === 'selesai' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihJumlahMode('selesai')">✅ Sampai Klik "Selesai"</button>
+            </div>
+            <div id="ai-jumlah-wrap" style="display:${this.cfg.jumlahMode === 'tentu' ? 'block' : 'none'};margin-top:10px">
+              <label style="font-size:13px;color:var(--c-sub)">Berapa soal:</label><br>
+              <input type="number" id="ai-jumlah-soal" class="quiz-select" style="max-width:120px;margin-top:6px" min="3" max="100"
+                value="${this.cfg.jumlahSoal}" onchange="Psikotes.AI.cfg.jumlahSoal = Math.max(3, parseInt(this.value)||10)">
+            </div>
+          </div>
+
+          <div class="pk-card">
+            <h3>🎮 Mode Jika Salah</h3>
+            <div class="opsi-grup" style="flex-direction:column;align-items:stretch">
+              <button class="opsi aktif-hijau ${this.cfg.modeSalah === 'lanjut' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihModeSalah('lanjut')">➡️ Lanjut Terus — tampil jawaban benar + trik, lalu lanjut ke soal berikutnya</button>
+              <button class="opsi aktif-kuning ${this.cfg.modeSalah === 'review' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihModeSalah('review')">🔁 Muncul Lagi di Akhir Sesi — soal yang salah diulang setelah sesi utama selesai</button>
+              <button class="opsi aktif-merah ${this.cfg.modeSalah === 'ulangSampaiBenar' ? 'aktif' : ''}" onclick="Psikotes.AI._pilihModeSalah('ulangSampaiBenar')">🔂 Ulang Sampai Benar — jawab ulang soal yang sama sampai benar, lalu mundur 2 soal</button>
+            </div>
+          </div>
+
+          <p class="pk-hint" style="text-align:center">⚠️ Fitur ini butuh Gemini API key (sama seperti fitur AI lain di aplikasi ini).</p>
+
+          <div class="btn-row" style="justify-content:center">
+            <button class="btn btn-hijau" onclick="Psikotes.AI._mulai()">▶ Mulai Latihan AI</button>
+            <button class="btn btn-abu" onclick="Psikotes.kembaliMenu()">← Kembali</button>
+          </div>
+        </div>
+      `;
+    },
+
+    _toggleKategori(k) {
+      const pos = this.cfg.kategori.indexOf(k);
+      if (pos === -1) this.cfg.kategori.push(k); else this.cfg.kategori.splice(pos, 1);
+      this._render();
+    },
+    _tambahKategoriCustom() {
+      const inp = el("ai-kategori-baru");
+      if (!inp) return;
+      const v = inp.value.trim();
+      if (!v) return;
+      if (!this._daftarKategori().some(k => k.toLowerCase() === v.toLowerCase())) this.cfg.kategoriCustom.push(v);
+      if (!this.cfg.kategori.includes(v)) this.cfg.kategori.push(v);
+      this._cariTeks = "";
+      this._render();
+    },
+    _pilihJumlahMode(m) { this.cfg.jumlahMode = m; this._render(); },
+    _pilihModeSalah(m) { this.cfg.modeSalah = m; this._render(); },
+
+    // ================================================================
+    //  MULAI SESI
+    // ================================================================
+    async _mulai() {
+      const jEl = el("ai-jumlah-soal"); if (jEl) this.cfg.jumlahSoal = Math.max(3, parseInt(jEl.value) || 10);
+      if (!this.cfg.kategori.length) { tampilToast('⚠️ Pilih atau tambahkan minimal 1 kategori dulu!'); return; }
+      if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) {
+        const k = prompt("Masukkan Gemini API key (dipakai juga oleh fitur AI lain):");
+        if (k) GeminiAPI.setKey(k); else { tampilToast("⚠️ Perlu API key Gemini untuk fitur ini."); return; }
+      }
+
+      resetSkor();
+      this.state = {
+        soalKe: 0,
+        totalBenar: 0, totalSalah: 0,
+        mulaiTs: Date.now(),
+        history: [],       // soal "normal" yang sudah selesai dijawab, urut
+        replayQueue: [],   // antrean soal utk ditampilkan lagi (mundur-2 / tinjauan akhir)
+        wrongLog: {},       // key kategori|pertanyaan -> {soal, count}
+        reviewDone: false,
+        soalMode: "normal", // "normal" | "retry" | "review"
+        soalSaatIni: null,
+      };
+      this._nextSoal();
+    },
+
+    _kunciSoal(soal) { return (soal.kategori || '') + '|' + (soal.pertanyaan || ''); },
+
+    async _nextSoal() {
+      // 1) layani antrean replay dulu (tinjauan akhir / mundur-2)
+      if (this.state.replayQueue.length) {
+        this.state.soalMode = "review";
+        this.state.soalSaatIni = this.state.replayQueue.shift();
+        this._tampilSoal();
+        return;
+      }
+      // 2) cek target tercapai
+      const target = this.cfg.jumlahMode === 'tentu' ? this.cfg.jumlahSoal : Infinity;
+      if (this.state.soalKe >= target) {
+        if (this.cfg.modeSalah === 'review' && !this.state.reviewDone && Object.keys(this.state.wrongLog).length) {
+          this.state.reviewDone = true;
+          this.state.replayQueue = Object.values(this.state.wrongLog).map(w => w.soal);
+          tampilToast(`🔁 Meninjau ${this.state.replayQueue.length} soal yang tadi salah...`);
+          this._nextSoal();
+          return;
+        }
+        this._selesai();
+        return;
+      }
+      // 3) generate soal baru via AI
+      this.state.soalMode = "normal";
+      setHTML("konten-utama", `<div class="soal-wrap"><div class="soal-header"><span class="progres-teks">Menyiapkan soal...</span></div><div class="pk-card" style="text-align:center;padding:24px">⏳ AI sedang membuat soal psikotes...</div></div>`);
+      const kategoriPilih = this.cfg.kategori[Math.floor(Math.random() * this.cfg.kategori.length)];
+      try {
+        const soal = await this._generateSoal(kategoriPilih);
+        this.state.soalSaatIni = soal;
+        this._tampilSoal();
+      } catch (e) {
+        tampilToast('❌ Gagal membuat soal: ' + e.message);
+        this._selesai();
+      }
+    },
+
+    async _generateSoal(kategori) {
+      const prompt = `Kamu pembuat soal tes psikotes/tes potensi akademik yang umum beredar di Indonesia (mirip soal seleksi kerja/CPNS/TPA).
+Buatkan 1 soal psikotes ORIGINAL dengan kategori: "${kategori}".
+Soal harus pilihan ganda, 4-5 pilihan jawaban, hanya 1 jawaban benar, berbahasa Indonesia, jelas & tidak ambigu, tanpa perlu gambar (hanya teks/angka).
+Balas HANYA JSON valid tanpa markdown, format:
+{
+  "kategori": "${kategori.replace(/"/g, '\\"')}",
+  "pertanyaan": "...",
+  "pilihan": ["...","...","...","..."],
+  "jawabanIdx": 0
+}`;
+      const data = await GeminiAPI.callJSON(prompt, 600);
+      if (!data || !data.pertanyaan || !Array.isArray(data.pilihan) || data.pilihan.length < 2) throw new Error('Format soal dari AI tidak valid');
+      if (typeof data.jawabanIdx !== 'number' || data.jawabanIdx < 0 || data.jawabanIdx >= data.pilihan.length) data.jawabanIdx = 0;
+      data.kategori = data.kategori || kategori;
+      return data;
+    },
+
+    _tampilSoal() {
+      const soal = this.state.soalSaatIni;
+      const target = this.cfg.jumlahMode === 'tentu' ? `Soal ${Math.min(this.state.soalKe + 1, this.cfg.jumlahSoal)}/${this.cfg.jumlahSoal}` : `Soal ke-${this.state.soalKe + 1}`;
+      const labelMode = this.state.soalMode === 'review' ? '🔁 Tinjau Ulang · ' : this.state.soalMode === 'retry' ? '🔂 Ulangi Sampai Benar · ' : '';
+      el("konten-utama").innerHTML = `
+        <div class="soal-wrap">
+          <div class="soal-header">
+            <span class="progres-teks">${labelMode}${target}</span>
+            <span id="ai-skor-mini">✅ ${this.state.totalBenar} &nbsp;❌ ${this.state.totalSalah}</span>
+          </div>
+          <div class="quiz-label-row"><span class="quiz-chip quiz-chip-ungu">${pkEsc(soal.kategori)}</span></div>
+          <div class="quiz-soal-box">${pkEsc(soal.pertanyaan)}</div>
+          <div id="ai-pilihan-wrap" class="sub-menu-grid" style="grid-template-columns:1fr"></div>
+          <div id="ai-hasil" class="hasil-box" style="display:none"></div>
+          <div class="btn-row" style="margin-top:14px;justify-content:center">
+            <button class="btn btn-abu" onclick="Psikotes.AI.selesaiSekarang()">✅ Selesai</button>
+          </div>
+        </div>
+      `;
+      const wrap = el("ai-pilihan-wrap");
+      soal.pilihan.forEach((p, i) => {
+        const b = document.createElement('button');
+        b.className = 'btn-pilihan'; b.style.textAlign = 'left'; b.innerText = p;
+        b.onclick = () => this._pilihJawaban(wrap, soal, i);
+        wrap.appendChild(b);
+      });
+    },
+
+    _pilihJawaban(container, soal, idxPilihan) {
+      if (this.state._transisi) return;
+      const benar = idxPilihan === soal.jawabanIdx;
+      highlightPilihan(container, soal.jawabanIdx, idxPilihan);
+      const hasilEl = el('ai-hasil');
+      this.state._transisi = true;
+      const modeSaatIni = this.state.soalMode;
+
+      if (benar) {
+        tambahSkor(true); this.state.totalBenar++;
+        if (hasilEl) { hasilEl.style.display = 'block'; hasilEl.className = 'hasil-box benar'; hasilEl.innerText = modeSaatIni === 'retry' ? '✅ Benar! Mundur 2 soal untuk pengulangan...' : '✅ Benar!'; }
+        tampilTombolLanjut('ai-hasil', () => {
+          this.state._transisi = false;
+          if (modeSaatIni === 'retry') {
+            const key = this._kunciSoal(soal);
+            delete this.state.wrongLog[key];
+            const dua = this.state.history.slice(-2);
+            this.state.replayQueue = [...dua, ...this.state.replayQueue];
+          }
+          if (modeSaatIni !== 'review') { this.state.history.push(soal); this.state.soalKe++; }
+          this._nextSoal();
+        });
+      } else {
+        tambahSkor(false); this.state.totalSalah++;
+        const key = this._kunciSoal(soal);
+        if (!this.state.wrongLog[key]) this.state.wrongLog[key] = { soal, count: 0 };
+        this.state.wrongLog[key].count++;
+        if (hasilEl) {
+          hasilEl.style.display = 'block'; hasilEl.className = 'hasil-box salah';
+          hasilEl.innerHTML = `❌ Salah! Jawaban benar: <b>${pkEsc(soal.pilihan[soal.jawabanIdx])}</b><br><span id="ai-trik-loading">⏳ Mencari trik cepat...</span>`;
+        }
+        this._tampilkanTrik(soal);
+        if (this.cfg.modeSalah === 'ulangSampaiBenar' && modeSaatIni !== 'review') {
+          tampilTombolLanjut('ai-hasil', () => {
+            this.state._transisi = false;
+            this.state.soalMode = 'retry';
+            this.state.soalSaatIni = soal;
+            this._tampilSoal();
+          }, '🔁 Coba Lagi');
+        } else {
+          tampilTombolLanjut('ai-hasil', () => {
+            this.state._transisi = false;
+            if (modeSaatIni !== 'review') { this.state.history.push(soal); this.state.soalKe++; }
+            this._nextSoal();
+          });
+        }
+      }
+    },
+
+    async _tampilkanTrik(soal) {
+      const target = el('ai-trik-loading');
+      if (!target) return;
+      let teks;
+      try {
+        if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) throw new Error('no-key');
+        const prompt = `Kamu tutor psikotes. Soal: "${soal.pertanyaan}" (kategori: "${soal.kategori}"). Pilihan: ${soal.pilihan.join(' | ')}. Jawaban benar: "${soal.pilihan[soal.jawabanIdx]}".
+Berikan HANYA 1-2 kalimat trik cepat berbahasa Indonesia: cara berpikir sederhana tanpa kalkulator/hitungan rumit, langsung ke inti, atau analogi logis yang mudah dipahami. Jangan mengulang soal atau jawabannya.`;
+        teks = await GeminiAPI.call(prompt, 200);
+      } catch (e) {
+        teks = Psikotes._localTrik({ kategori: soal.kategori, jawaban: soal.pilihan[soal.jawabanIdx] });
+      }
+      const el2 = el('ai-trik-loading');
+      if (el2) el2.outerHTML = `<span>💡 <b>Trik:</b> ${typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks)}</span>`;
+    },
+
+    selesaiSekarang() { this._selesai(true); },
+
+    // ================================================================
+    //  HASIL AKHIR PSIKOTES AI
+    // ================================================================
+    _selesai(dipercepat) {
+      const total = this.state.totalBenar + this.state.totalSalah;
+      const pct = total ? Math.round(this.state.totalBenar / total * 100) : 0;
+      const emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '💪';
+      const elapsedDetik = Math.floor((Date.now() - this.state.mulaiTs) / 1000);
+      App.catatSesiSelesai('psikotes-ai', this.state.totalBenar, total);
+
+      const top5 = Object.values(this.state.wrongLog).sort((a, b) => b.count - a.count).slice(0, 5);
+
+      el("konten-utama").innerHTML = `
+        <div class="selesai-wrap" style="text-align:left">
+          <div style="text-align:center">
+            <div class="selesai-emoji">${emoji}</div>
+            <h2 style="text-align:center">Latihan Psikotes AI Selesai!</h2>
+            ${dipercepat ? '<div class="soal-hint">Diselesaikan lebih awal</div>' : ''}
+          </div>
+          <div class="selesai-skor" style="text-align:center">
+            <div>✅ Benar: <b>${this.state.totalBenar}</b> &nbsp; ❌ Salah: <b>${this.state.totalSalah}</b></div>
+            <div class="skor-pct">${pct}%</div>
+            <div class="soal-hint">⏱️ Waktu: ${Psikotes._formatWaktu(elapsedDetik)}</div>
+          </div>
+
+          ${top5.length ? `
+          <div class="pk-card" style="margin-top:14px">
+            <h3>🔁 5 Soal yang Sering Salah</h3>
+            <ul style="margin:6px 0 0 18px;padding:0;font-size:13.5px">
+              ${top5.map(d => `<li style="margin-bottom:8px">
+                <span class="quiz-chip quiz-chip-ungu" style="font-size:10.5px">${pkEsc(d.soal.kategori)}</span><br>
+                <b>${pkEsc(d.soal.pertanyaan)}</b><br>
+                Jawaban benar: <span style="color:var(--c-hijau-d);font-weight:700">${pkEsc(d.soal.pilihan[d.soal.jawabanIdx])}</span>
+                ${d.count > 1 ? ` (salah ${d.count}×)` : ''}
+              </li>`).join('')}
+            </ul>
+          </div>` : ''}
+
+          <div class="pk-card" style="margin-top:14px">
+            <h3>💡 Saran &amp; Trik Cepat</h3>
+            <div id="ai-saran-akhir" class="pk-saran-teks">⏳ Menyiapkan saran...</div>
+          </div>
+
+          <div class="btn-row" style="justify-content:center;margin-top:16px">
+            <button class="btn btn-hijau" onclick="Psikotes.AI.bukaSetup()">🔄 Latihan Lagi</button>
+            <button class="btn btn-abu" onclick="Psikotes.kembaliMenu()">← Menu Psikotes</button>
+          </div>
+        </div>
+      `;
+      this._isiSaranAkhir(pct, top5);
+    },
+
+    async _isiSaranAkhir(pct, top5) {
+      const target = el('ai-saran-akhir');
+      if (!target) return;
+      let teks;
+      try {
+        if (typeof GeminiAPI === "undefined" || !GeminiAPI.getKey()) throw new Error('no-key');
+        const daftarTeks = top5.slice(0, 3).map(d => `- [${d.soal.kategori}] ${d.soal.pertanyaan}`).join('\n');
+        const prompt = `Pengguna baru saja latihan soal psikotes buatan AI dan mendapat skor ${pct}%.
+${daftarTeks ? 'Beberapa soal yang sering salah:\n' + daftarTeks : 'Tidak ada catatan soal yang salah.'}
+Berikan saran singkat (maksimal 4 kalimat, berbahasa Indonesia, dalam bentuk paragraf tanpa list) untuk membantu berlatih kategori-kategori tersebut lebih baik, sertakan 1 trik berpikir cepat & analogi sederhana yang relevan agar bisa menjawab tanpa perhitungan rumit.`;
+        teks = await GeminiAPI.call(prompt, 300);
+      } catch (e) {
+        teks = pct >= 80
+          ? 'Hasil kamu sudah bagus! Coba tantang diri dengan kategori yang belum dicoba, atau kurangi waktu berpikir per soal supaya makin reflek.'
+          : 'Fokus pelajari pola soal dari kategori yang paling sering salah dulu — kenali polanya lewat beberapa contoh, baru coba jawab cepat tanpa mikir rumus panjang. Baca soal sekali dengan teliti, garis bawahi kata kunci, lalu eliminasi dulu pilihan yang jelas salah sebelum memutuskan.';
+      }
+      target.innerHTML = typeof GeminiAPI !== 'undefined' ? GeminiAPI.esc2(teks) : pkEsc(teks).replace(/\n/g, '<br>');
     },
   },
 };
