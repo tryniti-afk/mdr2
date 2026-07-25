@@ -1442,9 +1442,36 @@ ${Psikotes.ATURAN_FORMAT_HITUNG}`;
         this.state.soalSaatIni = soal;
         this._tampilSoal();
       } catch (e) {
-        tampilToast('❌ Gagal menyiapkan soal: ' + e.message);
-        this._selesai();
+        console.error("Psikotes.AI._nextSoal gagal:", e);
+        this._tampilErrorSoal(e && e.message ? e.message : "Terjadi kesalahan tak dikenal.");
       }
+    },
+
+    // Ditampilkan kalau AI/pencarian internet gagal menyiapkan soal —
+    // sesi TIDAK langsung diakhiri, biar progres & skor yang sudah ada
+    // tidak hilang begitu saja; user bisa coba lagi, ganti pengaturan,
+    // atau memilih selesai sendiri kalau memang mau berhenti.
+    _tampilErrorSoal(pesan) {
+      const total = this.state.totalBenar + this.state.totalSalah;
+      el("konten-utama").innerHTML = `
+        <div class="soal-wrap">
+          <div class="soal-header">
+            <span class="progres-teks">Soal ke-${this.state.soalKe + 1}</span>
+            <span id="ai-skor-mini">✅ ${this.state.totalBenar} &nbsp;❌ ${this.state.totalSalah}</span>
+          </div>
+          <div class="pk-card" style="text-align:center;padding:20px 16px">
+            <div style="font-size:32px">⚠️</div>
+            <p style="font-weight:700;margin:6px 0 4px">Gagal menyiapkan soal</p>
+            <p class="pk-hint">${pkEsc(pesan)}</p>
+            ${this.cfg.sumberMode === 'internet' ? `<p class="pk-hint">💡 Kalau pesan di atas terus muncul, model AI yang dipakai mungkin belum mendukung fitur pencarian internet — coba ganti ke mode "🤖 Dikarang AI" di pengaturan.</p>` : ""}
+          </div>
+          <div class="btn-row" style="justify-content:center;margin-top:10px">
+            <button class="btn btn-hijau" onclick="Psikotes.AI._nextSoal()">🔄 Coba Lagi</button>
+            <button class="btn btn-biru" onclick="Psikotes.AI.bukaSetup()">⚙️ Ganti Pengaturan</button>
+            <button class="btn btn-abu" onclick="Psikotes.AI.selesaiSekarang()">✅ ${total ? "Selesai &amp; Simpan Skor" : "Selesai"}</button>
+          </div>
+        </div>
+      `;
     },
 
     // Coba generate beberapa kali sampai dapat soal yang belum pernah muncul
