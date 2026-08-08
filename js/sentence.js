@@ -554,9 +554,16 @@ var SentenceVocab = {
     sedangChat: false,
     // Opsi tambahan
     tampilkanPinyin: false,   // Tampilkan pinyin di soal hanzi-indo
-    modePermainan: false,     // Mode game: salah → ulang sampai benar
-    _gameRetry: false,        // Flag sedang retry soal saat ini
-    _gameSoalSelesai: 0,      // Counter soal yang sudah diselesaikan
+    modePermainan: false,     // Mode game: salah → ditangani sesuai requeueDiAkhir
+    requeueDiAkhir: true,     // true = soal salah muncul lagi di akhir sesi | false = tidak diulang
+    _queueUlang: [],          // Antrian soal yang salah, menunggu diulang di akhir sesi
+    _sedangUlangan: false,    // Flag: soal yang sedang tampil adalah soal ulangan dari antrian
+    _benarTerakhir: false,    // Hasil jawaban soal terakhir (dipakai _lanjut utk requeue)
+
+    // Alur jawab: pinyin dulu sebelum arti Indonesia (khusus mode hanzi-indo)
+    jawabPinyinDulu: false,   // true = harus jawab pinyin benar dulu, baru lanjut arti Indonesia
+    pinyinStrict: true,       // true = wajib nada (pakai keyboard pinyin) | false = tanpa nada (ketik bebas)
+    _tahapJawab: "pinyin",    // "pinyin" | "indo" — tahap soal saat ini (jika jawabPinyinDulu aktif)
   },
 
   // ── PARSE VOCAB ──────────────────────────────────────────────
@@ -788,6 +795,30 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
           <div style="font-size:11px;color:#78909c;margin-top:4px">Pinyin hanya tersedia saat mode Hanzi → Indonesia</div>
         </div>
 
+        <div class="sv-section" id="sv-jawabpinyin-section" style="${s.mode !== 'hanzi-indo' ? 'display:none' : ''}">
+          <div class="sv-label">🈺 Alur Jawaban:</div>
+          <div class="sv-chips">
+            <button class="sv-chip ${!s.jawabPinyinDulu ? "aktif" : ""}"
+              id="sv-chip-alur-indo"
+              onclick="SentenceVocab._setAlurJawab(false)">🇮🇩 Langsung Arti Indonesia</button>
+            <button class="sv-chip ${s.jawabPinyinDulu ? "aktif" : ""}"
+              id="sv-chip-alur-pinyin"
+              onclick="SentenceVocab._setAlurJawab(true)">🔤 Pinyin Dulu → Arti Indonesia</button>
+          </div>
+          <div id="sv-pinyinmode-sub" style="margin-top:8px;${!s.jawabPinyinDulu ? "display:none" : ""}">
+            <div class="sv-label" style="font-size:12px">Cara Menjawab Pinyin:</div>
+            <div class="sv-chips">
+              <button class="sv-chip ${s.pinyinStrict ? "aktif" : ""}"
+                id="sv-chip-pystrict-ya"
+                onclick="SentenceVocab._setPinyinStrict(true)">🎯 Wajib Nada (Keyboard)</button>
+              <button class="sv-chip ${!s.pinyinStrict ? "aktif" : ""}"
+                id="sv-chip-pystrict-tidak"
+                onclick="SentenceVocab._setPinyinStrict(false)">🌊 Tanpa Nada</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#78909c;margin-top:4px">Jika aktif: kamu harus menjawab pinyin kalimat dengan benar dulu, baru lanjut menjawab arti Indonesianya.</div>
+        </div>
+
         <div class="sv-section">
           <div class="sv-label">👁️ Tampilkan Soal:</div>
           <div class="sv-chips">
@@ -828,7 +859,23 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
               onclick="SentenceVocab._setGameMode(false)">📝 Normal</button>
           </div>
           <div style="font-size:11px;color:#78909c;margin-top:6px">
-            Mode permainan: jika jawaban salah, soal diulang sampai benar sebelum lanjut ke soal berikutnya.
+            Mode permainan: skor & progres ditandai khusus. Atur di bawah apa yang terjadi kalau jawabanmu salah.
+          </div>
+
+          <div id="sv-requeue-section" style="margin-top:10px;${!s.modePermainan ? "display:none" : ""}">
+            <div style="font-size:12px;color:#6a1b9a;font-weight:600;margin-bottom:6px">🔁 Jika Jawaban Salah:</div>
+            <div class="sv-chips">
+              <button class="sv-chip ${s.requeueDiAkhir ? "aktif" : ""}"
+                id="sv-chip-requeue-ya"
+                onclick="SentenceVocab._setRequeue(true)">🔁 Muncul Lagi di Akhir</button>
+              <button class="sv-chip ${!s.requeueDiAkhir ? "aktif" : ""}"
+                id="sv-chip-requeue-tidak"
+                onclick="SentenceVocab._setRequeue(false)">➡️ Tidak Diulang</button>
+            </div>
+            <div style="font-size:11px;color:#78909c;margin-top:6px">
+              "Muncul Lagi di Akhir": soal yang salah akan ditanyakan ulang setelah semua soal baru selesai, sampai kamu jawab benar.<br>
+              "Tidak Diulang": soal yang salah langsung lanjut ke soal berikutnya, tidak muncul lagi.
+            </div>
           </div>
         </div>
 
@@ -900,11 +947,15 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       if (group) group.querySelectorAll(".sv-chip").forEach(b => b.classList.remove("aktif"));
       btn.classList.add("aktif");
     }
-    // Tampilkan/sembunyikan opsi pinyin berdasarkan mode
+    // Tampilkan/sembunyikan opsi pinyin & alur jawab berdasarkan mode
     if (key === "mode") {
       const pinyinSection = document.getElementById("sv-pinyin-section");
       if (pinyinSection) {
         pinyinSection.style.display = val === "hanzi-indo" ? "" : "none";
+      }
+      const jawabPinyinSection = document.getElementById("sv-jawabpinyin-section");
+      if (jawabPinyinSection) {
+        jawabPinyinSection.style.display = val === "hanzi-indo" ? "" : "none";
       }
     }
   },
@@ -917,10 +968,38 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     if (tidak) tidak.classList.toggle("aktif", !aktif);
   },
 
+  _setAlurJawab(aktif) {
+    this._state.jawabPinyinDulu = aktif;
+    const ya    = document.getElementById("sv-chip-alur-pinyin");
+    const tidak = document.getElementById("sv-chip-alur-indo");
+    if (ya)    ya.classList.toggle("aktif", aktif);
+    if (tidak) tidak.classList.toggle("aktif", !aktif);
+    const sub = document.getElementById("sv-pinyinmode-sub");
+    if (sub) sub.style.display = aktif ? "" : "none";
+  },
+
+  _setPinyinStrict(aktif) {
+    this._state.pinyinStrict = aktif;
+    const ya    = document.getElementById("sv-chip-pystrict-ya");
+    const tidak = document.getElementById("sv-chip-pystrict-tidak");
+    if (ya)    ya.classList.toggle("aktif", aktif);
+    if (tidak) tidak.classList.toggle("aktif", !aktif);
+  },
+
   _setGameMode(aktif) {
     this._state.modePermainan = aktif;
     const ya    = document.getElementById("sv-chip-game-ya");
     const tidak = document.getElementById("sv-chip-game-tidak");
+    if (ya)    ya.classList.toggle("aktif", aktif);
+    if (tidak) tidak.classList.toggle("aktif", !aktif);
+    const requeueSection = document.getElementById("sv-requeue-section");
+    if (requeueSection) requeueSection.style.display = aktif ? "" : "none";
+  },
+
+  _setRequeue(aktif) {
+    this._state.requeueDiAkhir = aktif;
+    const ya    = document.getElementById("sv-chip-requeue-ya");
+    const tidak = document.getElementById("sv-chip-requeue-tidak");
     if (ya)    ya.classList.toggle("aktif", aktif);
     if (tidak) tidak.classList.toggle("aktif", !aktif);
   },
@@ -948,8 +1027,10 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     s.idx   = 0;
     s.skor  = { benar: 0, salah: 0 };
     s.soalSaat = null;
-    s._gameRetry = false;
-    s._gameSoalSelesai = 0;
+    s._queueUlang = [];
+    s._sedangUlangan = false;
+    s._benarTerakhir = false;
+    s._tahapJawab = "pinyin";
 
     el("konten-utama").innerHTML = this._htmlLoading("Mengambil vocab dari spreadsheet...");
 
@@ -970,22 +1051,28 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
   async _nextSoal() {
     const s = this._state;
-    // Check completion using game counter or normal idx
-    const selesai = s.modePermainan ? s._gameSoalSelesai : s.idx;
-    if (selesai >= s.total) { this._tampilSelesai(); return; }
 
-    // Jika game retry: soal sama, jangan generate ulang
-    if (s._gameRetry && s.soalSaat) {
-      s.chatHistory = [];
-      s.sedangChat  = false;
-      this._tampilSoal();
+    // Semua soal baru (s.total) sudah diproses → cek antrian ulang (mode game + requeue)
+    if (s.idx >= s.total) {
+      if (s.modePermainan && s.requeueDiAkhir && s._queueUlang.length) {
+        s.soalSaat       = s._queueUlang.shift();
+        s._sedangUlangan = true;
+        s._tahapJawab    = "pinyin";
+        s.chatHistory    = [];
+        s.sedangChat     = false;
+        this._tampilSoal();
+        return;
+      }
+      this._tampilSelesai();
       return;
     }
 
-    el("konten-utama").innerHTML = this._htmlLoading(`Generating soal ${selesai + 1} dari ${s.total}...`);
+    s._sedangUlangan = false;
+    el("konten-utama").innerHTML = this._htmlLoading(`Generating soal ${s.idx + 1} dari ${s.total}...`);
 
     try {
       s.soalSaat    = await this._generateSoal(s.vocabPool, s.grammarContoh, s.mode);
+      s._tahapJawab = "pinyin";
       s.chatHistory = [];
       s.sedangChat  = false;
       this._tampilSoal();
@@ -1010,14 +1097,16 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     const tampilan = s.tampilan;
     const jawab    = s.jawab;
     const isGame   = s.modePermainan;
+    const ulangan  = s._sedangUlangan;
 
-    // Progress: di mode game pakai soal selesai, normal pakai idx
-    const soalKe  = isGame ? s._gameSoalSelesai + 1 : s.idx + 1;
-    const pct     = Math.round((isGame ? s._gameSoalSelesai : s.idx) / s.total * 100);
+    // Progress: soal baru pakai idx; soal ulangan ditandai terpisah (tidak menambah total)
+    const pct     = Math.round(Math.min(s.idx, s.total) / s.total * 100);
     const gameTag = isGame ? ` <span style="font-size:11px;background:#9c27b0;color:#fff;padding:2px 6px;border-radius:10px;margin-left:4px">🎮 Game</span>` : "";
+    const ulanganTag = ulangan ? ` <span style="font-size:11px;background:#ff9800;color:#fff;padding:2px 6px;border-radius:10px;margin-left:4px">🔁 Ulangan (${s._queueUlang.length + 1} tersisa)</span>` : "";
+    const soalTeks = ulangan ? `Soal Ulangan` : `Soal ${s.idx + 1} / ${s.total}`;
     const header = `
       <div class="soal-header">
-        <div class="progres-teks">Soal ${soalKe} / ${s.total}${gameTag}</div>
+        <div class="progres-teks">${soalTeks}${gameTag}${ulanganTag}</div>
         <div class="skor-mini" id="sv-skor-mini">✅ ${s.skor.benar} ❌ ${s.skor.salah}</div>
       </div>
       <div class="progres-bar">
@@ -1029,12 +1118,61 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     const hanziEsc = this._esc(soal.hanzi);
     const indoEsc  = this._esc(soal.indonesia);
 
+    // ── TAHAP PINYIN (jika opsi "Pinyin Dulu" aktif, khusus mode hanzi-indo) ──
+    if (mode === "hanzi-indo" && s.jawabPinyinDulu && s._tahapJawab === "pinyin") {
+      const showTeks  = tampilan !== "audio";
+      const showAudio = tampilan !== "teks";
+      const pinyinInputArea = s.pinyinStrict
+        ? `<div id="kb-pinyin-cont"></div>`
+        : `<textarea id="sv-input-jawab" class="input-jawab" rows="2" placeholder="Tulis pinyin (tanpa nada juga boleh)..."></textarea>`;
+      el("konten-utama").innerHTML = `
+        ${header}
+        <div class="soal-wrap">
+          <div class="label-mode">🈯 Hanzi → Pinyin (Tahap 1/2)</div>
+          ${showTeks ? `<div class="soal-kalimat">${soal.hanzi}</div>` : ""}
+          ${showAudio ? `<div class="audio-btn-wrap">
+            <button class="btn-audio" onclick="TTS.mandarin('${hanziEsc}')">🔊 Putar Audio</button>
+          </div>` : ""}
+          <div class="soal-hint">Tulis pinyin kalimat di atas${s.pinyinStrict ? " (dengan tanda nada)" : ""}:</div>
+          ${pinyinInputArea}
+          <div class="hasil-box" id="sv-hasil-box"></div>
+          <div class="btn-row">
+            <button class="btn btn-hijau" onclick="SentenceVocab._jawabPinyinTahap()">✅ Submit Pinyin</button>
+            <button class="btn btn-kuning" onclick="SentenceVocab._lewatiPinyin()">⏭ Lewati Pinyin</button>
+            <button class="btn btn-abu" onclick="SentenceVocab.kembaliMenu()">← Menu</button>
+          </div>
+        </div>`;
+
+      if (tampilan === "audio" || tampilan === "teks-audio") {
+        setTimeout(() => TTS.mandarin(soal.hanzi), 500);
+      }
+      if (s.pinyinStrict) {
+        setTimeout(() => buildKbPinyin("kb-display", null), 50);
+      } else {
+        setTimeout(() => { const inp = el("sv-input-jawab"); if (inp) inp.focus(); }, 100);
+        setTimeout(() => {
+          const inp = el("sv-input-jawab");
+          if (inp) {
+            inp.addEventListener("keydown", e => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                SentenceVocab._jawabPinyinTahap();
+              }
+            });
+          }
+        }, 150);
+      }
+      return;
+    }
+
     if (mode === "hanzi-indo") {
       const showTeks  = tampilan !== "audio";
       const showAudio = tampilan !== "teks";
       const showPinyin = s.tampilkanPinyin && soal.pinyin;
+      const tahapTag = s.jawabPinyinDulu ? " (Tahap 2/2)" : "";
       soalKonten = `
-        <div class="label-mode">🈯 Hanzi → Indonesia</div>
+        <div class="label-mode">🈯 Hanzi → Indonesia${tahapTag}</div>
+        ${s.jawabPinyinDulu ? `<div style="font-size:12px;color:#2e7d32;margin-bottom:4px">✅ Pinyin sudah benar: <b>${soal.pinyin || ""}</b></div>` : ""}
         ${showTeks ? `<div class="soal-kalimat">${soal.hanzi}</div>
           ${showPinyin ? `<div class="soal-pinyin-hint">${soal.pinyin}</div>` : ""}` : ""}
         ${showAudio ? `<div class="audio-btn-wrap">
@@ -1102,6 +1240,40 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     }, 150);
   },
 
+  // ── TAHAP PINYIN (sebelum arti Indonesia) ────────────────────
+  _jawabPinyinTahap() {
+    const s    = this._state;
+    const soal = s.soalSaat;
+    let input;
+    if (s.pinyinStrict) {
+      input = getKbTeks();
+    } else {
+      const inp = el("sv-input-jawab");
+      input = inp ? inp.value.trim() : "";
+    }
+    if (!input) { tampilToast("Tulis pinyin dulu!"); return; }
+
+    const benar = cekPinyin(input, soal.pinyin || "", s.pinyinStrict);
+    const hEl = el("sv-hasil-box");
+    if (benar) {
+      if (hEl) {
+        hEl.className = "hasil-box benar";
+        hEl.innerHTML = "✅ Pinyin benar! Lanjut ke arti Indonesia...";
+      }
+      setTimeout(() => { s._tahapJawab = "indo"; this._tampilSoal(); }, 900);
+    } else {
+      if (hEl) {
+        hEl.className = "hasil-box salah";
+        hEl.innerHTML = `❌ Pinyin belum tepat, coba lagi.<div style="font-size:11px;margin-top:4px;color:#78909c">Tahap pinyin belum dinilai ke skor — betulkan dulu atau tekan "Lewati Pinyin".</div>`;
+      }
+    }
+  },
+
+  _lewatiPinyin() {
+    this._state._tahapJawab = "indo";
+    this._tampilSoal();
+  },
+
   // ── JAWAB: KETIK ─────────────────────────────────────────────
   _jawabKetik() {
     const inp   = el("sv-input-jawab");
@@ -1123,6 +1295,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
     if (benar) this._state.skor.benar++;
     else this._state.skor.salah++;
+    this._state._benarTerakhir = benar;
     if (inp) inp.disabled = true;
 
     this._tampilHasil(benar, kunci, soal, input);
@@ -1148,6 +1321,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
         if (!this._state._ulangiUcapan) {
           if (benar) this._state.skor.benar++;
           else this._state.skor.salah++;
+          this._state._benarTerakhir = benar;
         }
         this._state._ulangiUcapan = false;
         if (btnMic) btnMic.textContent = "✔ Terjawab";
@@ -1204,11 +1378,16 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       ? '<span style="font-size:11px;color:#388e3c;background:#e8f5e9;padding:2px 6px;border-radius:4px">📂 dari data kamu</span>'
       : '<span style="font-size:11px;color:#1565c0;background:#e3f2fd;padding:2px 6px;border-radius:4px">🌐 grammar umum</span>';
 
-    // Game mode: jika salah tampilkan notif retry
-    const gameSalahHtml = (!benar && isGame) ? `
-      <div style="margin:8px 0;padding:8px 12px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:6px;font-size:13px;color:#e65100">
-        🎮 <b>Mode Permainan:</b> Soal ini akan diulang sampai kamu benar!
-      </div>` : "";
+    // Game mode: jika salah tampilkan notif sesuai pengaturan requeue
+    const gameSalahHtml = (!benar && isGame) ? (
+      s.requeueDiAkhir
+        ? `<div style="margin:8px 0;padding:8px 12px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:6px;font-size:13px;color:#e65100">
+             🎮 <b>Mode Permainan:</b> Soal ini akan muncul lagi di akhir sesi sampai kamu jawab benar!
+           </div>`
+        : `<div style="margin:8px 0;padding:8px 12px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:6px;font-size:13px;color:#e65100">
+             🎮 <b>Mode Permainan:</b> Soal ini tidak diulang, lanjut ke soal berikutnya.
+           </div>`
+    ) : "";
 
     hEl.innerHTML = `
       ${benar
@@ -1254,10 +1433,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
       <div class="btn-row" style="margin-top:12px" id="sv-btn-lanjut-wrap">
         ${s.jawab === "suara" ? `<button class="btn btn-kuning" onclick="SentenceVocab._ulangiUcapan()">🔁 Ulangi Ucapan</button>` : ""}
-        ${isGame && !benar
-          ? `<button class="btn btn-hijau" onclick="SentenceVocab._gameRetry()">🔄 Coba Lagi</button>`
-          : `<button class="btn btn-biru" onclick="SentenceVocab._lanjut()">→ Soal Berikutnya</button>`
-        }
+        <button class="btn btn-biru" onclick="SentenceVocab._lanjut()">→ Soal Berikutnya</button>
         <button class="btn btn-abu" onclick="SentenceVocab.kembaliMenu()">← Menu</button>
       </div>
     `;
@@ -1268,12 +1444,6 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
     // Auto TTS kalimat benar
     setTimeout(() => TTS.mandarin(soal.hanzi), 400);
-  },
-
-  // ── GAME MODE RETRY ──────────────────────────────────────────
-  _gameRetry() {
-    this._state._gameRetry = true;
-    this._tampilSoal();
   },
 
   // Ulangi ucapan untuk soal yang sama (tidak generate soal baru, tidak dobel skor)
@@ -1377,27 +1547,24 @@ Jika perlu contoh, berikan 1-2 contoh kalimat pendek.`,
     const s    = this._state;
     const soal = s.soalSaat;
     s.skor.salah++;
+    s._benarTerakhir = false;
     const hEl = el("sv-hasil-box");
     if (hEl) {
       hEl.className = "hasil-box salah";
       hEl.innerHTML = `⏭ Di-skip.<br>Kalimat: <b>${soal.hanzi}</b> = ${soal.indonesia}`;
-    }
-    // Di mode game, skip = lanjut ke soal berikutnya (hitung salah, reset retry)
-    if (s.modePermainan) {
-      s._gameRetry = false;
-      s._gameSoalSelesai++;
     }
     setTimeout(() => this._lanjut(), 1800);
   },
 
   _lanjut() {
     const s = this._state;
-    // Mode game: saat benar, tambah counter soal selesai
-    if (s.modePermainan && !s._gameRetry) {
-      s._gameSoalSelesai++;
+    // Mode game + requeue: soal yang salah dimasukkan ke antrian untuk diulang di akhir sesi
+    if (s.modePermainan && s.requeueDiAkhir && !s._benarTerakhir) {
+      s._queueUlang.push(s.soalSaat);
     }
-    s._gameRetry = false;
-    s.idx++;
+    // Hanya soal baru (bukan soal ulangan) yang menambah idx / progres utama
+    if (!s._sedangUlangan) s.idx++;
+    s._sedangUlangan = false;
     this._nextSoal();
   },
 
