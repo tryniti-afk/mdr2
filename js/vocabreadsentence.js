@@ -16,12 +16,12 @@
 //        - ❓ Tanya AI         → tanya bebas seputar kalimat/kata ini
 //
 //  Dipakai: pitch.js (GeminiAPI), engine.js (TTS, STT, el, dst),
-//           vocab_ai.js (VocabAIData.ambilKata), setsoal.js (SetSoal),
+//           setsoal.js (SetSoal.getSoalSiap/potongSoal — pakai set soal
+//           & urutan/range yang sudah dipilih user di menu Vocabulary),
 //           datamanager.js (SHEET_VOCAB)
 // ================================================================
 
 var VocabReadSentence = {
-  jumlah: 5,
   soalList: [],
   idx: 0,
   current: null,     // { word, data } — data = hasil parse JSON dari AI
@@ -51,17 +51,10 @@ var VocabReadSentence = {
       <div class="soal-wrap">
         <div class="label-mode">📖 Baca Kalimat AI</div>
         <div class="soal-teks-indo" style="margin-bottom:12px">
-          AI akan membuatkan 1 kalimat baru untuk tiap kata dari set soal yang sudah kamu pilih di menu Vocabulary.
-          Kata-kata lain dalam kalimat dibatasi ke level <b>${lv.label}</b> (${vrsEsc(lv.desc)}) supaya tetap bisa dipahami.
+          AI akan membuatkan 1 kalimat baru untuk tiap kata dari set soal yang sudah kamu pilih & atur urutannya
+          di menu Vocabulary (📋 Set Soal — sesuai soal ke berapa yang dipilih di sana). Kata-kata lain dalam kalimat
+          dibatasi ke level <b>${lv.label}</b> (${vrsEsc(lv.desc)}) supaya tetap bisa dipahami.
           Kamu bebas cuma baca-baca, dengar, lihat pinyin/arti, atau coba membaca keras — semuanya opsional.
-        </div>
-
-        <div style="font-weight:700;margin:10px 0 6px">Jumlah Kata Fokus</div>
-        <div class="sub-menu-grid">
-          ${[3, 5, 8].map(n => `
-            <div class="sub-card ${this.jumlah === n ? "sub-card-aktif" : ""}" onclick="VocabReadSentence._pilihJumlah(${n})">
-              <div class="sub-label">${n} kata</div>
-            </div>`).join("")}
         </div>
 
         ${renderKontrolLanjut("VocabReadSentence._renderUlangSetup")}
@@ -72,7 +65,6 @@ var VocabReadSentence = {
       </div>`;
   },
   _renderUlangSetup() { el("konten-utama").innerHTML = VocabReadSentence.renderSetup(); },
-  _pilihJumlah(n) { this.jumlah = n; el("konten-utama").innerHTML = this.renderSetup(); },
 
   // ── MULAI SESI ───────────────────────────────────────────────
   async mulai() {
@@ -81,9 +73,10 @@ var VocabReadSentence = {
       if (k) GeminiAPI.setKey(k); else { tampilToast("⚠️ Perlu API key Gemini untuk fitur ini."); return; }
     }
     this.idx = 0;
-    const kata = await VocabAIData.ambilKata(this.jumlah);
-    if (!kata.length) { tampilToast("⚠️ Data vocab kosong."); this.buka(); return; }
-    this.soalList = kata;
+    const raw = await SetSoal.getSoalSiap("vocab");
+    if (!raw || !raw.length) { tampilToast("⚠️ Tidak ada soal! Cek set soal yang dipilih."); this.buka(); return; }
+    this.soalList = SetSoal.potongSoal(raw, "vocab");
+    if (!this.soalList.length) { tampilToast("⚠️ Tidak ada soal! Cek set soal yang dipilih."); this.buka(); return; }
     this.tampilSoal();
   },
 
