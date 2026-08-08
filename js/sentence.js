@@ -1264,7 +1264,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     } else {
       if (hEl) {
         hEl.className = "hasil-box salah";
-        hEl.innerHTML = `❌ Pinyin belum tepat, coba lagi.<div style="font-size:11px;margin-top:4px;color:#78909c">Tahap pinyin belum dinilai ke skor — betulkan dulu atau tekan "Lewati Pinyin".</div>`;
+        hEl.innerHTML = `❌ Pinyin belum tepat.<div style="font-size:12px;margin-top:4px;color:#37474f">Kunci jawaban: <b>${soal.pinyin || "-"}</b></div><div style="font-size:11px;margin-top:4px;color:#78909c">Tahap pinyin belum dinilai ke skor — betulkan dulu atau tekan "Lewati Pinyin".</div>`;
       }
     }
   },
