@@ -1194,7 +1194,6 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
       const tahapTag = s.jawabPinyinDulu ? " (Tahap 2/2)" : "";
       soalKonten = `
         <div class="label-mode">🈯 Hanzi → Indonesia${tahapTag}</div>
-        ${s.jawabPinyinDulu ? `<div style="font-size:12px;color:#2e7d32;margin-bottom:4px">✅ Pinyin sudah benar: <b>${soal.pinyin || ""}</b></div>` : ""}
         ${showTeks ? `<div class="soal-kalimat">${soal.hanzi}</div>
           ${showPinyin ? `<div class="soal-pinyin-hint">${soal.pinyin}</div>` : ""}` : ""}
         ${showAudio ? `<div class="audio-btn-wrap">
