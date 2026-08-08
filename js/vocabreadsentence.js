@@ -227,15 +227,27 @@ Aturan PENTING:
     });
 
     let breakdownHTML = "";
+    let wIdx = 0;
     (data.tokens || []).forEach(tok => {
       if (tok.type !== "word") return;
-      (tok.chars || []).forEach(c => {
-        breakdownHTML += `<div class="vrs-breakdown-row">
-          <div class="vrs-bd-hanzi">${vrsEsc(c.c)}</div>
-          <div class="vrs-bd-pinyin">${vrsEsc(c.py || "")}</div>
-          <div class="vrs-bd-arti">${vrsEsc(c.arti || "")}</div>
-        </div>`;
-      });
+      const chars = tok.chars || [];
+      const bisaDibuka = chars.length > 1;
+      const rowId = `vrs-bd-chars-${wIdx}`;
+      breakdownHTML += `<div class="vrs-breakdown-word">
+        <div class="vrs-breakdown-row${bisaDibuka ? " vrs-bd-clickable" : ""}"${bisaDibuka ? ` onclick="VocabReadSentence._toggleBreakdownChars('${rowId}', this)"` : ""}>
+          <div class="vrs-bd-hanzi">${vrsEsc(tok.hanzi)}${bisaDibuka ? ` <span class="vrs-bd-arrow">▾</span>` : ""}</div>
+          <div class="vrs-bd-pinyin">${vrsEsc(tok.pinyin || "")}</div>
+          <div class="vrs-bd-arti">${vrsEsc(tok.arti || "")}</div>
+        </div>
+        ${bisaDibuka ? `<div class="vrs-breakdown-chars" id="${rowId}" style="display:none">
+          ${chars.map(c => `<div class="vrs-breakdown-row vrs-bd-char-row">
+            <div class="vrs-bd-hanzi">${vrsEsc(c.c)}</div>
+            <div class="vrs-bd-pinyin">${vrsEsc(c.py || "")}</div>
+            <div class="vrs-bd-arti">${vrsEsc(c.arti || "")}</div>
+          </div>`).join("")}
+        </div>` : ""}
+      </div>`;
+      wIdx++;
     });
 
     el("konten-utama").innerHTML = `
@@ -283,6 +295,15 @@ Aturan PENTING:
   },
 
   _toggle(key) { this[key] = !this[key]; this._renderSoal(); },
+
+  _toggleBreakdownChars(id, rowEl) {
+    const kontEl = document.getElementById(id);
+    if (!kontEl) return;
+    const tampilkan = kontEl.style.display === "none";
+    kontEl.style.display = tampilkan ? "" : "none";
+    const panah = rowEl.querySelector(".vrs-bd-arrow");
+    if (panah) panah.textContent = tampilkan ? "▴" : "▾";
+  },
 
   _dengar() {
     const { data } = this.current;
