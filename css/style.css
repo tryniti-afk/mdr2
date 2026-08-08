@@ -1562,3 +1562,15 @@ body {
 .pk-gg-genap  { background: var(--c-biru); }
 .pk-gg-ganjil { background: var(--c-naranja, #ff9800); }
 [data-theme="dark"] .pk-gg-soal { background: var(--c-card); border-color: var(--c-border); }
+
+/* ── VOCAB: Baca Kalimat AI (1 kata fokus) ─────────────────────── */
+.vrs-char        { color: var(--c-text); font-weight: 700; }
+.vrs-fokus        { background: color-mix(in srgb, var(--c-kuning, #ffc107) 30%, transparent); border-radius: 5px; box-shadow: 0 0 0 2px var(--c-kuning, #ffc107) inset; }
+.vrs-breakdown    { margin-top: 10px; padding: 10px 12px; background: var(--c-card); border: 1.5px solid var(--c-border); border-radius: 12px; text-align: left; }
+.vrs-breakdown-row{ display: flex; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px dashed var(--c-border); font-size: 13.5px; }
+.vrs-breakdown-row:last-child { border-bottom: none; }
+.vrs-bd-hanzi     { font-size: 20px; font-weight: 800; min-width: 30px; }
+.vrs-bd-pinyin    { color: var(--c-biru); font-weight: 600; min-width: 55px; }
+.vrs-bd-arti      { color: var(--c-sub); flex: 1; }
+.vrs-tanya-box    { margin-top: 12px; padding: 8px 10px; background: rgba(33,150,243,.08); border-radius: 8px; }
+[data-theme="dark"] .vrs-breakdown { background: var(--c-card); border-color: var(--c-border); }
