@@ -30,6 +30,7 @@ var Vocab = {
       { id:"shadow",       icon:"🗣️", label:"Shadowing",           desc:"Dengar & tirukan, kata yang meleset ditandai", fn:"bukaShadowing()" },
       { id:"buat-kalimat", icon:"✍️", label:"Buat Kalimat + Timer", desc:"1 kata → speaking bikin kalimat, dinilai AI", fn:"bukaBuatKalimat()" },
       { id:"baca-ulang",   icon:"🔁", label:"Baca Berulang",       desc:"Baca sama berkali-kali, lihat progres kecepatan", fn:"bukaBacaUlang()" },
+      { id:"baca-kalimat-ai", icon:"📖", label:"Baca Kalimat AI",  desc:"AI buatkan kalimat pakai 1 kata fokus, coba baca & pahami kegunaannya", fn:"bukaBacaKalimatAI()" },
     ];
     const lanjut = ambilSesiLanjut("vocab");
     const bannerLanjut = lanjut ? `
@@ -65,6 +66,7 @@ var Vocab = {
   bukaShadowing()  { ShadowModule.bukaVocab(); },
   bukaBuatKalimat(){ VocabMakeSentence.buka(); },
   bukaBacaUlang()  { VocabRepeatRead.buka(); },
+  bukaBacaKalimatAI() { VocabReadSentence.buka(); },
 
   _pasangEventMenu() {
     SetSoal._pilihSheet("vocab", SetSoal.get("vocab").sheet, "v");
