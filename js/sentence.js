@@ -1363,9 +1363,22 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     const target = mode === "hanzi-indo" ? soal.indonesia : soal.hanzi;
 
     STT.mulai(lang,
-      (hasil, semua) => {
+      async (hasil, semua) => {
         const cln  = s => s.replace(/[。，！？\s,.!?]/g, "").toLowerCase();
-        const benar = semua.some(h => cln(h).includes(cln(target)) || cln(target).includes(cln(h)));
+        let benar     = semua.some(h => cln(h).includes(cln(target)) || cln(target).includes(cln(h)));
+        let catatanAI = "";
+
+        // Mode hanzi-indo: kalau cocok kasar (substring) gagal, minta AI menilai MAKNA
+        // dulu sebelum divonis salah (sama seperti jawaban ketik)
+        if (!benar && mode === "hanzi-indo") {
+          if (btnMic) btnMic.textContent = "🎙️ Memeriksa makna dengan AI...";
+          if (hasilEl) hasilEl.innerHTML = `Kamu bilang: "${this._esc2(hasil)}"<br>⏳ Memeriksa makna dengan AI...`;
+          const hasilAI = await this._nilaiIndoAI(soal.hanzi, soal.indonesia, hasil);
+          if (hasilAI.benar === true)       { benar = true; catatanAI = hasilAI.catatan; }
+          else if (hasilAI.benar === false) { catatanAI = hasilAI.catatan; }
+          // hasilAI.benar === null → AI tidak bisa diverifikasi, tetap pakai hasil substring (salah)
+        }
+
         // Kalau ini pengulangan ucapan (bukan jawaban pertama), jangan hitung skor dua kali.
         if (!this._state._ulangiUcapan) {
           if (benar) this._state.skor.benar++;
@@ -1374,7 +1387,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
         }
         this._state._ulangiUcapan = false;
         if (btnMic) btnMic.textContent = "✔ Terjawab";
-        this._tampilHasil(benar, target, soal, hasil);
+        this._tampilHasil(benar, target, soal, hasil, catatanAI);
       },
       err => {
         if (hasilEl) hasilEl.textContent = "❌ Error mic: " + err;
