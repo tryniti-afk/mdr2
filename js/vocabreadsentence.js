@@ -152,7 +152,8 @@ Balas HANYA JSON valid (tanpa markdown, tanpa penjelasan tambahan) dengan format
     {"type":"word","hanzi":"...","pinyin":"... (pakai diakritik nada ā á ǎ à, BUKAN angka)","arti":"arti kata ini dalam konteks kalimat","chars":[{"c":"satu karakter hanzi","py":"pinyin karakter itu","arti":"arti/makna karakter itu"}]},
     {"type":"punct","text":"，"}
   ],
-  "penjelasanFokus": "2-4 kalimat Bahasa Indonesia yang menjelaskan KEGUNAAN/FUNGSI kata fokus \\"${word.hanzi}\\" dalam kalimat ini: posisinya dalam kalimat, pola/struktur yang dipakai, dan kenapa kata itu dipakai seperti itu."
+  "penjelasanFokus": "2-4 kalimat Bahasa Indonesia yang menjelaskan KEGUNAAN/FUNGSI kata fokus \\"${word.hanzi}\\" dalam kalimat ini: posisinya dalam kalimat, pola/struktur yang dipakai, dan kenapa kata itu dipakai seperti itu.",
+  "artiFokus": "arti/makna kata fokus \\"${word.hanzi}\\" SPESIFIK dalam konteks kalimat ini (boleh sama dengan arti kamus \\"${word.arti || "-"}\\", atau jelaskan singkat kalau maknanya sedikit bergeser di kalimat ini)"
 }
 Aturan PENTING:
 - Gabungan semua token (hanzi kata + text tanda baca) berurutan HARUS persis sama dengan field "kalimat".
@@ -261,7 +262,10 @@ Aturan PENTING:
         </div>
 
         ${this.showBreakdown ? `<div class="vrs-breakdown">${breakdownHTML || "-"}</div>` : ""}
-        ${this.showFokus ? `<div class="hasil-box info" style="margin-top:10px;text-align:left">🎯 ${vrsEsc(data.penjelasanFokus || "-")}</div>` : ""}
+        ${this.showFokus ? `<div class="hasil-box info" style="margin-top:10px;text-align:left">
+          <div>📌 <b>Arti kata fokus:</b> ${vrsEsc(data.artiFokus || word.arti || "-")}</div>
+          <div style="margin-top:6px">🎯 <b>Kegunaan:</b> ${vrsEsc(data.penjelasanFokus || "-")}</div>
+        </div>` : ""}
 
         <div class="btn-row" style="margin-top:14px">
           <button class="btn btn-hijau" id="vrs-btn-baca" onclick="VocabReadSentence._cobaBaca()">🎤 Coba Membaca</button>
@@ -385,7 +389,8 @@ Balas HANYA JSON valid format PERSIS:
     if (inp) inp.disabled = true;
     try {
       if (!GeminiAPI.getKey()) throw new Error("Perlu API key Gemini dulu.");
-      const prompt = `Kamu tutor bahasa Mandarin yang ramah. Konteks: siswa sedang belajar kata fokus "${word.hanzi}" (${word.pinyin || "-"}, arti: ${word.arti || "-"}) lewat kalimat contoh: "${data.kalimat}" (arti: ${data.arti || "-"}).
+      const prompt = `Kamu tutor bahasa Mandarin yang ramah. Konteks: siswa sedang belajar kata fokus "${word.hanzi}" (${word.pinyin || "-"}, arti kamus: ${word.arti || "-"}) lewat kalimat contoh: "${data.kalimat}" (arti: ${data.arti || "-"}).
+Arti kata fokus dalam konteks kalimat ini: "${data.artiFokus || word.arti || "-"}"
 Penjelasan kegunaan kata fokus yang sudah diberikan: "${data.penjelasanFokus || "-"}"
 Siswa bertanya: "${teks}"
 Jawab dengan jelas, singkat (maksimal 4 kalimat), berbahasa Indonesia.`;
