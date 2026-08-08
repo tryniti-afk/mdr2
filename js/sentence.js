@@ -564,6 +564,8 @@ var SentenceVocab = {
     jawabPinyinDulu: false,   // true = harus jawab pinyin benar dulu, baru lanjut arti Indonesia
     pinyinStrict: true,       // true = wajib nada (pakai keyboard pinyin) | false = tanpa nada (ketik bebas)
     _tahapJawab: "pinyin",    // "pinyin" | "indo" — tahap soal saat ini (jika jawabPinyinDulu aktif)
+    durasiKunciPinyin: 5,     // detik kunci jawaban pinyin tampil saat salah | 0 = tetap tampil
+    _kunciPinyinTimer: null,  // handle setTimeout utk sembunyikan kunci jawaban
   },
 
   // ── PARSE VOCAB ──────────────────────────────────────────────
@@ -816,6 +818,16 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
                 onclick="SentenceVocab._setPinyinStrict(false)">🌊 Tanpa Nada</button>
             </div>
           </div>
+          <div id="sv-durasikunci-sub" style="margin-top:8px;${!s.jawabPinyinDulu ? "display:none" : ""}">
+            <div class="sv-label" style="font-size:12px">⏱️ Kunci Jawaban Tampil Selama:</div>
+            <div class="sv-chips">
+              ${[3, 5, 10, 0].map(d => `
+                <button class="sv-chip ${s.durasiKunciPinyin === d ? "aktif" : ""}"
+                  id="sv-chip-durasi-${d}"
+                  onclick="SentenceVocab._setDurasiKunci(${d})">${d === 0 ? "♾️ Tetap" : `${d} detik`}</button>
+              `).join("")}
+            </div>
+          </div>
           <div style="font-size:11px;color:#78909c;margin-top:4px">Jika aktif: kamu harus menjawab pinyin kalimat dengan benar dulu, baru lanjut menjawab arti Indonesianya.</div>
         </div>
 
@@ -976,6 +988,8 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     if (tidak) tidak.classList.toggle("aktif", !aktif);
     const sub = document.getElementById("sv-pinyinmode-sub");
     if (sub) sub.style.display = aktif ? "" : "none";
+    const durasiSub = document.getElementById("sv-durasikunci-sub");
+    if (durasiSub) durasiSub.style.display = aktif ? "" : "none";
   },
 
   _setPinyinStrict(aktif) {
@@ -984,6 +998,14 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     const tidak = document.getElementById("sv-chip-pystrict-tidak");
     if (ya)    ya.classList.toggle("aktif", aktif);
     if (tidak) tidak.classList.toggle("aktif", !aktif);
+  },
+
+  _setDurasiKunci(detik) {
+    this._state.durasiKunciPinyin = detik;
+    [3, 5, 10, 0].forEach(d => {
+      const chip = document.getElementById(`sv-chip-durasi-${d}`);
+      if (chip) chip.classList.toggle("aktif", d === detik);
+    });
   },
 
   _setGameMode(aktif) {
@@ -1255,6 +1277,13 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
     const benar = cekPinyin(input, soal.pinyin || "", s.pinyinStrict);
     const hEl = el("sv-hasil-box");
+
+    // Bersihkan timer kunci jawaban sebelumnya (kalau ada)
+    if (s._kunciPinyinTimer) {
+      clearTimeout(s._kunciPinyinTimer);
+      s._kunciPinyinTimer = null;
+    }
+
     if (benar) {
       if (hEl) {
         hEl.className = "hasil-box benar";
@@ -1264,12 +1293,23 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     } else {
       if (hEl) {
         hEl.className = "hasil-box salah";
-        hEl.innerHTML = `❌ Pinyin belum tepat.<div style="font-size:12px;margin-top:4px;color:#37474f">Kunci jawaban: <b>${soal.pinyin || "-"}</b></div><div style="font-size:11px;margin-top:4px;color:#78909c">Tahap pinyin belum dinilai ke skor — betulkan dulu atau tekan "Lewati Pinyin".</div>`;
+        hEl.innerHTML = `❌ Pinyin belum tepat.<div id="sv-kunci-pinyin" style="font-size:12px;margin-top:4px;color:#37474f">Kunci jawaban: <b>${soal.pinyin || "-"}</b></div><div style="font-size:11px;margin-top:4px;color:#78909c">Tahap pinyin belum dinilai ke skor — betulkan dulu atau tekan "Lewati Pinyin".</div>`;
+      }
+      const durasi = s.durasiKunciPinyin;
+      if (durasi && durasi > 0) {
+        s._kunciPinyinTimer = setTimeout(() => {
+          const kunciEl = el("sv-kunci-pinyin");
+          if (kunciEl) kunciEl.style.display = "none";
+        }, durasi * 1000);
       }
     }
   },
 
   _lewatiPinyin() {
+    if (this._state._kunciPinyinTimer) {
+      clearTimeout(this._state._kunciPinyinTimer);
+      this._state._kunciPinyinTimer = null;
+    }
     this._state._tahapJawab = "indo";
     this._tampilSoal();
   },
