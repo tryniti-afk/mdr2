@@ -108,6 +108,7 @@ var VocabReadSentence = {
       if (k) GeminiAPI.setKey(k); else { tampilToast("⚠️ Perlu API key Gemini untuk fitur ini."); return; }
     }
     this.idx = 0;
+    this._riwayat = {};   // reset riwayat kalimat tiap kata (biar "Kalimat Lain" gak ulang kalimat lama) untuk sesi baru
     const raw = await SetSoal.getSoalSiap("vocab");
     if (!raw || !raw.length) { tampilToast("⚠️ Tidak ada soal! Cek set soal yang dipilih."); this.buka(); return; }
     this.soalList = SetSoal.potongSoal(raw, "vocab");
@@ -134,9 +135,14 @@ var VocabReadSentence = {
 
   async _generate(word) {
     const lv = this._levelInfo();
+    if (!this._riwayat) this._riwayat = {};
+    const riwayat = this._riwayat[this.idx] || [];
+    const larangan = riwayat.length
+      ? `\n\nPENTING — jangan ulang kalimat: kalimat-kalimat berikut SUDAH pernah dipakai untuk kata fokus ini pada sesi ini, buat kalimat yang BENAR-BENAR BERBEDA (struktur/pola/konteks berbeda, bukan cuma ganti 1-2 kata):\n${riwayat.map((k, i) => `${i + 1}. ${k}`).join("\n")}`
+      : "";
     const promptTeks = `Kamu tutor bahasa Mandarin yang membuat contoh kalimat latihan membaca untuk siswa.
 Kata FOKUS yang WAJIB muncul dalam kalimat: "${word.hanzi}" (pinyin: ${word.pinyin || "-"}, arti: ${word.arti || "-"}).
-Buat SATU kalimat Mandarin natural yang memakai kata fokus tsb. SEMUA kata LAIN dalam kalimat (selain kata fokus) WAJIB memenuhi aturan level berikut: ${lv.desc}. Panjang kalimat wajar (sekitar 4-12 karakter hanzi), natural, dan masuk akal untuk percakapan/tulisan sehari-hari.
+Buat SATU kalimat Mandarin natural yang memakai kata fokus tsb. SEMUA kata LAIN dalam kalimat (selain kata fokus) WAJIB memenuhi aturan level berikut: ${lv.desc}. Panjang kalimat wajar (sekitar 4-12 karakter hanzi), natural, dan masuk akal untuk percakapan/tulisan sehari-hari.${larangan}
 
 Balas HANYA JSON valid (tanpa markdown, tanpa penjelasan tambahan) dengan format PERSIS:
 {
@@ -176,6 +182,9 @@ Aturan PENTING:
       this._tampilError(word, lastErr ? lastErr.message : "Gagal membuat kalimat. Coba lagi.");
       return;
     }
+
+    if (!this._riwayat[this.idx]) this._riwayat[this.idx] = [];
+    this._riwayat[this.idx].push(data.kalimat);
 
     this.current = { word, data };
     this.showPinyin = false;
