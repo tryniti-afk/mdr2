@@ -30,6 +30,7 @@ var VocabReadSentence = {
   showBreakdown: false,
   showFokus: false,
   _listening: false,
+  levelMode: "sama-bawah",   // "sama" | "sama-bawah" | "bawah"
 
   // ── ENTRY ────────────────────────────────────────────────────
   buka() { el("konten-utama").innerHTML = this.renderSetup(); },
@@ -37,34 +38,68 @@ var VocabReadSentence = {
   _levelInfo() {
     const sheet = (typeof SetSoal !== "undefined") ? SetSoal.get("vocab").sheet : "lokal";
     const MAP = {
-      "hsk1-2": { label: "HSK 1-2", desc: "HSK 1 dan HSK 2" },
-      "Hsk3":   { label: "HSK 1-3", desc: "HSK 1 sampai HSK 3" },
-      "Hsk4":   { label: "HSK 1-4", desc: "HSK 1 sampai HSK 4" },
-      "Hsk5":   { label: "HSK 1-5", desc: "HSK 1 sampai HSK 5" },
+      "hsk1-2": { label: "HSK 1-2" },
+      "Hsk3":   { label: "HSK 3" },
+      "Hsk4":   { label: "HSK 4" },
+      "Hsk5":   { label: "HSK 5" },
     };
-    return MAP[sheet] || { label: "Dasar-Menengah", desc: "kosakata dasar-menengah yang umum dipakai sehari-hari (setara HSK 1-3)" };
+    const lv = MAP[sheet] || { label: "Dasar-Menengah (setara HSK 1-3)", generic: true };
+
+    let desc;
+    if (lv.generic) {
+      // Tidak ada referensi HSK pasti (mis. sheet Les/lokal) — tetap pakai deskripsi umum apa pun mode-nya.
+      desc = "kosakata dasar-menengah yang umum dipakai sehari-hari (setara HSK 1-3)";
+    } else if (this.levelMode === "sama") {
+      desc = `HANYA kosakata level ${lv.label} — JANGAN pakai kosakata di luar level ${lv.label} (baik lebih tinggi maupun lebih rendah)`;
+    } else if (this.levelMode === "bawah") {
+      desc = `HARUS lebih sederhana/rendah daripada level ${lv.label} — JANGAN pakai kosakata level ${lv.label} itu sendiri ataupun yang lebih tinggi`;
+    } else {
+      desc = `level ${lv.label} atau lebih sederhana/rendah daripada itu`;
+    }
+    return { label: lv.label, desc, generic: !!lv.generic };
+  },
+
+  _levelModeLabel(mode) {
+    return { sama: "Hanya Level Ini", "sama-bawah": "Level Ini atau di Bawahnya", bawah: "Khusus di Bawah Level Ini" }[mode];
   },
 
   renderSetup() {
     const lv = this._levelInfo();
+    const modes = [
+      { id: "sama",       icon: "🎯", label: "Hanya Level Ini",          desc: `Kosakata lain HARUS level ${lv.label} saja` },
+      { id: "sama-bawah", icon: "🪜", label: "Level Ini atau di Bawahnya", desc: `Kosakata lain boleh level ${lv.label} atau lebih sederhana` },
+      { id: "bawah",      icon: "⬇️", label: "Khusus di Bawah Level Ini", desc: `Kosakata lain WAJIB lebih sederhana dari level ${lv.label}` },
+    ];
     return `
       <div class="soal-wrap">
         <div class="label-mode">📖 Baca Kalimat AI</div>
         <div class="soal-teks-indo" style="margin-bottom:12px">
           AI akan membuatkan 1 kalimat baru untuk tiap kata dari set soal yang sudah kamu pilih & atur urutannya
-          di menu Vocabulary (📋 Set Soal — sesuai soal ke berapa yang dipilih di sana). Kata-kata lain dalam kalimat
-          dibatasi ke level <b>${lv.label}</b> (${vrsEsc(lv.desc)}) supaya tetap bisa dipahami.
-          Kamu bebas cuma baca-baca, dengar, lihat pinyin/arti, atau coba membaca keras — semuanya opsional.
+          di menu Vocabulary (📋 Set Soal — sesuai soal ke berapa yang dipilih di sana).
+          Kamu bebas cuma baca-baca, dengar, lihat pinyin/arti, atau coba membaca keras — semuanya opsional, lanjut ke kalimat berikutnya selalu manual lewat tombol.
         </div>
 
-        ${renderKontrolLanjut("VocabReadSentence._renderUlangSetup")}
+        ${lv.generic ? `
+        <div class="hasil-box info" style="margin-bottom:12px">ℹ️ Set soal ini (Les/Lokal) tidak punya level HSK pasti, jadi kosakata lain dalam kalimat otomatis dibuat sederhana (setara HSK 1-3).</div>
+        ` : `
+        <div style="font-weight:700;margin:10px 0 6px">Level Kosakata Lain dalam Kalimat (kata fokus dari set: <b>${lv.label}</b>)</div>
+        <div class="sub-menu-grid">
+          ${modes.map(m => `
+            <div class="sub-card ${this.levelMode === m.id ? "sub-card-aktif" : ""}" onclick="VocabReadSentence._pilihLevelMode('${m.id}')">
+              <div class="sub-icon">${m.icon}</div>
+              <div class="sub-label">${m.label}</div>
+              <div class="sub-desc">${m.desc}</div>
+            </div>`).join("")}
+        </div>
+        `}
+
         <div class="btn-row" style="margin-top:16px">
           <button class="btn btn-hijau" onclick="VocabReadSentence.mulai()">▶ Mulai</button>
           <button class="btn btn-abu" onclick="Vocab.kembaliMenu()">← Batal</button>
         </div>
       </div>`;
   },
-  _renderUlangSetup() { el("konten-utama").innerHTML = VocabReadSentence.renderSetup(); },
+  _pilihLevelMode(mode) { this.levelMode = mode; el("konten-utama").innerHTML = this.renderSetup(); },
 
   // ── MULAI SESI ───────────────────────────────────────────────
   async mulai() {
@@ -101,7 +136,7 @@ var VocabReadSentence = {
     const lv = this._levelInfo();
     const promptTeks = `Kamu tutor bahasa Mandarin yang membuat contoh kalimat latihan membaca untuk siswa.
 Kata FOKUS yang WAJIB muncul dalam kalimat: "${word.hanzi}" (pinyin: ${word.pinyin || "-"}, arti: ${word.arti || "-"}).
-Buat SATU kalimat Mandarin natural yang memakai kata fokus tsb. SEMUA kata LAIN dalam kalimat (selain kata fokus) WAJIB berupa kosakata level ${lv.desc} atau lebih rendah/sederhana — JANGAN pakai kosakata yang lebih sulit dari level itu untuk kata selain kata fokus. Panjang kalimat wajar (sekitar 4-12 karakter hanzi), natural, dan masuk akal untuk percakapan/tulisan sehari-hari.
+Buat SATU kalimat Mandarin natural yang memakai kata fokus tsb. SEMUA kata LAIN dalam kalimat (selain kata fokus) WAJIB memenuhi aturan level berikut: ${lv.desc}. Panjang kalimat wajar (sekitar 4-12 karakter hanzi), natural, dan masuk akal untuk percakapan/tulisan sehari-hari.
 
 Balas HANYA JSON valid (tanpa markdown, tanpa penjelasan tambahan) dengan format PERSIS:
 {
@@ -199,7 +234,7 @@ Aturan PENTING:
           <div class="progres-teks">Kata ${this.idx + 1}/${this.soalList.length}</div>
         </div>
         <div class="label-mode">📖 Fokus kata: <b>${vrsEsc(word.hanzi)}</b> (${vrsEsc(word.pinyin || "")}) — ${vrsEsc(word.arti || "")}</div>
-        <div class="soal-teks-indo" style="margin-bottom:10px">Coba baca kalimat berikut. Kosakata lainnya level ${lv.label}.</div>
+        <div class="soal-teks-indo" style="margin-bottom:10px">Coba baca kalimat berikut. ${lv.generic ? "Kosakata lainnya level dasar-menengah." : `Kosakata lainnya: ${vrsEsc(this._levelModeLabel(this.levelMode))} (${vrsEsc(lv.label)}).`}</div>
 
         <div class="btn-row" style="margin-bottom:10px;flex-wrap:wrap">
           <button class="btn-audio" onclick="VocabReadSentence._dengar()">🔊 Dengar Kalimat</button>
