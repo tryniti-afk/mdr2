@@ -1274,20 +1274,69 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     this._tampilSoal();
   },
 
+  // ── NILAI JAWABAN INDO DENGAN AI (toleran parafrase/susunan beda) ──
+  async _nilaiIndoAI(hanzi, kunciIndo, inputUser) {
+    const prompt = `Kamu adalah guru bahasa Mandarin yang menilai jawaban terjemahan siswa.
+
+Kalimat Mandarin: ${hanzi}
+Terjemahan baku (kunci jawaban): "${kunciIndo}"
+Jawaban siswa: "${inputUser}"
+
+Tugas: Nilai apakah MAKNA jawaban siswa sama dengan makna kalimat Mandarin di atas, meskipun susunan kalimat, pilihan kata, atau urutannya berbeda dari kunci jawaban. Terima jawaban yang merupakan padanan makna yang wajar walau tidak identik kata demi kata (parafrase, sinonim, urutan berbeda tetap boleh). Tolak hanya jika ada makna yang salah, terbalik, hilang, atau berubah signifikan.
+
+Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
+{"benar": true, "catatan": "penjelasan singkat 1 kalimat kenapa diterima/ditolak"}`;
+
+    try {
+      const rawText = await this._callAI([{ role: "user", content: prompt }], 200);
+      const clean = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (e) {
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+        else throw e;
+      }
+      return { benar: !!parsed.benar, catatan: parsed.catatan || "" };
+    } catch (e) {
+      // AI gagal/tidak bisa diakses → null artinya "tidak bisa diverifikasi"
+      return { benar: null, catatan: "" };
+    }
+  },
+
   // ── JAWAB: KETIK ─────────────────────────────────────────────
-  _jawabKetik() {
+  async _jawabKetik() {
+    if (this._state._sedangNilai) return;
     const inp   = el("sv-input-jawab");
     const input = inp ? inp.value.trim() : "";
     if (!input) { tampilToast("Tulis jawaban dulu!"); return; }
 
-    const soal  = this._state.soalSaat;
-    const mode  = this._state.mode;
-    let benar   = false;
-    let kunci   = "";
+    const soal    = this._state.soalSaat;
+    const mode    = this._state.mode;
+    let benar     = false;
+    let kunci     = "";
+    let catatanAI = "";
 
     if (mode === "hanzi-indo") {
       kunci = soal.indonesia;
       benar = cekJawaban(input, soal.indonesia);
+
+      // Kalau pencocokan literal gagal, minta AI menilai kesamaan MAKNA
+      // (jawaban dengan urutan/kata beda tapi makna sama tetap diterima)
+      if (!benar) {
+        this._state._sedangNilai = true;
+        if (inp) inp.disabled = true;
+        const hEl = el("sv-hasil-box");
+        if (hEl) { hEl.className = "hasil-box"; hEl.innerHTML = "⏳ Memeriksa makna jawaban dengan AI..."; }
+
+        const hasilAI = await this._nilaiIndoAI(soal.hanzi, soal.indonesia, input);
+        this._state._sedangNilai = false;
+
+        if (hasilAI.benar === true)      { benar = true;  catatanAI = hasilAI.catatan; }
+        else if (hasilAI.benar === false) { catatanAI = hasilAI.catatan; }
+        // hasilAI.benar === null → AI tidak bisa diverifikasi, tetap pakai hasil pencocokan lokal (salah)
+      }
     } else {
       kunci = soal.hanzi;
       benar = input.replace(/\s/g, "") === soal.hanzi.replace(/\s/g, "");
@@ -1298,7 +1347,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
     this._state._benarTerakhir = benar;
     if (inp) inp.disabled = true;
 
-    this._tampilHasil(benar, kunci, soal, input);
+    this._tampilHasil(benar, kunci, soal, input, catatanAI);
   },
 
   // ── JAWAB: SUARA ─────────────────────────────────────────────
@@ -1341,7 +1390,7 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
   },
 
   // ── TAMPIL HASIL + BREAKDOWN + GRAMMAR ───────────────────────
-  _tampilHasil(benar, kunci, soal, inputUser) {
+  _tampilHasil(benar, kunci, soal, inputUser, catatanAI = "") {
     const hEl = el("sv-hasil-box");
     if (!hEl) return;
     const s = this._state;
@@ -1391,10 +1440,13 @@ Balas HANYA dengan JSON valid (tanpa markdown, tanpa komentar):
 
     hEl.innerHTML = `
       ${benar
-        ? `<div class="sv-hasil-status sv-benar-status">✅ Benar! Bagus sekali!</div>`
+        ? `<div class="sv-hasil-status sv-benar-status">✅ Benar! Bagus sekali!</div>
+           ${catatanAI ? `<div style="font-size:12px;color:#2e7d32;margin-top:2px">🤖 ${this._esc2(catatanAI)}</div>` : ""}
+           <div style="font-size:12px;color:#546e7a;margin-top:4px">📌 Contoh jawaban baku (lengkap &amp; terstruktur): <b>${kunci}</b></div>`
         : `<div class="sv-hasil-status sv-salah-status">❌ Kurang tepat.</div>
            <div class="sv-hasil-kunci">Jawaban: <b>${kunci}</b></div>
-           ${inputUser ? `<div style="font-size:12px;color:#78909c;margin-top:4px">Jawabanmu: "${this._esc2(inputUser)}"</div>` : ""}`
+           ${inputUser ? `<div style="font-size:12px;color:#78909c;margin-top:4px">Jawabanmu: "${this._esc2(inputUser)}"</div>` : ""}
+           ${catatanAI ? `<div style="font-size:12px;color:#c62828;margin-top:4px">🤖 ${this._esc2(catatanAI)}</div>` : ""}`
       }
       ${gameSalahHtml}
 
