@@ -146,17 +146,20 @@ var VocabReadSentence = {
           <button class="btn btn-abu" onclick="VocabReadSentence.kembaliMenu()">← Menu</button>
         </div>
       </div>`;
-    this._generate(word);
+    this._generate(word, true);   // true = ini kalimat AWAL saat kata ini pertama muncul di sesi ini
   },
 
-  async _generate(word) {
+  // isAwal = true  → kalimat pertama yang tampil untuk kata ini saat sesi baru dimulai:
+  //                  HARUS beda dari kalimat "awal" yang pernah dipakai sebelumnya (persisten lintas sesi).
+  // isAwal = false → dipanggil dari tombol "🔄 Kalimat Lain": bebas, boleh sama dengan kalimat lama.
+  async _generate(word, isAwal) {
     const lv = this._levelInfo();
     if (!this._riwayat) this._riwayat = this._loadRiwayatPersisten();
-    // riwayat sekarang disimpan per KATA (word.hanzi) & persisten lintas sesi/hari,
-    // jadi kalimat yang pernah dibuat sebelumnya (kapan pun) juga dihindari, bukan cuma dalam sesi ini.
+    // riwayat disimpan per KATA (word.hanzi) & persisten lintas sesi/hari, tapi HANYA dipakai
+    // sebagai larangan ketika ini kalimat awal sesi. Kalau user klik "Kalimat Lain", tidak ada larangan.
     const riwayat = this._riwayat[word.hanzi] || [];
-    const larangan = riwayat.length
-      ? `\n\nPENTING — jangan ulang kalimat: kalimat-kalimat berikut SUDAH pernah dipakai untuk kata fokus ini (termasuk pada sesi-sesi sebelumnya), buat kalimat yang BENAR-BENAR BERBEDA (struktur/pola/konteks berbeda, bukan cuma ganti 1-2 kata):\n${riwayat.map((k, i) => `${i + 1}. ${k}`).join("\n")}`
+    const larangan = (isAwal && riwayat.length)
+      ? `\n\nPENTING — jangan ulang kalimat: kalimat-kalimat berikut SUDAH pernah dipakai sebagai kalimat AWAL untuk kata fokus ini pada sesi-sesi sebelumnya, buat kalimat yang BENAR-BENAR BERBEDA (struktur/pola/konteks berbeda, bukan cuma ganti 1-2 kata):\n${riwayat.map((k, i) => `${i + 1}. ${k}`).join("\n")}`
       : "";
     const promptTeks = `Kamu tutor bahasa Mandarin yang membuat contoh kalimat latihan membaca untuk siswa.
 Kata FOKUS yang WAJIB muncul dalam kalimat: "${word.hanzi}" (pinyin: ${word.pinyin || "-"}, arti: ${word.arti || "-"}).
@@ -198,17 +201,21 @@ Aturan PENTING:
     }
 
     if (!data) {
-      this._tampilError(word, lastErr ? lastErr.message : "Gagal membuat kalimat. Coba lagi.");
+      this._tampilError(word, lastErr ? lastErr.message : "Gagal membuat kalimat. Coba lagi.", isAwal);
       return;
     }
 
-    if (!this._riwayat[word.hanzi]) this._riwayat[word.hanzi] = [];
-    this._riwayat[word.hanzi].push(data.kalimat);
-    // batasi jumlah riwayat yang disimpan per kata biar prompt gak makin panjang terus
-    if (this._riwayat[word.hanzi].length > this._RIWAYAT_MAX) {
-      this._riwayat[word.hanzi] = this._riwayat[word.hanzi].slice(-this._RIWAYAT_MAX);
+    // hanya kalimat AWAL yang dicatat ke riwayat persisten (yang dipakai sebagai larangan
+    // di sesi-sesi berikutnya). Kalimat dari "Kalimat Lain" boleh berulang jadi tidak dicatat.
+    if (isAwal) {
+      if (!this._riwayat[word.hanzi]) this._riwayat[word.hanzi] = [];
+      this._riwayat[word.hanzi].push(data.kalimat);
+      // batasi jumlah riwayat yang disimpan per kata biar prompt gak makin panjang terus
+      if (this._riwayat[word.hanzi].length > this._RIWAYAT_MAX) {
+        this._riwayat[word.hanzi] = this._riwayat[word.hanzi].slice(-this._RIWAYAT_MAX);
+      }
+      this._simpanRiwayatPersisten();
     }
-    this._simpanRiwayatPersisten();
 
     this.current = { word, data };
     this.showPinyin = false;
@@ -218,7 +225,7 @@ Aturan PENTING:
     this._renderSoal();
   },
 
-  _tampilError(word, msg) {
+  _tampilError(word, msg, isAwal) {
     el("konten-utama").innerHTML = `
       <div class="soal-wrap">
         <div class="soal-header">
@@ -227,7 +234,7 @@ Aturan PENTING:
         <div class="label-mode">📖 Baca Kalimat AI — "${vrsEsc(word.hanzi)}"</div>
         <div class="hasil-box salah" style="margin-top:10px">⚠️ ${vrsEsc(msg)}</div>
         <div class="btn-row" style="margin-top:14px">
-          <button class="btn btn-hijau" onclick="VocabReadSentence._generate(VocabReadSentence.soalList[VocabReadSentence.idx])">🔄 Coba Lagi</button>
+          <button class="btn btn-hijau" onclick="VocabReadSentence._generate(VocabReadSentence.soalList[VocabReadSentence.idx], ${isAwal ? "true" : "false"})">🔄 Coba Lagi</button>
           <button class="btn btn-kuning" onclick="VocabReadSentence._lanjutKata()">⏭ Lewati</button>
           <button class="btn btn-abu" onclick="VocabReadSentence.kembaliMenu()">← Menu</button>
         </div>
@@ -405,7 +412,7 @@ Balas HANYA JSON valid format PERSIS:
         </div>
         <div class="label-mode">🤖 Membuat kalimat baru untuk "${vrsEsc(word.hanzi)}"...</div>
       </div>`;
-    this._generate(word);
+    this._generate(word, false);   // false = bukan kalimat awal, boleh berulang
   },
 
   // ── TANYA AI BEBAS SEPUTAR KALIMAT INI ────────────────────────
