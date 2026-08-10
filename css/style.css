@@ -69,6 +69,9 @@
 
 [data-theme="dark"] input[type="text"],
 [data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] input:not([type]),
 [data-theme="dark"] textarea,
 [data-theme="dark"] select,
 [data-theme="dark"] .input-jawab,
@@ -77,6 +80,8 @@
   color: var(--c-text);
   border-color: var(--c-border);
 }
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: #6b7190; }
 
 [data-theme="dark"] .input-jawab::placeholder { color: #555a72; }
 
@@ -1582,3 +1587,87 @@ body {
 .vrs-bd-char-row  { padding: 4px 0; font-size: 12.5px; }
 .vrs-tanya-box    { margin-top: 12px; padding: 8px 10px; background: rgba(33,150,243,.08); border-radius: 8px; }
 [data-theme="dark"] .vrs-breakdown { background: var(--c-card); border-color: var(--c-border); }
+
+/* ================================================================
+   DARK MODE — CATCH-ALL untuk inline style terang (background/color)
+   Banyak modul (interview.js, sentence.js, vocab_ai.js, vocab.js,
+   pintar.js, modules.js) pakai style="background:#xxxxx" inline yang
+   TIDAK ikut ganti pas dark mode aktif, jadi kotaknya tetap terang
+   sementara teks di dalamnya pakai warna tema (var(--c-text)/var(--c-sub)/
+   var(--c-biru) dll yang jadi terang juga di dark mode) → teks tak
+   kebaca. Ditangani generik pakai attribute-selector [style*="..."]
+   supaya otomatis kena di semua file, tanpa perlu edit tiap file JS.
+   Urutan penting: yang lebih spesifik (background+border/color) taruh
+   duluan, override lebih umum menyusul, semua pakai !important supaya
+   menang lawan inline style yang tidak punya !important.
+   ================================================================ */
+
+/* -- background terang → versi gelap senada -- */
+[data-theme="dark"] [style*="background:#f0f4f8"] { background: #1a2030 !important; }
+[data-theme="dark"] [style*="background:#e3f2fd"] { background: #16202e !important; }
+[data-theme="dark"] [style*="background:#e8f5e9"] { background: #16261a !important; }
+[data-theme="dark"] [style*="background:#f3e5f5"] { background: #241a35 !important; }
+[data-theme="dark"] [style*="background:#fff3e0"] { background: #2a1e10 !important; }
+[data-theme="dark"] [style*="background:#fff8e1"] { background: #2a2410 !important; }
+[data-theme="dark"] [style*="background:#f9fbe7"] { background: #1e2612 !important; }
+[data-theme="dark"] [style*="background:#f0f0f0"] { background: #262a3d !important; }
+[data-theme="dark"] [style*="background:#ffebee"] { background: #2e1b1b !important; }
+
+/* -- warna teks gelap/pekat yang jadi tak kebaca di atas background gelap -- */
+[data-theme="dark"] [style*="color:#546e7a"] { color: #aab4c8 !important; }
+[data-theme="dark"] [style*="color:#37474f"] { color: #d3d8e8 !important; }
+[data-theme="dark"] [style*="color:#78909c"] { color: #a9b4c4 !important; }
+[data-theme="dark"] [style*="color:#e65100"] { color: #ffcc80 !important; }
+[data-theme="dark"] [style*="color:#6a1b9a"] { color: #ce93d8 !important; }
+[data-theme="dark"] [style*="color:#c62828"] { color: #ef9a9a !important; }
+[data-theme="dark"] [style*="color:#5d4037"] { color: #d7ccc8 !important; }
+[data-theme="dark"] [style*="color:#2e7d32"] { color: #a5d6a7 !important; }
+[data-theme="dark"] [style*="color:#388e3c"] { color: #a5d6a7 !important; }
+[data-theme="dark"] [style*="color:#0277bd"] { color: #90caf9 !important; }
+[data-theme="dark"] [style*="color:#0d47a1"] { color: #90caf9 !important; }
+[data-theme="dark"] [style*="color:#1565c0"] { color: #64b5f6 !important; }
+[data-theme="dark"] [style*="color:#558b2f"] { color: #aed581 !important; }
+[data-theme="dark"] [style*="color:#888"]    { color: #9aa0b8 !important; }
+[data-theme="dark"] [style*="color:#999"]    { color: #9aa0b8 !important; }
+[data-theme="dark"] [style*="color:#666"]    { color: #b3b9cc !important; }
+[data-theme="dark"] [style*="color:#777"]    { color: #a9aec2 !important; }
+[data-theme="dark"] [style*="color:#555"]    { color: #b3b9cc !important; }
+
+/* -- border yang sekalian ikut nyala biar konsisten sama background baru -- */
+[data-theme="dark"] [style*="border:1.5px solid #b0bec5"],
+[data-theme="dark"] [style*="border: 1.5px solid #b0bec5"] { border-color: #3a3f56 !important; }
+[data-theme="dark"] [style*="border:1px solid #e0e0e0"],
+[data-theme="dark"] [style*="border: 1px solid #e0e0e0"] { border-color: #3a3f56 !important; }
+
+/* -- komponen bersama (sv-*, ss-*) dipakai lintas modul: interview.js,
+      sentence.js, vocab_ai.js. Class-nya sama tapi warnanya di-set inline,
+      jadi tetap diamankan juga lewat class supaya konsisten. -- */
+[data-theme="dark"] .sv-section,
+[data-theme="dark"] .ss-info-box { color: var(--c-text) !important; }
+[data-theme="dark"] .sv-header       { background: #16202e !important; }
+[data-theme="dark"] .sv-title        { color: #64b5f6 !important; }
+[data-theme="dark"] .sv-subtitle     { color: var(--c-sub) !important; }
+[data-theme="dark"] .sv-label        { color: var(--c-text) !important; }
+[data-theme="dark"] .sv-chip         { background: #22253a !important; color: var(--c-sub) !important; border-color: #3a3f56 !important; }
+[data-theme="dark"] .sv-chip.aktif   { background: var(--c-biru) !important; color: #fff !important; border-color: var(--c-biru) !important; }
+[data-theme="dark"] .sv-chip:hover:not(.aktif) { background: #1a2a3a !important; border-color: var(--c-biru) !important; }
+[data-theme="dark"] .sv-info-kalimat { background: #1e2612 !important; }
+[data-theme="dark"] .sv-struktur     { background: #2a1e10 !important; color: #ffcc80 !important; }
+[data-theme="dark"] .sv-vocab-badge-result { background: #16202e !important; border-color: #1e88e5 !important; }
+[data-theme="dark"] .sv-bd-title     { color: var(--c-sub) !important; }
+[data-theme="dark"] .sv-breakdown-item { background: #1e2133 !important; border-color: #3a3f56 !important; }
+[data-theme="dark"] .sv-breakdown-item.sv-vocab-highlight { background: #16261a !important; border-color: #388e3c !important; }
+[data-theme="dark"] .sv-bd-hanzi     { color: var(--c-text) !important; }
+[data-theme="dark"] .sv-bd-pinyin    { color: #64b5f6 !important; }
+[data-theme="dark"] .sv-bd-arti      { color: var(--c-sub) !important; }
+[data-theme="dark"] .sv-bd-tag       { color: #a5d6a7 !important; background: #16261a !important; }
+[data-theme="dark"] .sv-bd-hsk-tag   { color: #ce93d8 !important; background: #241a35 !important; border-color: #6a3080 !important; }
+[data-theme="dark"] .sv-hasil-kunci  { color: var(--c-text) !important; }
+[data-theme="dark"] .sv-tanya-wrap   { background: #241a35 !important; border-color: #6a3080 !important; }
+[data-theme="dark"] .sv-tanya-title  { color: #ce93d8 !important; }
+[data-theme="dark"] .sv-chat-user    { background: #16202e !important; color: #64b5f6 !important; }
+[data-theme="dark"] .sv-chat-ai      { background: #1e2133 !important; color: var(--c-text) !important; border-color: #3a3f56 !important; }
+[data-theme="dark"] .sv-tanya-input-wrap input { background: #22253a !important; color: var(--c-text) !important; border-color: #3a3f56 !important; }
+[data-theme="dark"] .sv-spinner      { border-color: #22253a !important; border-top-color: var(--c-biru) !important; }
+[data-theme="dark"] .sv-match-btn    { background: #22253a !important; color: var(--c-text) !important; border-color: #3a3f56 !important; }
+[data-theme="dark"] .sv-match-btn.sv-match-salah { background: #2e1b1b !important; border-color: #c62828 !important; color: #ef9a9a !important; }
