@@ -101,6 +101,20 @@ var VocabReadSentence = {
   },
   _pilihLevelMode(mode) { this.levelMode = mode; el("konten-utama").innerHTML = this.renderSetup(); },
 
+  // ── RIWAYAT KALIMAT (persisten lintas sesi, biar kalimat pertama gak selalu sama) ──
+  _RIWAYAT_KEY: "mdr2_vrs_riwayat_kalimat",
+  _RIWAYAT_MAX: 8,   // maksimal kalimat lama yang disimpan & dikirim ke AI per kata
+
+  _loadRiwayatPersisten() {
+    try {
+      const raw = localStorage.getItem(this._RIWAYAT_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  },
+  _simpanRiwayatPersisten() {
+    try { localStorage.setItem(this._RIWAYAT_KEY, JSON.stringify(this._riwayat)); } catch (e) {}
+  },
+
   // ── MULAI SESI ───────────────────────────────────────────────
   async mulai() {
     if (!GeminiAPI.getKey()) {
@@ -108,7 +122,9 @@ var VocabReadSentence = {
       if (k) GeminiAPI.setKey(k); else { tampilToast("⚠️ Perlu API key Gemini untuk fitur ini."); return; }
     }
     this.idx = 0;
-    this._riwayat = {};   // reset riwayat kalimat tiap kata (biar "Kalimat Lain" gak ulang kalimat lama) untuk sesi baru
+    // riwayat kalimat per KATA (bukan per idx), dimuat dari localStorage supaya kalimat
+    // pertama yang muncul untuk suatu kata tidak selalu sama tiap kali sesi baru dimulai.
+    this._riwayat = this._loadRiwayatPersisten();
     const raw = await SetSoal.getSoalSiap("vocab");
     if (!raw || !raw.length) { tampilToast("⚠️ Tidak ada soal! Cek set soal yang dipilih."); this.buka(); return; }
     this.soalList = SetSoal.potongSoal(raw, "vocab");
@@ -135,10 +151,12 @@ var VocabReadSentence = {
 
   async _generate(word) {
     const lv = this._levelInfo();
-    if (!this._riwayat) this._riwayat = {};
-    const riwayat = this._riwayat[this.idx] || [];
+    if (!this._riwayat) this._riwayat = this._loadRiwayatPersisten();
+    // riwayat sekarang disimpan per KATA (word.hanzi) & persisten lintas sesi/hari,
+    // jadi kalimat yang pernah dibuat sebelumnya (kapan pun) juga dihindari, bukan cuma dalam sesi ini.
+    const riwayat = this._riwayat[word.hanzi] || [];
     const larangan = riwayat.length
-      ? `\n\nPENTING — jangan ulang kalimat: kalimat-kalimat berikut SUDAH pernah dipakai untuk kata fokus ini pada sesi ini, buat kalimat yang BENAR-BENAR BERBEDA (struktur/pola/konteks berbeda, bukan cuma ganti 1-2 kata):\n${riwayat.map((k, i) => `${i + 1}. ${k}`).join("\n")}`
+      ? `\n\nPENTING — jangan ulang kalimat: kalimat-kalimat berikut SUDAH pernah dipakai untuk kata fokus ini (termasuk pada sesi-sesi sebelumnya), buat kalimat yang BENAR-BENAR BERBEDA (struktur/pola/konteks berbeda, bukan cuma ganti 1-2 kata):\n${riwayat.map((k, i) => `${i + 1}. ${k}`).join("\n")}`
       : "";
     const promptTeks = `Kamu tutor bahasa Mandarin yang membuat contoh kalimat latihan membaca untuk siswa.
 Kata FOKUS yang WAJIB muncul dalam kalimat: "${word.hanzi}" (pinyin: ${word.pinyin || "-"}, arti: ${word.arti || "-"}).
@@ -184,8 +202,13 @@ Aturan PENTING:
       return;
     }
 
-    if (!this._riwayat[this.idx]) this._riwayat[this.idx] = [];
-    this._riwayat[this.idx].push(data.kalimat);
+    if (!this._riwayat[word.hanzi]) this._riwayat[word.hanzi] = [];
+    this._riwayat[word.hanzi].push(data.kalimat);
+    // batasi jumlah riwayat yang disimpan per kata biar prompt gak makin panjang terus
+    if (this._riwayat[word.hanzi].length > this._RIWAYAT_MAX) {
+      this._riwayat[word.hanzi] = this._riwayat[word.hanzi].slice(-this._RIWAYAT_MAX);
+    }
+    this._simpanRiwayatPersisten();
 
     this.current = { word, data };
     this.showPinyin = false;
