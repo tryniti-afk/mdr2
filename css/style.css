@@ -138,6 +138,20 @@
 [data-theme="dark"] .quiz-soal-box { color: var(--c-text); }
 [data-theme="dark"] .label-mode    { color: var(--c-biru); }
 [data-theme="dark"] .quiz-streak   { color: #ffa726; }
+[data-theme="dark"] .soal-teks-indo { background: #241a35; color: var(--c-text); }
+[data-theme="dark"] .label-mode      { background: #16202e; color: #64b5f6; }
+[data-theme="dark"] .grammar-info    { background: #241a35; color: var(--c-sub); }
+[data-theme="dark"] .writing-prompt  { background: #241a35; color: var(--c-text); }
+[data-theme="dark"] .shadowing-teks  { background: #2a1e10; }
+[data-theme="dark"] .pinyin-mode-tag.ketat   { background: #2e1b1b; color: #ef9a9a; border-color: #c62828; }
+[data-theme="dark"] .pinyin-mode-tag.longgar { background: #10231f; color: #4db6ac; border-color: #00695c; }
+[data-theme="dark"] .reorder-area, [data-theme="dark"] .reorder-bank { background: #1a1d27; }
+[data-theme="dark"] .reorder-area   { background: #16202e; border-color: var(--c-biru); }
+[data-theme="dark"] .token-placed   { background: #16261a; }
+[data-theme="dark"] #kb-pinyin-cont { background: #1a1d27; border-color: var(--c-border); }
+[data-theme="dark"] .kb-display     { background: #22253a; color: var(--c-text); border-color: var(--c-biru); }
+[data-theme="dark"] .btn-settings   { background: #22253a; color: var(--c-text); border-color: var(--c-border); }
+[data-theme="dark"] .btn-settings:hover { background: #2a2e45; border-color: var(--c-sub); }
 
 [data-theme="dark"] code {
   background: #22253a;
